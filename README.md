@@ -14,7 +14,8 @@ Server**; alerts go to **Telegram**; it runs as a **systemd** service on a VPS.
 ## Status
 
 - ✅ **Phase 1 — Project skeleton, config, secrets & DB schema** (complete)
-- ⬜ Phase 2 — Market data ingestion (next)
+- ✅ **Phase 2 — Market data ingestion** (complete)
+- ⬜ Phase 3 — Indicators & support/resistance detection (next)
 
 ## Layout
 
@@ -24,11 +25,13 @@ bot/
   secrets.py   # loads .env via python-dotenv, fails fast on missing secrets
   db.py        # SQL Server connection + parameterized query helpers
   broker.py    # Alpaca client wrapper (account access; orders arrive Phase 6)
+  data.py      # market-data ingestion: ET-indexed OHLCV bars (RTH-filtered)
 sql/
   schema.sql   # CREATE TABLE statements (idempotent)
 scripts/
   seed_watchlist.py  # seed watchlist with default liquid symbols
   smoke_test.py      # Phase 1 acceptance check
+  show_bars.py       # Phase 2 check — print watchlist bars
 .env.example   # template — copy to .env (gitignored) and fill in
 requirements.txt
 ```

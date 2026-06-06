@@ -61,12 +61,15 @@
 
 **Goal:** reliably fetch intraday OHLCV bars for every watchlist symbol.
 
-- [ ] `data.py`: use `StockHistoricalDataClient` + `StockBarsRequest` to fetch bars at `BAR_TIMEFRAME` (5Min) for a symbol, returning a clean pandas DataFrame (open/high/low/close/volume, time-indexed).
-- [ ] Function to fetch the last N bars for all active watchlist symbols.
-- [ ] Set the data **feed** explicitly (`IEX` for now); add a TODO noting the SIP/volume caveat from summary §10.
-- [ ] Handle empty results, missing symbols, and timezones (work in ET).
+- [x] `data.py`: use `StockHistoricalDataClient` + `StockBarsRequest` to fetch bars at `BAR_TIMEFRAME` (5Min) for a symbol, returning a clean pandas DataFrame (open/high/low/close/volume, time-indexed).
+- [x] Function to fetch the last N bars for all active watchlist symbols (`get_watchlist_bars`, one batched API call).
+- [x] Set the data **feed** explicitly (`IEX` for now); TODO(SIP) noting the SIP/volume caveat from summary §10 is in `data.py`.
+- [x] Handle empty results, missing symbols, and timezones (ET-indexed; missing/empty symbols → empty DataFrame).
+- [x] **Bonus:** `regular_hours_only` filter (default on) drops thin extended-hours IEX bars so only 09:30–16:00 ET bars reach the strategy.
 
 **Done when:** you can call one function and get back current 5-min bar DataFrames for the whole watchlist, printed sanely.
+
+> ✅ **Phase 2 complete (2026-06-06).** `scripts/show_bars.py` returns 50× 5-min RTH bars for all 15 symbols, ET-indexed, full-session volume (last bar = 15:55 ET close). Run: `.venv/bin/python -m scripts.show_bars`.
 
 ---
 
