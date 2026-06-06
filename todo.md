@@ -110,13 +110,15 @@
 
 **Goal:** fuse scores into 0–100 confidence and compute a capped share count.
 
-- [ ] `confidence.py`: weighted blend from summary §5.8 × `regime_multiplier` → 0–100.
-- [ ] `sizing.py`: map confidence → `risk_fraction` via the summary §5.9 table; compute `stop_distance = ATR * ATR_STOP_MULT`; `shares = floor(equity * risk_fraction / stop_distance)`.
-- [ ] **Enforce `MAX_RISK_PCT` (2%) as a hard ceiling** — clamp regardless of formula output.
-- [ ] Compute stop and take-profit prices (`RR_RATIO`).
-- [ ] Respect `MAX_CONCURRENT_POSITIONS` and skip symbols already held.
+- [x] `confidence.py`: weighted blend from summary §5.8 × `regime_multiplier` → 0–100.
+- [x] `sizing.py`: map confidence → `risk_fraction` via the summary §5.9 table; compute `stop_distance = ATR * ATR_STOP_MULT`; `shares = floor(equity * risk_fraction / stop_distance)`. Also caps shares by available buying power.
+- [x] **Enforce `MAX_RISK_PCT` (2%) as a hard ceiling** — clamped regardless of formula output (verified by sweep).
+- [x] Compute stop and take-profit prices (`RR_RATIO`).
+- [x] Respect `MAX_CONCURRENT_POSITIONS` and skip symbols already held (`broker.open_position_symbols()`).
 
 **Done when:** given a symbol + account equity, the bot outputs confidence, share count, stop price, and take-profit price — and you've verified a 95-confidence signal never risks more than 2% of equity.
+
+> ✅ **Phase 5 complete (2026-06-06).** `bot/confidence.py` + `bot/sizing.py`. Check: `.venv/bin/python -m scripts.show_sizing` — confidence math, risk table, and the hard 2% cap all verified (worst-case over full ATR×confidence sweep = exactly 2.0000%; 95-conf → 200 sh / $200 / 2.0% on $10k). NOTE: live Alpaca paper account currently funded at $0 — re-fund/reset to $10k before Phase 6 order placement.
 
 ---
 

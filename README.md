@@ -17,7 +17,8 @@ Server**; alerts go to **Telegram**; it runs as a **systemd** service on a VPS.
 - ✅ **Phase 2 — Market data ingestion** (complete)
 - ✅ **Phase 3 — Indicators & support/resistance detection** (complete)
 - ✅ **Phase 4 — Signal engine** (complete)
-- ⬜ Phase 5 — Confidence scoring & position sizing (next)
+- ✅ **Phase 5 — Confidence scoring & position sizing** (complete)
+- ⬜ Phase 6 — Order execution (bracket orders) on paper (next)
 
 ## Layout
 
@@ -31,6 +32,8 @@ bot/
   indicators.py # EMA, ATR, RSI, ADX(+DI/-DI), MACD, relative volume (Wilder)
   levels.py    # swing-pivot support/resistance, clustered with touch counts
   signals.py   # component scores (breakout/ma/value/momentum) + regime + evaluate()
+  confidence.py # fuse component scores -> 0-100 confidence
+  sizing.py    # confidence -> risk-capped shares + stop/take-profit (2% hard cap)
 sql/
   schema.sql   # CREATE TABLE statements (idempotent)
 scripts/
@@ -39,6 +42,7 @@ scripts/
   show_bars.py       # Phase 2 check — print watchlist bars
   show_indicators.py # Phase 3 check — indicators + S/R + math sanity checks
   show_signals.py    # Phase 4 check — signal engine (synthetic + live)
+  show_sizing.py     # Phase 5 check — confidence + sizing + hard-cap sweep
 .env.example   # template — copy to .env (gitignored) and fill in
 requirements.txt
 ```

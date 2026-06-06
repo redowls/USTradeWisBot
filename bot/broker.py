@@ -45,3 +45,13 @@ def account_summary() -> dict:
         "buying_power": float(acct.buying_power),
         "paper": secrets.ALPACA_PAPER,
     }
+
+
+def get_positions() -> list:
+    """All currently open positions (raw Alpaca position objects)."""
+    return trading_client().get_all_positions()
+
+
+def open_position_symbols() -> set[str]:
+    """Set of symbols currently held — feeds sizing's already-held / concurrency checks."""
+    return {p.symbol.upper() for p in get_positions()}
