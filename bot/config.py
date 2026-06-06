@@ -25,6 +25,10 @@ ATR_PERIOD = 14
 RSI_PERIOD = 14
 ADX_PERIOD = 14
 REL_VOL_LOOKBACK = 20           # bars for the average-volume baseline
+MACD_FAST = 12                  # MACD fast EMA
+MACD_SLOW = 26                  # MACD slow EMA
+MACD_SIGNAL = 9                 # MACD signal-line EMA
+SLOPE_LOOKBACK = 3              # bars back used to gauge EMA slope/separation
 
 # --- Support / resistance ---
 PIVOT_LOOKBACK = 3              # swing-pivot: bars required on each side
@@ -50,6 +54,7 @@ CONFIDENCE_RISK_TABLE = [
     (90, 2.0),   # capped at MAX_RISK_PCT
 ]
 MIN_CONFIDENCE = 60             # minimum confidence to take a trade
+MA_SIGNAL_MIN = 0.6             # ma_score at/above this counts as an MA signal
 
 # --- Signal filters / thresholds ---
 RSI_OVERBOUGHT = 70             # over-extension penalty trigger

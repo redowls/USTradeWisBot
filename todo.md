@@ -93,14 +93,16 @@
 
 **Goal:** produce the component scores for a symbol. Still no orders.
 
-- [ ] `signals.py` → `breakout_score`: candle **close** above a resistance level + `BREAKOUT_BUFFER` + relative volume ≥ `VOL_CONFIRM_MULT` (+ optional touch-count). Returns 0–1 and the level broken.
-- [ ] `ma_score`: short set **8>10>20** stacked, with slope & separation factored in. Returns 0–1.
-- [ ] `value_score` (over-extension): distance from 20-EMA in ATR multiples, RSI overbought, aberrant range. Returns 0–1 (1 = good value).
-- [ ] `momentum_score`: RSI/MACD supportive. Returns 0–1.
-- [ ] `regime_ok`: `ADX ≥ ADX_MIN` and/or long set **21>34>55** stacked. Returns bool + multiplier.
-- [ ] A `evaluate(symbol)` function that returns all component scores + `signal_type` ('BREAKOUT'/'MA'/'BOTH') + the broken level.
+- [x] `signals.py` → `breakout_score`: candle **close** above a resistance level + `BREAKOUT_BUFFER` + relative volume ≥ `VOL_CONFIRM_MULT` (+ touch-count). Returns 0–1 and the level broken.
+- [x] `ma_score`: short set **8>10>20** stacked, with slope & separation factored in. Returns 0–1.
+- [x] `value_score` (over-extension): distance from 20-EMA in ATR multiples, RSI overbought, aberrant range. Returns 0–1 (1 = good value).
+- [x] `momentum_score`: RSI/MACD supportive. Returns 0–1. (MACD added to `indicators.py`.)
+- [x] `regime_ok`: `ADX ≥ ADX_MIN` and/or long set **21>34>55** stacked. Returns bool + multiplier (1.0 both / 0.5 one / 0.0 neither).
+- [x] A `evaluate(symbol)` function that returns all component scores + `signal_type` ('BREAKOUT'/'MA'/'BOTH'/None) + the broken level.
 
 **Done when:** `evaluate()` on a live symbol returns a sensible dict of component scores and correctly flags whether it broke resistance, has MA alignment, or both — verifiable by eye against the chart.
+
+> ✅ **Phase 4 complete (2026-06-06).** `bot/signals.py` + MACD in `indicators.py`. Check: `.venv/bin/python -m scripts.show_signals` — synthetic known-answer scenarios (breakout / MA / downtrend / over-extension) all pass; live watchlist evaluation prints component scores + classification (regime multiplier correctly zeroes out non-trending names like BAC).
 
 ---
 

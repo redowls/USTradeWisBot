@@ -95,6 +95,18 @@ def relative_volume(
     return volume / avg
 
 
+def macd(
+    close: pd.Series,
+    fast: int = config.MACD_FAST,
+    slow: int = config.MACD_SLOW,
+    signal: int = config.MACD_SIGNAL,
+) -> tuple[pd.Series, pd.Series, pd.Series]:
+    """MACD. Returns (macd_line, signal_line, histogram)."""
+    macd_line = ema(close, fast) - ema(close, slow)
+    signal_line = ema(macd_line, signal)
+    return macd_line, signal_line, macd_line - signal_line
+
+
 def compute(df: pd.DataFrame) -> pd.DataFrame:
     """Return df augmented with all indicator columns (full history)."""
     out = df.copy()
@@ -107,6 +119,10 @@ def compute(df: pd.DataFrame) -> pd.DataFrame:
     out["plus_di"] = plus_di
     out["minus_di"] = minus_di
     out["rel_vol"] = relative_volume(df["volume"])
+    macd_line, signal_line, hist = macd(df["close"])
+    out["macd"] = macd_line
+    out["macd_signal"] = signal_line
+    out["macd_hist"] = hist
     return out
 
 
@@ -120,5 +136,6 @@ def snapshot(df: pd.DataFrame) -> dict | None:
         return None
     out = compute(df).iloc[-1]
     keys = ["close", *[f"ema_{p}" for p in (*config.EMA_SHORT, *config.EMA_LONG)],
-            "atr", "rsi", "adx", "plus_di", "minus_di", "rel_vol"]
+            "atr", "rsi", "adx", "plus_di", "minus_di", "rel_vol",
+            "macd", "macd_signal", "macd_hist"]
     return {k: (float(out[k]) if pd.notna(out[k]) else float("nan")) for k in keys}
