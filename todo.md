@@ -24,9 +24,9 @@
 
 **Goal:** a clean repo that loads config/secrets, connects to Alpaca paper, and has the database tables created.
 
-- [ ] Create repo structure:
+- [x] Create repo structure:
   ```
-  trade-bot/
+  USTradeWisBot/
     bot/
       __init__.py
       config.py          # non-secret tunables (see summary §11)
@@ -35,20 +35,25 @@
       broker.py          # Alpaca client wrapper
     sql/
       schema.sql         # CREATE TABLE statements
+    scripts/
+      seed_watchlist.py  # seed the watchlist
+      smoke_test.py      # Phase 1 acceptance check
     .env.example
-    .gitignore           # MUST include .env
+    .gitignore           # includes .env
     requirements.txt
     README.md
   ```
-- [ ] `requirements.txt`: `alpaca-py`, `pyodbc`, `python-dotenv`, `pandas`, `numpy`, `scipy`, `python-telegram-bot` (and optionally `pandas-ta`).
-- [ ] `secrets.py`: `load_dotenv()`, read all keys with `os.getenv()`, raise a clear error if any required one is missing.
-- [ ] `config.py`: all tunables from summary §11 as constants.
-- [ ] `sql/schema.sql`: create `watchlist`, `trades`, `signals`, `daily_summary` (see summary §6). Run it via SSMS or `db.py`.
-- [ ] `db.py`: open a pyodbc connection (`ODBC Driver 18 for SQL Server`); helper functions use **parameterized queries** only.
-- [ ] `broker.py`: instantiate `TradingClient(key, secret, paper=True)`; a `get_account()` call that prints equity & buying power.
-- [ ] Seed `watchlist` with ~10–20 liquid symbols (AAPL, MSFT, NVDA, etc.).
+- [x] `requirements.txt`: `alpaca-py`, `pyodbc`, `python-dotenv`, `pandas`, `numpy`, `scipy`, `python-telegram-bot`.
+- [x] `secrets.py`: `load_dotenv()`, read all keys with `os.getenv()`, raise a clear error if any required one is missing.
+- [x] `config.py`: all tunables from summary §11 as constants.
+- [x] `sql/schema.sql`: create `watchlist`, `trades`, `signals`, `daily_summary` (see summary §6). Applied via `sqlcmd`.
+- [x] `db.py`: open a pyodbc connection (`ODBC Driver 18 for SQL Server`); helper functions use **parameterized queries** only.
+- [x] `broker.py`: instantiate `TradingClient(key, secret, paper=True)`; `account_summary()` prints equity & buying power.
+- [x] Seed `watchlist` with ~10–20 liquid symbols (15 seeded: AAPL, MSFT, NVDA, etc.).
 
 **Done when:** running a smoke-test script prints your Alpaca **paper account equity** and successfully **reads the seeded watchlist back from SQL Server**. `.env` is gitignored.
+
+> ✅ **Phase 1 complete (2026-06-06).** Smoke test green: Alpaca paper equity USD 1,000.00; 15 active watchlist symbols read back from SQL Server (`USTradeWisBot` DB, local SQL Server 2022, `sa` login). `.env` gitignored + `chmod 600`. Built/run on the VPS with a `.venv` (Python 3.12).
 
 ---
 
