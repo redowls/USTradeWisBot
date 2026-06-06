@@ -77,13 +77,15 @@
 
 **Goal:** turn raw bars into the indicators and S/R levels the strategy needs. Pure functions, easy to unit-test.
 
-- [ ] `indicators.py`: functions for **EMA** (both sets 8/10/20 and 21/34/55), **ATR(14)**, **RSI(14)**, **ADX(14)**, and **relative volume**.
-- [ ] `levels.py`: **swing-pivot / fractal** detection (`PIVOT_LOOKBACK` bars each side) → resistance & support pivots.
-- [ ] **Cluster** nearby pivots into a small set of clean levels; track **touch count** per level.
-- [ ] (Optional) stub a volume-profile / POC function for later.
-- [ ] Quick visual/printed sanity check on a few symbols (do the levels look right vs the chart?).
+- [x] `indicators.py`: functions for **EMA** (both sets 8/10/20 and 21/34/55), **ATR(14)**, **RSI(14)**, **ADX(14)** (+ ±DI), and **relative volume**. ATR/RSI/ADX use Wilder smoothing. Hand-rolled pandas/numpy (no extra deps).
+- [x] `levels.py`: **swing-pivot / fractal** detection (`PIVOT_LOOKBACK` bars each side) → resistance & support pivots.
+- [x] **Cluster** nearby pivots into a small set of clean levels (`LEVEL_CLUSTER_PCT`); track **touch count** per level. Plus `nearest_resistance_above()` / `nearest_support_below()` helpers for Phase 4.
+- [ ] (Optional) stub a volume-profile / POC function for later. *(deferred — optional)*
+- [x] Quick visual/printed sanity check on a few symbols + synthetic known-answer math checks (EMA/RSI/ATR/ADX/pivots).
 
 **Done when:** for a sample symbol you can print its current EMAs, ATR, RSI, ADX, relative volume, and a short list of support/resistance levels with touch counts.
+
+> ✅ **Phase 3 complete (2026-06-06).** `bot/indicators.py` + `bot/levels.py`. Check: `.venv/bin/python -m scripts.show_indicators` — synthetic math sanity checks pass and live EMAs/ATR/RSI/ADX/relVol + clustered S/R (with touch counts) print for AAPL/NVDA/TSLA.
 
 ---
 
