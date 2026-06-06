@@ -126,12 +126,14 @@
 
 **Goal:** actually place trades on the **paper** account, each with an attached stop & target.
 
-- [ ] `execution.py`: submit a **bracket order** (`OrderClass.BRACKET` + `TakeProfitRequest` + `StopLossRequest`) for the sized position.
-- [ ] Verify the order appears in Alpaca paper with both child legs (TP + SL).
-- [ ] Handle order rejections, insufficient buying power, and the 200 req/min rate limit (retry/backoff).
-- [ ] Return the broker order id for logging.
+- [x] `execution.py`: submit a **bracket order** (`OrderClass.BRACKET` + `TakeProfitRequest` + `StopLossRequest`) for the sized position. `build_bracket_request()` is pure/testable.
+- [~] Verify the order appears in Alpaca paper with both child legs (TP + SL). *Code + verification path done; final dashboard confirmation pending a funded account + open market.*
+- [x] Handle order rejections, insufficient buying power, and the 200 req/min rate limit (retry/backoff on transient errors only). Verified: $0 account returns a clean `rejected` result (`403 insufficient buying power`), no crash.
+- [x] Return the broker order id for logging.
 
 **Done when:** the bot places a real paper bracket order from a live signal, and you can see the entry + take-profit + stop-loss legs in the Alpaca paper dashboard.
+
+> ✅ **Phase 6 code complete (2026-06-06).** `bot/execution.py` (+ `get_order`/`cancel_order`). Check: `.venv/bin/python -m scripts.place_test_order` — offline construction/skip/retry checks pass; live submit path exercised and rejection handled cleanly. ⏳ **Pending:** fund the paper account (~$10k) and re-run during market hours to see a real bracket order with both legs (it auto-cancels the test order).
 
 ---
 
