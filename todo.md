@@ -221,13 +221,15 @@
 
 **Goal:** prove the strategy on paper before risking real capital. **Do not skip.**
 
-- [ ] Run on paper for **several weeks** of full trading days.
-- [ ] Review `daily_summary` and `signals`: win rate, average P&L %, false-breakout rate, which signal types perform best.
-- [ ] Sanity checks: is the false-breakout rate < ~40%? Is expectancy positive over 50–100+ trades? Are correlated positions concentrating risk?
-- [ ] Tune cautiously (few parameters, watch for overfitting per summary §10); decide on the IEX-vs-SIP data question.
+- [ ] Run on paper for **several weeks** of full trading days. *(ongoing — fund + enable the service, then let it run)*
+- [x] Tooling to review `daily_summary` and `signals`: `bot/analytics.py` + `scripts/report.py` compute win rate, avg P&L %, expectancy, profit factor, performance by signal type, and false-breakout rate.
+- [x] Sanity-check tooling: `incubation_verdict()` flags false-breakout ≥ ~40%, non-positive expectancy, and insufficient sample (<50 trades). *(Correlated-position concentration: review manually / future enhancement.)*
+- [ ] Tune cautiously (few parameters, watch for overfitting per summary §10); decide on the IEX-vs-SIP data question. *(after data accumulates)*
 - [ ] **Only then**, if results justify it: flip `ALPACA_PAPER=false`, fund a small live account, start with reduced size, and watch the paper-vs-live slippage gap closely.
 
 **Done when:** you have weeks of logged paper results you understand and trust — and a deliberate, eyes-open decision about whether/when to go live.
+
+> ✅ **Phase 12 tooling complete (2026-06-06).** `bot/analytics.py` + `scripts/report.py` (`--days N`, `--selftest`). Metric math verified via selftest; live report reads trades/signals/daily_summary and prints the incubation scorecard + verdict. ⏳ **The incubation run itself is ongoing** — fund the paper account (done: $10k), enable the systemd service, and let it trade for several weeks, then run `python -m scripts.report` to evaluate before any go-live decision.
 
 ---
 

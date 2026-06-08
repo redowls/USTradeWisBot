@@ -24,7 +24,11 @@ Server**; alerts go to **Telegram**; it runs as a **systemd** service on a VPS.
 - ✅ **Phase 9 — Telegram alerts** (complete)
 - ✅ **Phase 10 — Scheduler / main loop** (code complete; live session pending account funding)
 - ✅ **Phase 11 — VPS deployment & monitoring** (service installed, left disabled until funded)
-- ⬜ Phase 12 — Paper incubation & validation (next)
+- ✅ **Phase 12 — Paper incubation & validation** (tooling complete; multi-week paper run is ongoing)
+
+**All 13 phases (0–12) built.** Remaining work is operational: fund the paper
+account (done — $10k), enable the systemd service, let it incubate for weeks,
+then review `python -m scripts.report` before any live decision.
 
 ## Layout
 
@@ -44,6 +48,7 @@ bot/
   exits.py     # detect filled exits + P&L; 15:30 entry cutoff; 15:55 EOD flatten
   logbook.py   # persist trades/signals/daily_summary to SQL Server
   notify.py    # Telegram alerts: entry/exit/daily-summary/error/heartbeat
+  analytics.py # incubation metrics: win rate, expectancy, false-breakout rate
   engine.py    # the main loop: market-hours aware, ties all modules together
 main.py        # entrypoint: `python main.py [--dry-run]`
 deploy/        # systemd unit + logrotate + install.sh (see DEPLOY.md)
@@ -61,6 +66,7 @@ scripts/
   check_logging.py   # Phase 8 check — DB lifecycle + daily summary (self-cleaning)
   check_notify.py    # Phase 9 check — send all Telegram alert types
   check_engine.py    # Phase 10 check — dry-run of the full main loop
+  report.py          # Phase 12 — incubation report (--days N, --selftest)
 .env.example   # template — copy to .env (gitignored) and fill in
 requirements.txt
 ```
