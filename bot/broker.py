@@ -55,3 +55,13 @@ def get_positions() -> list:
 def open_position_symbols() -> set[str]:
     """Set of symbols currently held — feeds sizing's already-held / concurrency checks."""
     return {p.symbol.upper() for p in get_positions()}
+
+
+def cancel_all_orders():
+    """Cancel every open order. Returns Alpaca's per-order cancel statuses."""
+    return trading_client().cancel_orders()
+
+
+def close_all_positions(cancel_orders: bool = True):
+    """Liquidate all open positions at market (and optionally cancel open orders first)."""
+    return trading_client().close_all_positions(cancel_orders=cancel_orders)

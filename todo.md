@@ -141,13 +141,15 @@
 
 **Goal:** track exits, record results, and guarantee no overnight holds.
 
-- [ ] `exits.py`: each loop, detect filled exit legs; capture exit price/time and **exit_reason** ('TAKE_PROFIT'/'STOP').
-- [ ] Compute `realized_pl` and `realized_pl_pct`.
-- [ ] **Entry cutoff**: no new entries after `ENTRY_CUTOFF_ET` (15:30).
-- [ ] **Flatten routine** at `FLATTEN_ET` (15:55): cancel open orders, market-sell all open positions, mark `exit_reason = 'EOD_FLATTEN'`.
-- [ ] (Optional later) trailing-stop logic managed here.
+- [x] `exits.py`: `detect_exits()` reads each entry order, finds filled bracket legs, and `build_exit_record()` captures exit price/time + **exit_reason** ('TAKE_PROFIT'/'STOP').
+- [x] Compute `realized_pl` and `realized_pl_pct` (`compute_pl()`).
+- [x] **Entry cutoff**: `entries_allowed()` / `past_entry_cutoff()` — no new entries at/after `ENTRY_CUTOFF_ET` (15:30 ET).
+- [x] **Flatten routine** `flatten_all()` / `maybe_flatten()` at `FLATTEN_ET` (15:55): cancel open orders + market-sell all positions, reason `EOD_FLATTEN`.
+- [ ] (Optional later) trailing-stop logic managed here. *(deferred)*
 
 **Done when:** in a paper session, positions close on target/stop during the day, and any still-open position is force-closed at 15:55 ET with the reason recorded. No position survives to the next day.
+
+> ✅ **Phase 7 code complete (2026-06-06).** `bot/exits.py` + `broker.cancel_all_orders()`/`close_all_positions()`. Check: `.venv/bin/python -m scripts.check_exits` — time rules (15:30/15:55), P&L, reason classification, and exit-record building all verified offline against fake TP/SL/open/unfilled orders. ⏳ **Pending:** a funded paper session during market hours to watch real target/stop exits and the live 15:55 flatten (same funding dependency as Phase 6).
 
 ---
 
