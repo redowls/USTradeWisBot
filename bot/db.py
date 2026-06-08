@@ -67,6 +67,15 @@ def executemany(sql: str, rows: Iterable[Sequence[Any]]) -> int:
         return cur.rowcount
 
 
+def insert_returning_id(sql: str, params: Sequence[Any] | None = None) -> int | None:
+    """Run an INSERT whose statement uses OUTPUT INSERTED.<id>; return that id."""
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(sql, params or [])
+        row = cur.fetchone()
+        return int(row[0]) if row else None
+
+
 def query(sql: str, params: Sequence[Any] | None = None) -> list[dict[str, Any]]:
     """Run a SELECT and return rows as a list of dicts."""
     with get_conn() as conn:

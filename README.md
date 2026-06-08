@@ -20,7 +20,8 @@ Server**; alerts go to **Telegram**; it runs as a **systemd** service on a VPS.
 - ✅ **Phase 5 — Confidence scoring & position sizing** (complete)
 - ✅ **Phase 6 — Order execution (bracket orders) on paper** (code complete; live fill pending account funding)
 - ✅ **Phase 7 — Exit management & end-of-day flatten** (code complete; live session pending account funding)
-- ⬜ Phase 8 — Database logging & daily summary (next)
+- ✅ **Phase 8 — Database logging & daily summary** (complete)
+- ⬜ Phase 9 — Telegram alerts (next)
 
 ## Layout
 
@@ -38,6 +39,7 @@ bot/
   sizing.py    # confidence -> risk-capped shares + stop/take-profit (2% hard cap)
   execution.py # submit bracket orders (market buy + TP + SL) on paper; retries
   exits.py     # detect filled exits + P&L; 15:30 entry cutoff; 15:55 EOD flatten
+  logbook.py   # persist trades/signals/daily_summary to SQL Server
 sql/
   schema.sql   # CREATE TABLE statements (idempotent)
 scripts/
@@ -49,6 +51,7 @@ scripts/
   show_sizing.py     # Phase 5 check — confidence + sizing + hard-cap sweep
   place_test_order.py # Phase 6 check — bracket construction + live submit path
   check_exits.py     # Phase 7 check — time rules, P&L, exit-record building
+  check_logging.py   # Phase 8 check — DB lifecycle + daily summary (self-cleaning)
 .env.example   # template — copy to .env (gitignored) and fill in
 requirements.txt
 ```

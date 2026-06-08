@@ -157,12 +157,14 @@
 
 **Goal:** persist everything to SQL Server, including the daily P&L recap.
 
-- [ ] On entry: insert into `trades` (status OPEN) and `signals` (confidence + all component scores + `signal_type` + broken level).
-- [ ] On exit: update the `trades` row (exit price/time, P&L, P&L %, status CLOSED, exit_reason).
-- [ ] After the close: compute and insert the `daily_summary` row (buys/sells, wins/losses, gross P&L, day P&L %, equity open/close, symbols traded).
-- [ ] Verify in **SSMS** that a full day's trades, their reasons, and the summary row are all present and correct.
+- [x] On entry: `logbook.record_entry()` inserts `trades` (status OPEN) and `signals` (confidence + all component scores + `signal_type` + broken level).
+- [x] On exit: `logbook.record_exit()` / `update_trade_exit()` updates the `trades` row (exit price/time, P&L, P&L %, status CLOSED, exit_reason).
+- [x] After the close: `logbook.write_daily_summary()` computes + upserts the `daily_summary` row (buys/sells, wins/losses, gross P&L, day P&L %, equity open/close, symbols traded).
+- [x] Verified against the live SQL Server (via `scripts/check_logging.py`, which also self-cleans). Inspect anytime in SSMS.
 
 **Done when:** after a paper session, SSMS shows every trade, a matching `signals` row explaining *why* each was taken, and one accurate `daily_summary` row for the day.
+
+> ✅ **Phase 8 complete (2026-06-06).** `bot/logbook.py` (+ `db.insert_returning_id`). Check: `.venv/bin/python -m scripts.check_logging` — simulated AAPL(TP)+NVDA(STOP) trades + signals round-trip through SQL Server; daily_summary aggregates correctly (2 buys/2 sells/1 win/1 loss/$50/0.5%); test rows cleaned up. Fully verified (no Alpaca funding needed).
 
 ---
 
