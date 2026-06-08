@@ -203,15 +203,17 @@
 
 **Goal:** run the bot 24/7 reliably on the VPS.
 
-- [ ] Copy the repo to the VPS; create the `.env` there and `chmod 600 .env`.
-- [ ] Create a **systemd** service: `Restart=on-failure`, `EnvironmentFile=` pointing at `.env`, correct working dir and Python path.
-- [ ] Confirm the VPS **timezone / ET handling** so 15:30 & 15:55 fire correctly.
-- [ ] File logging + log rotation; verify the `bot_log`/heartbeat (if added).
-- [ ] Add uptime monitoring (e.g. alert if no heartbeat / UptimeRobot).
-- [ ] Lock down: SSH keys only, UFW firewall deny inbound (except SSH).
-- [ ] Reboot the VPS and confirm the service restarts automatically.
+- [x] Repo already on the VPS at `/root/USTradeWisBot`; `.env` present and `chmod 600`.
+- [x] Created a **systemd** service (`deploy/ustradewisbot.service`): `Restart=on-failure`, correct WorkingDirectory + venv Python path. Secrets loaded by the app via python-dotenv (no secrets in the unit). Installed via `deploy/install.sh` (currently **disabled** per request).
+- [x] Confirmed **timezone / ET handling**: bot uses `ZoneInfo("America/New_York")` explicitly + Alpaca clock, independent of the system TZ (which is UTC) — 15:30 & 15:55 fire correctly.
+- [x] File logging to `/var/log/ustradewisbot/bot.log` + logrotate (daily, 14 kept, copytruncate); also visible via `journalctl`.
+- [x] Monitoring: `Restart=on-failure`, Telegram error alerts + startup/open/shutdown heartbeats; UptimeRobot option documented in `DEPLOY.md`.
+- [ ] Lock down: SSH keys only, UFW deny inbound (except SSH). *Documented in `DEPLOY.md` with cautions (SSH lockout / remote SSMS on 1433); left for deliberate manual action.*
+- [ ] Reboot the VPS and confirm the service restarts automatically. *Do after enabling (post-funding); steps in `DEPLOY.md`.*
 
 **Done when:** the bot runs as a systemd service, survives a reboot, logs to disk, and sends its market-open heartbeat from the VPS.
+
+> ✅ **Phase 11 code/install complete (2026-06-06).** `deploy/` (service + logrotate + install.sh) + `DEPLOY.md`. Unit installed, passes `systemd-analyze verify`, currently **disabled + inactive** (left so until the paper account is funded). ⏳ **Pending (after funding):** `systemctl enable --now ustradewisbot`, reboot test, optional UFW lockdown.
 
 ---
 

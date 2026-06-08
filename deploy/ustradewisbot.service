@@ -1,0 +1,26 @@
+[Unit]
+Description=USTradeWisBot - intraday US stock trading bot (paper)
+Documentation=https://github.com/redowls/USTradeWisBot
+# Start after network and the local SQL Server are up.
+After=network-online.target mssql-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/USTradeWisBot
+# Secrets are loaded by the app itself from /root/USTradeWisBot/.env via
+# python-dotenv (chmod 600). No secrets are inlined in this unit.
+ExecStart=/root/USTradeWisBot/.venv/bin/python /root/USTradeWisBot/main.py
+Restart=on-failure
+RestartSec=10
+# Let the loop catch SIGTERM and shut down cleanly.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+# File logging (rotated by /etc/logrotate.d/ustradewisbot). Also visible via
+# journalctl since systemd still tracks the unit.
+StandardOutput=append:/var/log/ustradewisbot/bot.log
+StandardError=append:/var/log/ustradewisbot/bot.log
+
+[Install]
+WantedBy=multi-user.target

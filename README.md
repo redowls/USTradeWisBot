@@ -23,7 +23,8 @@ Server**; alerts go to **Telegram**; it runs as a **systemd** service on a VPS.
 - ✅ **Phase 8 — Database logging & daily summary** (complete)
 - ✅ **Phase 9 — Telegram alerts** (complete)
 - ✅ **Phase 10 — Scheduler / main loop** (code complete; live session pending account funding)
-- ⬜ Phase 11 — VPS deployment & monitoring (next)
+- ✅ **Phase 11 — VPS deployment & monitoring** (service installed, left disabled until funded)
+- ⬜ Phase 12 — Paper incubation & validation (next)
 
 ## Layout
 
@@ -45,6 +46,7 @@ bot/
   notify.py    # Telegram alerts: entry/exit/daily-summary/error/heartbeat
   engine.py    # the main loop: market-hours aware, ties all modules together
 main.py        # entrypoint: `python main.py [--dry-run]`
+deploy/        # systemd unit + logrotate + install.sh (see DEPLOY.md)
 sql/
   schema.sql   # CREATE TABLE statements (idempotent)
 scripts/

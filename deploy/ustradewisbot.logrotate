@@ -1,0 +1,11 @@
+# Log rotation for USTradeWisBot. Install to /etc/logrotate.d/ustradewisbot.
+# copytruncate is used because systemd holds the log file open (StandardOutput=append:).
+/var/log/ustradewisbot/bot.log {
+    daily
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+}
