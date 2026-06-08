@@ -22,7 +22,8 @@ Server**; alerts go to **Telegram**; it runs as a **systemd** service on a VPS.
 - ✅ **Phase 7 — Exit management & end-of-day flatten** (code complete; live session pending account funding)
 - ✅ **Phase 8 — Database logging & daily summary** (complete)
 - ✅ **Phase 9 — Telegram alerts** (complete)
-- ⬜ Phase 10 — Scheduler / main loop (next)
+- ✅ **Phase 10 — Scheduler / main loop** (code complete; live session pending account funding)
+- ⬜ Phase 11 — VPS deployment & monitoring (next)
 
 ## Layout
 
@@ -42,6 +43,8 @@ bot/
   exits.py     # detect filled exits + P&L; 15:30 entry cutoff; 15:55 EOD flatten
   logbook.py   # persist trades/signals/daily_summary to SQL Server
   notify.py    # Telegram alerts: entry/exit/daily-summary/error/heartbeat
+  engine.py    # the main loop: market-hours aware, ties all modules together
+main.py        # entrypoint: `python main.py [--dry-run]`
 sql/
   schema.sql   # CREATE TABLE statements (idempotent)
 scripts/
@@ -55,6 +58,7 @@ scripts/
   check_exits.py     # Phase 7 check — time rules, P&L, exit-record building
   check_logging.py   # Phase 8 check — DB lifecycle + daily summary (self-cleaning)
   check_notify.py    # Phase 9 check — send all Telegram alert types
+  check_engine.py    # Phase 10 check — dry-run of the full main loop
 .env.example   # template — copy to .env (gitignored) and fill in
 requirements.txt
 ```
@@ -85,6 +89,17 @@ sqlcmd -S localhost,1433 -U sa -P '***' -C -d USTradeWisBot -i sql/schema.sql
 
 A green smoke test prints the Alpaca **paper** account equity and reads the
 seeded watchlist back from SQL Server.
+
+## Run
+
+```bash
+.venv/bin/python main.py            # live (paper) trading loop, market-hours aware
+.venv/bin/python main.py --dry-run  # evaluate & size each tick, place no orders
+```
+
+The loop only trades while the US market is open, stops new entries at 15:30 ET,
+flattens everything at 15:55 ET, logs to SQL Server, and sends Telegram alerts.
+(Phase 11 wraps this in a systemd service.)
 
 ## Guardrails (non-negotiable — see summary §2)
 

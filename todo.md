@@ -186,14 +186,16 @@
 
 **Goal:** tie all modules into one continuously-running process.
 
-- [ ] `main.py`: loop that runs every `POLL_INTERVAL_SEC` during **regular trading hours** only.
-- [ ] Use Alpaca's clock/calendar (or an ET market-hours check) to know when the market is open; sleep otherwise.
-- [ ] Each tick: ingest data → evaluate watchlist → score & size → execute new entries (before cutoff) → manage exits → log → alert.
-- [ ] Enforce entry cutoff (15:30) and flatten (15:55) inside the loop.
-- [ ] Send a heartbeat at startup and at market open; graceful shutdown handling.
-- [ ] Robust try/except around each tick so one symbol's error doesn't kill the loop.
+- [x] `main.py` (entrypoint) + `bot/engine.py` (`Engine`): loop runs every `POLL_INTERVAL_SEC` during **regular trading hours** only.
+- [x] Uses Alpaca's clock (`broker.get_clock()`) to know when the market is open; sleeps until next open otherwise.
+- [x] Each tick: manage exits → (before cutoff) ingest → evaluate → score & size → execute new entries → log → alert.
+- [x] Enforces entry cutoff (15:30, `consider_entries`) and flatten (15:55, `eod_flatten`) inside the loop; daily summary written once after close.
+- [x] Heartbeats at startup and at market open; SIGINT/SIGTERM graceful shutdown (interruptible sleep).
+- [x] try/except around each tick (error alert sent) so one symbol's error can't kill the loop.
 
 **Done when:** `python main.py` runs a full simulated trading day end-to-end on paper unattended — entering, managing, exiting, flattening, logging, and alerting — without manual intervention.
+
+> ✅ **Phase 10 code complete (2026-06-06).** `bot/engine.py` + root `main.py` (`--dry-run` flag). Check: `.venv/bin/python -m scripts.check_engine` — dry-run proves the full ingest→evaluate→score→size chain, entry-cutoff gating, exit management, and flatten path (NFLX surfaced as the would-trade candidate at conf 63.9). ⏳ **Pending:** funded account + open market for a real unattended session (same dependency as Phase 6/7).
 
 ---
 

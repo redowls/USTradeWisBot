@@ -57,6 +57,16 @@ def open_position_symbols() -> set[str]:
     return {p.symbol.upper() for p in get_positions()}
 
 
+def get_clock():
+    """Alpaca market clock (is_open, next_open, next_close, timestamp)."""
+    return trading_client().get_clock()
+
+
+def is_market_open() -> bool:
+    """True when US equities regular session is currently open."""
+    return bool(get_clock().is_open)
+
+
 def cancel_all_orders():
     """Cancel every open order. Returns Alpaca's per-order cancel statuses."""
     return trading_client().cancel_orders()
