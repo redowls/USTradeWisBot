@@ -21,7 +21,8 @@ Server**; alerts go to **Telegram**; it runs as a **systemd** service on a VPS.
 - ✅ **Phase 6 — Order execution (bracket orders) on paper** (code complete; live fill pending account funding)
 - ✅ **Phase 7 — Exit management & end-of-day flatten** (code complete; live session pending account funding)
 - ✅ **Phase 8 — Database logging & daily summary** (complete)
-- ⬜ Phase 9 — Telegram alerts (next)
+- ✅ **Phase 9 — Telegram alerts** (complete)
+- ⬜ Phase 10 — Scheduler / main loop (next)
 
 ## Layout
 
@@ -40,6 +41,7 @@ bot/
   execution.py # submit bracket orders (market buy + TP + SL) on paper; retries
   exits.py     # detect filled exits + P&L; 15:30 entry cutoff; 15:55 EOD flatten
   logbook.py   # persist trades/signals/daily_summary to SQL Server
+  notify.py    # Telegram alerts: entry/exit/daily-summary/error/heartbeat
 sql/
   schema.sql   # CREATE TABLE statements (idempotent)
 scripts/
@@ -52,6 +54,7 @@ scripts/
   place_test_order.py # Phase 6 check — bracket construction + live submit path
   check_exits.py     # Phase 7 check — time rules, P&L, exit-record building
   check_logging.py   # Phase 8 check — DB lifecycle + daily summary (self-cleaning)
+  check_notify.py    # Phase 9 check — send all Telegram alert types
 .env.example   # template — copy to .env (gitignored) and fill in
 requirements.txt
 ```

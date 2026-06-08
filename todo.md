@@ -172,11 +172,13 @@
 
 **Goal:** real-time notifications.
 
-- [ ] `notify.py`: send entry, exit, daily-summary, error, and heartbeat messages (content per summary §8).
-- [ ] Wire alerts into execution (entry), exits (exit), end-of-day (summary), and a global exception handler (error).
-- [ ] Format messages cleanly (symbol, prices, confidence, P&L).
+- [x] `notify.py`: send entry, exit, daily-summary, error, and heartbeat messages (content per summary §8). Best-effort (never raises); no-op if Telegram unconfigured.
+- [~] Wire alerts into execution (entry), exits (exit), end-of-day (summary), and a global exception handler (error). *Functions ready; wired into the main loop in Phase 10.*
+- [x] Format messages cleanly (symbol, prices, confidence, P&L) with HTML + emojis.
 
 **Done when:** a paper trade triggers an entry alert and later an exit alert on your phone, and you receive a daily summary message after the close.
+
+> ✅ **Phase 9 complete (2026-06-06).** `bot/notify.py` (stdlib HTTPS POST to the Bot API). Check: `.venv/bin/python -m scripts.check_notify` — all five alert types (heartbeat/entry/exit/daily-summary/error) sent live to chat 7739672535 and received on phone. Wiring into the live loop happens in Phase 10.
 
 ---
 
