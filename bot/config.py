@@ -40,8 +40,15 @@ VOL_CONFIRM_MULT = 1.3          # relative-volume threshold for a valid breakout
 MIN_LEVEL_TOUCHES = 2           # optional: prior touches before a level "counts"
 
 # --- Risk / sizing ---
-ATR_STOP_MULT = 1.0             # stop distance = ATR * this (intraday ~0.6-1.0)
-RR_RATIO = 2.0                  # take-profit = stop distance * this
+ATR_STOP_MULT = 1.8             # stop distance = ATR * this; widened from 1.0 —
+                                # 1x ATR(14) on 5-min bars (~0.13-0.27% of price)
+                                # sat inside intraday noise/spread and was being
+                                # tagged before trades could develop (see analysis
+                                # 2026-06-09: 18 STOP vs 4 TP, 22.7% win rate).
+MIN_STOP_PCT = 0.5             # floor: stop is at least this % of entry price, so
+                                # low-ATR names never get a sub-0.3% noise-tight stop.
+RR_RATIO = 1.5                  # take-profit = stop distance * this; lowered from 2.0
+                                # so the TP stays reachable now that stops are wider.
 MAX_RISK_PCT = 2.0              # HARD CAP on per-trade risk (% of equity)
 MAX_CONCURRENT_POSITIONS = 3    # exposure limit
 
@@ -55,6 +62,13 @@ CONFIDENCE_RISK_TABLE = [
 ]
 MIN_CONFIDENCE = 60             # minimum confidence to take a trade
 MA_SIGNAL_MIN = 0.6             # ma_score at/above this counts as an MA signal
+VALUE_VETO_FLOOR = 0.25         # veto breakout/BOTH entries when value_score (the
+                                # over-extension check) is below this — don't chase a
+                                # breakout that has already run too far above EMA20.
+                                # Added 2026-06-09 after BOTH went 0/5: JPM/XOM/ABNB
+                                # were flagged badly-extended (value 0.20/0.00/0.24)
+                                # yet still cleared confidence because value is only
+                                # 20% of the blend and could never veto.
 
 # --- Signal filters / thresholds ---
 RSI_OVERBOUGHT = 70             # over-extension penalty trigger

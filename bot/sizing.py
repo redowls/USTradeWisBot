@@ -93,7 +93,11 @@ def plan_position(
 
     # --- Sizing ---
     risk_pct = risk_fraction_for_confidence(confidence)   # already <= MAX_RISK_PCT
-    stop_distance = atr * config.ATR_STOP_MULT
+    # Stop distance = ATR-based, but floored at MIN_STOP_PCT of price so low-ATR
+    # names don't get a sub-0.3% stop that lives inside intraday noise/spread.
+    atr_distance = atr * config.ATR_STOP_MULT
+    min_distance = entry_price * (config.MIN_STOP_PCT / 100.0)
+    stop_distance = max(atr_distance, min_distance)
     dollar_risk_budget = equity * (risk_pct / 100.0)
     shares = math.floor(dollar_risk_budget / stop_distance)
 

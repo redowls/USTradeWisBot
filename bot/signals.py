@@ -169,9 +169,17 @@ def regime(comp: pd.DataFrame) -> tuple[bool, float]:
 
 # --- Top-level evaluation ---------------------------------------------------
 
-def _classify(bo_score: float, ma: float) -> str | None:
+def _classify(bo_score: float, ma: float, value: float) -> str | None:
     has_breakout = bo_score > 0.0
     has_ma = ma >= config.MA_SIGNAL_MIN
+    # Over-extension veto: a breakout that has already run too far above EMA20
+    # (low value_score) is buying the spike top. Skip the entry entirely rather
+    # than fall back to an MA entry on the same extended bar — buying extended is
+    # the problem regardless of the MA component. Pure-MA signals (no breakout)
+    # are left untouched. summary.md §5.6; analysis 2026-06-09 (BOTH went 0/5:
+    # JPM/XOM/ABNB were badly extended yet still traded).
+    if has_breakout and value < config.VALUE_VETO_FLOOR:
+        return None
     if has_breakout and has_ma:
         return "BOTH"
     if has_breakout:
@@ -219,7 +227,7 @@ def evaluate(symbol: str, df: pd.DataFrame | None = None, n_bars: int = 120) -> 
         "momentum_score": round(mom, 4),
         "regime_ok": regime_ok,
         "regime_multiplier": regime_mult,
-        "signal_type": _classify(bo_score, ma),
+        "signal_type": _classify(bo_score, ma, value),
         "broke_level": round(broke_level, 4) if broke_level is not None else None,
         "close": round(_safe(df["close"].iloc[-1]), 4),
         "atr": round(_safe(comp["atr"].iloc[-1]), 4),
