@@ -40,15 +40,19 @@ VOL_CONFIRM_MULT = 1.3          # relative-volume threshold for a valid breakout
 MIN_LEVEL_TOUCHES = 2           # optional: prior touches before a level "counts"
 
 # --- Risk / sizing ---
-ATR_STOP_MULT = 1.8             # stop distance = ATR * this; widened from 1.0 —
-                                # 1x ATR(14) on 5-min bars (~0.13-0.27% of price)
-                                # sat inside intraday noise/spread and was being
-                                # tagged before trades could develop (see analysis
-                                # 2026-06-09: 18 STOP vs 4 TP, 22.7% win rate).
-MIN_STOP_PCT = 0.5             # floor: stop is at least this % of entry price, so
-                                # low-ATR names never get a sub-0.3% noise-tight stop.
-RR_RATIO = 1.5                  # take-profit = stop distance * this; lowered from 2.0
-                                # so the TP stays reachable now that stops are wider.
+ATR_STOP_MULT = 3.0             # stop distance = ATR * this; widened from 1.8 —
+                                # 2026-06-10 session: 7 of 8 trades stopped at only
+                                # -0.44%..-0.77% from entry (stops still inside 5-min
+                                # noise), tripping the daily-loss halt by 11:00 ET.
+                                # Wider stop + risk-based sizing keeps $ risk constant
+                                # (fewer shares), but lets trades breathe until the
+                                # 15:55 EOD flatten instead of dying in minutes.
+MIN_STOP_PCT = 1.5              # floor: stop is at least this % of entry price
+                                # (raised from 0.5 — sub-1% stops were what kept
+                                # getting tagged on 06-10).
+RR_RATIO = 1.5                  # take-profit = stop distance * this; with the wider
+                                # stop the TP now sits >= ~2.25% above entry, so
+                                # winners run longer instead of capping out in minutes.
 MAX_RISK_PCT = 2.0              # HARD CAP on per-trade risk (% of equity)
 MAX_CONCURRENT_POSITIONS = 3    # exposure limit
 
