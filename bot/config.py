@@ -52,6 +52,19 @@ RR_RATIO = 1.5                  # take-profit = stop distance * this; lowered fr
 MAX_RISK_PCT = 2.0              # HARD CAP on per-trade risk (% of equity)
 MAX_CONCURRENT_POSITIONS = 3    # exposure limit
 
+# --- Daily-loss circuit breaker (#1) ---
+DAILY_LOSS_HALT_PCT = 3.0       # halt ALL new entries once the day's realized loss
+                                # reaches this % of session-open equity. Added after
+                                # 2026-06-09 (-9.4% over 17 trades): stop the bleed
+                                # early instead of trading the whole day down. Exits
+                                # on already-open positions are unaffected.
+
+# --- Re-entry throttle (#2) ---
+REENTRY_COOLDOWN_MIN = 30          # after a symbol's trade closes, wait this many
+                                   # minutes before re-entering it. Kills the same-name
+                                   # chasing seen 06-09 (AMD 3x, UNH 4x — all stopped).
+MAX_ENTRIES_PER_SYMBOL_PER_DAY = 2 # hard cap on entries per symbol per session.
+
 # Confidence -> risk fraction (% of equity). summary.md §5.9.
 # Each entry: (min_confidence_inclusive, risk_pct). Sorted ascending.
 CONFIDENCE_RISK_TABLE = [

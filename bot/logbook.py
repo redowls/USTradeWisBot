@@ -201,3 +201,36 @@ def get_open_trades() -> list[dict]:
 
 def get_daily_summary(trade_date: date) -> dict | None:
     return db.query_one("SELECT * FROM daily_summary WHERE trade_date = ?", [trade_date])
+
+
+# --- Risk-gate inputs (circuit breaker / re-entry throttle) -----------------
+
+def get_today_realized_pl(trade_date: date) -> float:
+    """Sum of realized P&L for trades that CLOSED on trade_date (0.0 if none)."""
+    row = db.query_one(
+        "SELECT COALESCE(SUM(realized_pl), 0) AS pl "
+        "FROM trades WHERE CAST(exit_time AS DATE) = ?",
+        [trade_date],
+    )
+    return float(row["pl"]) if row and row["pl"] is not None else 0.0
+
+
+def get_symbol_activity_today(trade_date: date) -> dict[str, dict]:
+    """Per-symbol activity for the re-entry throttle.
+
+    Returns {symbol: {"entries": int, "last_exit": datetime|None}} for every
+    symbol entered on trade_date. ``last_exit`` is the most recent exit_time
+    (naive ET, as stored) or None while a trade is still open.
+    """
+    rows = db.query(
+        """
+        SELECT symbol, COUNT(*) AS entries, MAX(exit_time) AS last_exit
+        FROM trades WHERE CAST(entry_time AS DATE) = ?
+        GROUP BY symbol
+        """,
+        [trade_date],
+    )
+    return {
+        r["symbol"]: {"entries": int(r["entries"]), "last_exit": r["last_exit"]}
+        for r in rows
+    }

@@ -32,6 +32,7 @@ class Engine:
         self.equity_open: float | None = None
         self.flattened_on: date | None = None
         self.summarized_on: date | None = None
+        self.halted_on: date | None = None
 
     # --- logging ---
     def _log(self, msg: str) -> None:
@@ -64,8 +65,29 @@ class Engine:
 
         acct = broker.account_summary()
         equity, buying_power = acct["equity"], acct["buying_power"]
+        today = now.date()
+
+        # --- #1 Daily-loss circuit breaker: halt new entries once the day's
+        # realized loss reaches DAILY_LOSS_HALT_PCT of session-open equity. ---
+        baseline = self.equity_open or equity
+        realized = logbook.get_today_realized_pl(today)
+        halt_at = -abs(baseline * config.DAILY_LOSS_HALT_PCT / 100.0)
+        if baseline > 0 and realized <= halt_at:
+            if self.halted_on != today:
+                self.halted_on = today
+                msg = (f"Daily-loss halt: realized ${realized:,.2f} "
+                       f"({realized / baseline * 100:+.2f}%) hit the "
+                       f"-{config.DAILY_LOSS_HALT_PCT:.1f}% limit — no new entries today.")
+                self._log(msg)
+                notify.error_alert(msg)
+            return actions
+
         held = broker.open_position_symbols()
         open_count = len(held)
+
+        # --- #2 Re-entry throttle inputs: per-symbol entry count + last exit. ---
+        activity = logbook.get_symbol_activity_today(today)
+        now_naive = now.astimezone(config.MARKET_TZ).replace(tzinfo=None)
 
         scored = sorted(
             ((confidence.score(ev), ev) for ev in signals.evaluate_watchlist()),
@@ -76,6 +98,21 @@ class Engine:
                 break
             if conf < config.MIN_CONFIDENCE or not ev.get("signal_type"):
                 continue
+            # Re-entry throttle: daily per-symbol cap + cooldown after last exit.
+            act = activity.get(ev["symbol"])
+            if act:
+                if act["entries"] >= config.MAX_ENTRIES_PER_SYMBOL_PER_DAY:
+                    actions.append({"symbol": ev["symbol"], "confidence": conf,
+                                    "action": "skip", "detail": "max_entries_per_symbol"})
+                    continue
+                last_exit = act["last_exit"]
+                if last_exit is not None:
+                    mins_since = (now_naive - last_exit).total_seconds() / 60.0
+                    if mins_since < config.REENTRY_COOLDOWN_MIN:
+                        wait = int(config.REENTRY_COOLDOWN_MIN - mins_since)
+                        actions.append({"symbol": ev["symbol"], "confidence": conf,
+                                        "action": "skip", "detail": f"cooldown_{wait}m"})
+                        continue
             plan = sizing.plan_position(
                 ev["symbol"], conf, ev["close"] or 0.0, ev["atr"] or 0.0,
                 equity, buying_power, held_symbols=held, open_positions_count=open_count,
@@ -188,6 +225,7 @@ class Engine:
                         self.equity_open = broker.account_summary()["equity"]
                         self.summarized_on = None
                         self.flattened_on = None
+                        self.halted_on = None
                         notify.heartbeat(f"Market open — equity ${self.equity_open:,.2f}")
                         self._log("market open")
                     self.tick()
