@@ -57,7 +57,11 @@ MAX_RISK_PCT = 2.0              # HARD CAP on per-trade risk (% of equity)
 MAX_CONCURRENT_POSITIONS = 3    # exposure limit
 
 # --- Daily-loss circuit breaker (#1) ---
-DAILY_LOSS_HALT_PCT = 3.0       # halt ALL new entries once the day's realized loss
+DAILY_LOSS_HALT_PCT = 8.0       # was 3.0; raised 2026-06-10 to un-halt after the
+                                # morning's tight-stop losses, then confirmed by the
+                                # user on 2026-06-11 as the PERMANENT setting (do not
+                                # lower without explicit user approval).
+                                # halt ALL new entries once the day's realized loss
                                 # reaches this % of session-open equity. Added after
                                 # 2026-06-09 (-9.4% over 17 trades): stop the bleed
                                 # early instead of trading the whole day down. Exits
