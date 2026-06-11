@@ -221,15 +221,46 @@
 
 **Goal:** prove the strategy on paper before risking real capital. **Do not skip.**
 
-- [ ] Run on paper for **several weeks** of full trading days. *(ongoing — fund + enable the service, then let it run)*
+- [~] Run on paper for **several weeks** of full trading days. *(IN PROGRESS — live on paper since 2026-06-08; only 3 sessions so far, weeks still needed.)*
 - [x] Tooling to review `daily_summary` and `signals`: `bot/analytics.py` + `scripts/report.py` compute win rate, avg P&L %, expectancy, profit factor, performance by signal type, and false-breakout rate.
 - [x] Sanity-check tooling: `incubation_verdict()` flags false-breakout ≥ ~40%, non-positive expectancy, and insufficient sample (<50 trades). *(Correlated-position concentration: review manually / future enhancement.)*
-- [ ] Tune cautiously (few parameters, watch for overfitting per summary §10); decide on the IEX-vs-SIP data question. *(after data accumulates)*
-- [ ] **Only then**, if results justify it: flip `ALPACA_PAPER=false`, fund a small live account, start with reduced size, and watch the paper-vs-live slippage gap closely.
+- [~] Tune cautiously (few parameters, watch for overfitting per summary §10); decide on the IEX-vs-SIP data question. *(IN PROGRESS — 3 risk-tuning iterations so far, see below. IEX-vs-SIP not yet decided.)*
+- [ ] **Only then**, if results justify it: flip `ALPACA_PAPER=false`, fund a small live account, start with reduced size, and watch the paper-vs-live slippage gap closely. *(NOT MET — results are negative; nowhere near a go-live decision.)*
 
 **Done when:** you have weeks of logged paper results you understand and trust — and a deliberate, eyes-open decision about whether/when to go live.
 
-> ✅ **Phase 12 tooling complete (2026-06-06).** `bot/analytics.py` + `scripts/report.py` (`--days N`, `--selftest`). Metric math verified via selftest; live report reads trades/signals/daily_summary and prints the incubation scorecard + verdict. ⏳ **The incubation run itself is ongoing** — fund the paper account (done: $10k), enable the systemd service, and let it trade for several weeks, then run `python -m scripts.report` to evaluate before any go-live decision.
+> ### 📍 CURRENT STAGE (2026-06-11): Phase 12 — paper incubation, IN PROGRESS
+>
+> All code (Phases 0–11) is built, deployed, and live. The bot runs 24/7 as the
+> `ustradewisbot` systemd service (enabled + active), paper account funded ($10k),
+> watchlist = 31 symbols, Telegram alerts working.
+>
+> **Incubation results so far are poor — this is why we paper-trade first:**
+>
+> | Session | Trades | W/L | Day P&L |
+> |---|---|---|---|
+> | 2026-06-08 | 22 | 5/17 | −4.15% |
+> | 2026-06-09 | 17 | 2/15 | −9.37% |
+> | 2026-06-10 | 12 | 3/9 | −3.87% |
+> | **Total (51 closed)** | **51** | **10/41** | **−$1,634 (≈ −16%)** |
+>
+> Win rate **19.6%**, expectancy **−$32/trade**, **false-breakout rate 90.5%**
+> (the breakout edge is not working on IEX intraday data as-is). Verdict from
+> `scripts/report.py`: **NEEDS WORK**.
+>
+> **Tuning iterations applied (committed):**
+> - `acf9c75` — wider stops + over-extension veto after the first paper day.
+> - `da0493e` — daily-loss circuit breaker + per-symbol re-entry throttle.
+> - `bcfdf0e` — widened stops (3×ATR, 1.5% floor) so trades survive intraday noise.
+>
+> **⚠️ Open item:** `config.py` `DAILY_LOSS_HALT_PCT` is temporarily set to **8.0**
+> (normal 3.0) for the 2026-06-10 session only — the inline comment says revert to
+> 3.0 after that close (now past). Uncommitted; needs reverting.
+>
+> **Next:** keep incubating, diagnose the 90.5% false-breakout rate (the core
+> problem — likely the breakout/volume filters on thin IEX data; revisit
+> SIP vs IEX and entry confirmation), and do NOT consider live money until
+> expectancy is positive over a much larger, longer sample.
 
 ---
 
