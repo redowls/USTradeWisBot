@@ -365,3 +365,25 @@ Encode these into expectations, not just code:
 ---
 
 *End of summary. Build order and acceptance criteria are in `todo.md`.*
+
+---
+
+## Improvement Log
+
+### 2026-06-11 · PHASE-001 — test suite + trade-replay harness
+- **Problem:** repo had no tests and no backtest capability; today's winners
+  (WMT/AAPL MFE +1.05%/+1.17% @13:30) faded into the 15:55 flatten with no
+  profit protection, but one 3-trade day (−$8.50) can't justify retuning exits.
+- **Root cause:** no validation infrastructure → strategy changes were being
+  made on intuition; exit ladder has nothing between fixed bracket and flatten.
+- **Changes:** new `bot/replay.py` (pure bar-walk simulator: bracket +
+  breakeven-at-NR what-ifs, stop-first conservative), `scripts/replay.py`
+  (fidelity baseline + what-if CLI), `tests/` with 22 pytest tests covering
+  exits time gates, P&L math, sizing risk caps, replay core (incl. recorded
+  WMT fade scenario). No runtime module touched.
+- **Validation:** 22/22 tests pass · smoke_test ALL GREEN · imports OK ·
+  replay fidelity baseline within $574 cumulative of recorded P&L (52 trades).
+- **Expected impact:** none tonight; harness shows breakeven@+0.5R would have
+  recovered +$563 sim-to-sim over 52 trades → seeds PHASE-002.
+- **Files:** bot/replay.py · scripts/replay.py · tests/* · phases/PHASE-001.md
+- **Commit:** (see git log — PHASE-001)

@@ -253,9 +253,8 @@
 > - `da0493e` — daily-loss circuit breaker + per-symbol re-entry throttle.
 > - `bcfdf0e` — widened stops (3×ATR, 1.5% floor) so trades survive intraday noise.
 >
-> **⚠️ Open item:** `config.py` `DAILY_LOSS_HALT_PCT` is temporarily set to **8.0**
-> (normal 3.0) for the 2026-06-10 session only — the inline comment says revert to
-> 3.0 after that close (now past). Uncommitted; needs reverting.
+> **Resolved 2026-06-11:** `DAILY_LOSS_HALT_PCT` stays at **8.0** permanently
+> (user decision, commit `b46f185`). Do not raise or lower it.
 >
 > **Next:** keep incubating, diagnose the 90.5% false-breakout rate (the core
 > problem — likely the breakout/volume filters on thin IEX data; revisit
@@ -273,3 +272,30 @@
 ```
 
 *Each phase builds on the last. Resist the urge to jump ahead to live trading — the guardrails are what keep the account alive.*
+
+---
+
+## Improvement backlog (auto-discovered)
+
+Ordered by expected impact; each item needs replay validation before code.
+
+1. **Breakeven stop at +0.5R** — `scripts/replay.py` (PHASE-001 harness):
+   sim-to-sim +$563 over 52 trades (−$848 vs −$1,411 baseline); 27/52 trades
+   reached +0.5R, 7 losers saw +1R before stopping. Implement as stop-leg
+   replace in the engine loop (beware Alpaca's rotating order id on replace).
+2. **Entry-near-day-high veto / pullback confirmation** — COST 06-11 entered
+   985.93 at 09:47 near the session high, MFE −0.17% (never positive).
+   Quantify across history with the replay harness first.
+3. **Open-cycle entries on stale bars** — signals at 09:30:12 are computed
+   entirely on the prior day's bars (first 5-min bar incomplete). Entries
+   before 09:35 ET: 7 trades, −$289.79. Consider requiring ≥1 completed
+   intraday bar.
+4. **Slot monopolization** — wide stops + RR 1.5 targets mean positions can
+   sit all day (3/3 slots held 09:57→15:55 on 06-11); a time-stop or stale-
+   position recycle would free capacity. Needs more sessions of data.
+
+## Completed phases
+
+- **2026-06-11 · PHASE-001** — pytest suite (22 tests: exits gates, P&L,
+  sizing caps, replay core) + trade-replay/what-if harness
+  (`bot/replay.py`, `scripts/replay.py`). Tooling only; no strategy change.
