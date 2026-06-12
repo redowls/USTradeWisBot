@@ -73,6 +73,25 @@ REENTRY_COOLDOWN_MIN = 30          # after a symbol's trade closes, wait this ma
                                    # chasing seen 06-09 (AMD 3x, UNH 4x — all stopped).
 MAX_ENTRIES_PER_SYMBOL_PER_DAY = 2 # hard cap on entries per symbol per session.
 
+# --- Underlying-equivalence guard (#3, PHASE-002) ---
+# Share classes of one company are ONE underlying: holding or recently trading
+# any member blocks entries in every other member (held-skip, cooldown and the
+# daily entry cap all apply across the group). Added 2026-06-12: GOOG hit TP at
+# 11:24 and the bot bought GOOGL 39s later at the top (-$128.79); on 06-10 it
+# held GOOG and GOOGL simultaneously (hidden 2x single-name exposure).
+EQUIVALENT_UNDERLYINGS: list[set[str]] = [
+    {"GOOG", "GOOGL"},
+]
+
+
+def equivalent_symbols(symbol: str) -> set[str]:
+    """All symbols sharing ``symbol``'s underlying (always includes itself)."""
+    for group in EQUIVALENT_UNDERLYINGS:
+        if symbol in group:
+            return set(group)
+    return {symbol}
+
+
 # Confidence -> risk fraction (% of equity). summary.md §5.9.
 # Each entry: (min_confidence_inclusive, risk_pct). Sorted ascending.
 CONFIDENCE_RISK_TABLE = [

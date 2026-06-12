@@ -293,9 +293,22 @@ Ordered by expected impact; each item needs replay validation before code.
 4. **Slot monopolization** — wide stops + RR 1.5 targets mean positions can
    sit all day (3/3 slots held 09:57→15:55 on 06-11); a time-stop or stale-
    position recycle would free capacity. Needs more sessions of data.
+5. **Take-profit exit slippage** — realized fills on TAKE_PROFIT exits average
+   $28.20/trade worse than the recorded trigger price (−$253.80 across 9 TPs;
+   GOOG 06-12: trigger 364.60 vs implied fill ~361.77). Investigate whether TP
+   is a resting limit leg or a polled market exit; if polled, hold the limit
+   at the broker. Also: STOP/TP `exit_price` vs `realized_pl` disagree in the
+   DB while EOD_FLATTEN matches exactly — record actual fill price.
+6. **Correlated-pair exposure (SPY/QQQ etc.)** — PHASE-002 covers identical
+   underlyings only; watchlist also carries highly correlated pairs. Needs
+   data before acting.
 
 ## Completed phases
 
 - **2026-06-11 · PHASE-001** — pytest suite (22 tests: exits gates, P&L,
   sizing caps, replay core) + trade-replay/what-if harness
   (`bot/replay.py`, `scripts/replay.py`). Tooling only; no strategy change.
+- **2026-06-12 · PHASE-002** — underlying-equivalence guard: GOOG/GOOGL now
+  count as one stock for held-skip, re-entry cooldown and daily entry cap
+  (`config.EQUIVALENT_UNDERLYINGS`, engine gate, 6 regression tests). Fixes
+  the 06-12 GOOGL top-tick re-entry (−$128.79) and 06-10 dual-class exposure.

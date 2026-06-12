@@ -98,16 +98,27 @@ class Engine:
                 break
             if conf < config.MIN_CONFIDENCE or not ev.get("signal_type"):
                 continue
-            # Re-entry throttle: daily per-symbol cap + cooldown after last exit.
-            act = activity.get(ev["symbol"])
-            if act:
-                if act["entries"] >= config.MAX_ENTRIES_PER_SYMBOL_PER_DAY:
+            # Underlying-equivalence guard (#3): share classes count as one
+            # stock for the held-skip, the daily cap and the cooldown.
+            equiv = config.equivalent_symbols(ev["symbol"])
+            held_equiv = equiv & held
+            if held_equiv:
+                actions.append({"symbol": ev["symbol"], "confidence": conf,
+                                "action": "skip",
+                                "detail": f"underlying_held_{sorted(held_equiv)[0]}"})
+                continue
+            # Re-entry throttle: daily per-symbol cap + cooldown after last
+            # exit, aggregated across the equivalence group.
+            acts = [activity[s] for s in equiv if s in activity]
+            if acts:
+                entries = sum(a["entries"] for a in acts)
+                if entries >= config.MAX_ENTRIES_PER_SYMBOL_PER_DAY:
                     actions.append({"symbol": ev["symbol"], "confidence": conf,
                                     "action": "skip", "detail": "max_entries_per_symbol"})
                     continue
-                last_exit = act["last_exit"]
-                if last_exit is not None:
-                    mins_since = (now_naive - last_exit).total_seconds() / 60.0
+                exits_seen = [a["last_exit"] for a in acts if a["last_exit"] is not None]
+                if exits_seen:
+                    mins_since = (now_naive - max(exits_seen)).total_seconds() / 60.0
                     if mins_since < config.REENTRY_COOLDOWN_MIN:
                         wait = int(config.REENTRY_COOLDOWN_MIN - mins_since)
                         actions.append({"symbol": ev["symbol"], "confidence": conf,

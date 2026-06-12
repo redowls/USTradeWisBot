@@ -387,3 +387,25 @@ Encode these into expectations, not just code:
   recovered +$563 sim-to-sim over 52 trades → seeds PHASE-002.
 - **Files:** bot/replay.py · scripts/replay.py · tests/* · phases/PHASE-001.md
 - **Commit:** (see git log — PHASE-001)
+
+### 2026-06-12 · PHASE-002 — underlying-equivalence guard (GOOG/GOOGL)
+- **Problem:** today 7 trades 4W:3L net −$166.39; biggest avoidable loss:
+  GOOG hit TP 11:24:48, bot bought GOOGL 11:25:27 (39s later, same company,
+  top of the move) → −$128.79. On 06-10 it held GOOG and GOOGL simultaneously.
+  GOOG+GOOGL combined 06-09→06-12: 7 trades, −$407.48.
+- **Root cause:** watchlist holds both share classes; re-entry cooldown,
+  daily entry cap and already-held skip all key on the raw ticker, so
+  GOOG ≠ GOOGL defeated all three gates.
+- **Changes:** `config.EQUIVALENT_UNDERLYINGS` + `equivalent_symbols()`;
+  `engine.consider_entries` now skips candidates whose equivalence group
+  intersects held positions (`underlying_held_*`) and aggregates throttle
+  activity (entries summed, last_exit=max) across the group. Entry-blocking
+  only; risk invariants untouched.
+- **Validation:** 28/28 tests pass (6 new in `tests/test_underlying_guard.py`
+  incl. trade #62 replay + 06-10 dual-hold + unrelated-symbol control) ·
+  smoke_test ALL GREEN · imports OK.
+- **Expected impact:** removes a recurring loss source (~22% of total account
+  drawdown came from GOOG/GOOGL); kills hidden 2× single-name exposure.
+- **Files:** bot/config.py · bot/engine.py · tests/test_underlying_guard.py ·
+  phases/PHASE-002.md
+- **Commit:** (see git log — PHASE-002)
