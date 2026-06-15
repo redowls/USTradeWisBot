@@ -42,24 +42,30 @@ def _ts(dt: datetime | None = None) -> str:
 
 
 def send(text: str, *, disable_notification: bool = False) -> bool:
-    """Send a raw HTML message. Returns True on success, False otherwise (never raises)."""
+    """Send a raw HTML message to every configured chat. True only if all sent (never raises)."""
     if not secrets.telegram_configured():
         return False
-    payload = urllib.parse.urlencode({
-        "chat_id": secrets.TELEGRAM_CHAT_ID,
-        "text": text,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": "true",
-        "disable_notification": "true" if disable_notification else "false",
-    }).encode()
+    # TELEGRAM_CHAT_ID may be a comma-separated list — send to each recipient.
+    chat_ids = [c.strip() for c in str(secrets.TELEGRAM_CHAT_ID).split(",") if c.strip()]
     url = _API.format(token=secrets.TELEGRAM_BOT_TOKEN)
-    try:
-        req = urllib.request.Request(url, data=payload)
-        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-            return bool(json.loads(resp.read()).get("ok"))
-    except Exception as exc:  # noqa: BLE001 - alerts must not crash the bot
-        print(f"[notify] Telegram send failed: {exc}", file=sys.stderr)
-        return False
+    ok = True
+    for chat_id in chat_ids:
+        payload = urllib.parse.urlencode({
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": "true",
+            "disable_notification": "true" if disable_notification else "false",
+        }).encode()
+        try:
+            req = urllib.request.Request(url, data=payload)
+            with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+                if not bool(json.loads(resp.read()).get("ok")):
+                    ok = False
+        except Exception as exc:  # noqa: BLE001 - alerts must not crash the bot
+            print(f"[notify] Telegram send failed (chat_id={chat_id}): {exc}", file=sys.stderr)
+            ok = False
+    return ok
 
 
 # --- Typed alerts -----------------------------------------------------------
