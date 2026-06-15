@@ -29,7 +29,7 @@ Entry template:
 - **Change:** `bot/logbook.py` — new `open_trade_symbols()` returning symbols with status OPEN. `bot/engine.py` — `held = broker.open_position_symbols() | logbook.open_trade_symbols()` so a submitted-but-unfilled bracket counts as held. Pure tightening of exposure control; no risk limit altered (paper endpoint, MAX_RISK_PCT, DAILY_LOSS_HALT_PCT 8.0, MAX_CONCURRENT 3, no-overnight all untouched).
 - **Validation:** Added regression test `test_unfilled_open_trade_blocks_re_entry` (06-15 ENPH replay) to `tests/test_underlying_guard.py`; harness extended with `open_trades` param. Full suite **29 passed**, `scripts.smoke_test` ALL GREEN, `scripts.check_engine` ALL GREEN. Service restarted clean.
 - **Expected impact:** Eliminates same-symbol double-entries from fill latency. On today's data this alone removes the −$87.36 duplicate leg → day swings from −$35.61 toward roughly breakeven/positive.
-- **Commit:** (filled below)
+- **Commit:** 5d908bb
 - **Observed effect:** (filled in by a later review once data exists)
 
 ---
