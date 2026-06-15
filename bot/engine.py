@@ -82,7 +82,11 @@ class Engine:
                 notify.error_alert(msg)
             return actions
 
-        held = broker.open_position_symbols()
+        # Held = filled Alpaca positions UNION symbols with an OPEN logbook trade.
+        # The logbook union closes the unfilled-order race: a bracket submitted on
+        # one tick may not yet be a filled Alpaca position on the next, which on
+        # 2026-06-15 let ENPH be entered twice 74s apart (-$117.59). IMP-001.
+        held = broker.open_position_symbols() | logbook.open_trade_symbols()
         open_count = len(held)
 
         # --- #2 Re-entry throttle inputs: per-symbol entry count + last exit. ---

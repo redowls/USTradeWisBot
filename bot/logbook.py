@@ -199,6 +199,16 @@ def get_open_trades() -> list[dict]:
     return db.query("SELECT * FROM trades WHERE status = 'OPEN' ORDER BY entry_time")
 
 
+def open_trade_symbols() -> set[str]:
+    """Symbols with an OPEN trade in the logbook (submitted but maybe unfilled).
+
+    Feeds the entry guard so a just-submitted bracket that has not yet shown up
+    as a filled Alpaca position can't be entered a second time on the next tick
+    (the 2026-06-15 ENPH double-entry, IMP-001).
+    """
+    return {r["symbol"].upper() for r in get_open_trades()}
+
+
 def get_daily_summary(trade_date: date) -> dict | None:
     return db.query_one("SELECT * FROM daily_summary WHERE trade_date = ?", [trade_date])
 

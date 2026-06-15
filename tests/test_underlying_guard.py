@@ -22,13 +22,15 @@ def _ev(symbol: str) -> dict:
     return {"symbol": symbol, "signal_type": "BREAKOUT", "close": 100.0, "atr": 2.0}
 
 
-def _run(monkeypatch, symbol: str, *, held: set[str], activity: dict) -> dict:
+def _run(monkeypatch, symbol: str, *, held: set[str], activity: dict,
+         open_trades: set[str] | None = None) -> dict:
     """Drive Engine.consider_entries (dry-run) for one candidate symbol."""
     now = exits.now_et().replace(hour=11, minute=25, second=27, microsecond=0)
     monkeypatch.setattr(exits, "entries_allowed", lambda _now: True)
     monkeypatch.setattr(broker, "account_summary",
                         lambda: {"equity": 10_000.0, "buying_power": 10_000.0})
     monkeypatch.setattr(broker, "open_position_symbols", lambda: set(held))
+    monkeypatch.setattr(logbook, "open_trade_symbols", lambda: set(open_trades or set()))
     monkeypatch.setattr(logbook, "get_today_realized_pl", lambda _d: 0.0)
     monkeypatch.setattr(logbook, "get_symbol_activity_today", lambda _d: activity)
     monkeypatch.setattr(signals, "evaluate_watchlist", lambda: [_ev(symbol)])
@@ -79,6 +81,18 @@ def test_unrelated_symbol_unaffected(monkeypatch):
     activity = {"GOOG": {"entries": 1, "last_exit": now_naive - timedelta(seconds=39)}}
     act = _run(monkeypatch, "META", held={"GOOG"}, activity=activity)
     assert act["action"] == "would_buy"
+
+
+def test_unfilled_open_trade_blocks_re_entry(monkeypatch):
+    """IMP-001 / 2026-06-15 ENPH replay: ENPH was entered at 9:31:22 and again at
+    9:32:36 because the first bracket had not filled, so it wasn't in the Alpaca
+    position set when the next tick's guard ran (combined -$117.59). An OPEN
+    logbook trade must now count as held even with zero filled positions."""
+    activity = {"ENPH": {"entries": 1, "last_exit": None}}  # entered once, not exited
+    act = _run(monkeypatch, "ENPH", held=set(), activity=activity,
+               open_trades={"ENPH"})
+    assert act["action"] == "skip"
+    assert act["detail"] == "underlying_held_ENPH"
 
 
 def test_single_symbol_cooldown_unchanged(monkeypatch):
