@@ -97,3 +97,36 @@ Second pass of the day (the 06:50 entry above was an early test run; 11:45 UTC i
 - Account equity at $8,205 (−18% from $10K start) — if drawdown reaches −25% ($7,500), flag for strategy review.
 
 ---
+
+## 2026-06-16 — Pre-market Research
+
+### Market context
+Risk-on tape into FOMC. Mon 06-15 was a big rally — S&P +1.7%, Nasdaq +3.1% (best day since Mar 31), Dow record close — on a US–Iran preliminary de-escalation (Strait of Hormuz reopening, oil lower, inflation fears easing). Index futures climbing again pre-open ahead of the **FOMC decision Wed 06-17 2:00PM ET** (Warsh's first as chair; hold at 3.50–3.75% near-certain, dot-plot/guidance is the binary). First theoretical 100%-odds hike now pushed out to Mar-2027. VIX calm. **Note: market closed all day Fri 06-19 (Juneteenth)** — the post-FOMC signal lands Thu 06-18. Today's earnings (JBL, KEP, KTAND, ~10 small caps) include **no watchlist name** — no intraday earnings risk on the list.
+
+### Carried from daily review (2026-06-15)
+- TSLA = franchise name (only winner again, conf 97; 4W0L / +$348 over 14d). Keep top-of-list. ✅ retained.
+- ENPH chopped/false-breakout at open; the double-entry was the IMP-001 bot bug (now fixed), not an ENPH problem. No park.
+- C, MU, AMD, JPM (0W4-5L cluster) + GOOGL (0W3L): daily review explicitly judged this **broad-regime weakness, "not yet name-specific park triggers — reassess later this week."** Instruction was *watch*, not park. Honored: no parks today.
+- WPM: park only if still zero signals by Jun 20 — not yet (today is 06-16).
+
+### Watchlist review
+- Positions: **zero open — nothing locked.** Equity $7,965.90 (flat vs last_equity; no trades since 06-15 close).
+- Per-symbol P&L last 14d (66 closed, net **−$1,845**): only TSLA +$348, XOM +$12.4, TSM +$9.6 positive. Worst: GOOGL −$357 (0W3), C −$308 (0W5), AMD −$240 (0W4), JPM −$231 (0W4), MU −$147 (0W4). The list bled even on a +3.1% Nasdaq day → confirms **broad-regime / strategy underperformance, not symbol-quality** (all names are liquid large-caps that fit the strategy's liquidity bar; strategy fixes belong to the daily-review routine, not pre-market curation).
+- No watchlist name has a disqualifying catalyst today (no intraday earnings, no halt/binary event). C is the single most matured park candidate (0W5L, breached its stated 0W4L watch line, weak conf-61 MA-only signals) — but the latest daily-review deliberately deferred it to "later this week," so held under watch one more session.
+- Adds: none — pre-FOMC caution (prior guidance: no new symbols until Warsh presser digested). No high-conviction large-cap breakout setup not already on the list.
+
+### Changes applied to watchlist
+**No changes.** 29 active retained. Park triggers (MU/AMD/JPM/C "next week"; GOOGL 0W4+L; WPM zero-signal by 06-20) have not matured as of today; deferral honored to avoid churn.
+
+### Final watchlist
+29 active (unchanged): AAPL ABNB AMD AMZN AVGO BAC C COST CRM ENPH GOOG GOOGL INTC JPM META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT WPM XOM
+Service restarted: no (no changes).
+
+### Notes for pre-market research (next session)
+- **Post-FOMC (Thu 06-18) is the decision point for the loser cluster.** If C (0W5L), MU/AMD/JPM (0W4L) keep losing through Wed, park the persistent ones Thu to consolidate around the few earners (TSLA, XOM, TSM). C is first in line — it has already breached its 0W4L watch line.
+- GOOGL still 0W3L — one more loss (0W4L) triggers the "consolidate to GOOG only" park.
+- WPM: park if still zero signals by Fri 06-20 (precious-metals proxy, doesn't fit breakout strategy).
+- FOMC Wed 06-17 2PM ET + Juneteenth Fri 06-19 closed → thin, headline-driven Wed PM and a 4-day week. Expect choppy, low-conviction breakouts; do not add names until the Warsh guidance is digested.
+- Strategy concern for daily-review: the book lost on a +3.1% Nasdaq day — entries are not capturing broad up-moves. Flag if drawdown reaches −25% ($7,500); currently $7,966 (−20.3%).
+
+---
