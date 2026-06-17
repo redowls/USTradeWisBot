@@ -130,3 +130,38 @@ Service restarted: no (no changes).
 - Strategy concern for daily-review: the book lost on a +3.1% Nasdaq day — entries are not capturing broad up-moves. Flag if drawdown reaches −25% ($7,500); currently $7,966 (−20.3%).
 
 ---
+
+## 2026-06-17 — Pre-market Research
+
+### Market context
+**FOMC decision day.** Futures mixed-to-higher into the meeting: Nasdaq-100 +0.6% (rebound after chips led equities lower Tue), Dow lower, S&P slightly up. Rate hold at 3.50–3.75% ~97% priced (Warsh's debut as chair) — the binary is the **dot plot / whether the Fed drops its easing bias** (May CPI 4.2%, a 3-yr high). Schedule ET: pending home sales + business inventories ~10:00, **rate decision 2:00PM, Warsh press conference 2:30PM**. CME FedWatch now prices ~40% odds of a hike by Dec vs ~0% cut. 10y 4.44%, oil ~$76, VIX calm. Today's earnings (JBL, KMX, ~8 names) include **no watchlist symbol** — no intraday earnings risk on the list. Reminder: **market closed Fri 06-19 (Juneteenth)** → 4-day week, post-FOMC signal lands Thu 06-18.
+
+### Carried from daily/research review (06-15, 06-16)
+- Loser-cluster park decision was explicitly **deferred to Thu 06-18 post-FOMC** ("if C/MU/AMD/JPM keep losing through Wed, park the persistent ones Thu"). Today is the FOMC chop day → honored, no parks.
+- GOOGL park trigger = 0W**4**L → consolidate to GOOG only. Still 0W**3**L (no new GOOGL trade since 06-12) → not matured, hold.
+- WPM park trigger = zero signals by Fri 06-20 → not yet (today 06-17), hold.
+- "Do not add new symbols until the Warsh guidance is digested" → honored, no adds.
+
+### Watchlist review
+- **Positions: 3 OPEN — AMZN (10sh, −$9.4), BAC (46sh, +$12.0), C (18sh, +$15.9). All LOCKED** (cannot park). Equity $7,948.87 (last_equity $7,939.19), buying power $22,605, account ACTIVE.
+- ⚠️ **Naked overnight holds:** all three were entered 06-16 (AMZN/C 09:41, BAC 10:24) and remain open pre-market 06-17 — the 15:55 ET EOD flatten did not close them despite the service being active since 06-15 21:29 UTC. No-overnight design violated; **flag for the daily-review/code routine** (this routine may not touch source code).
+- Per-symbol P&L (last 14d, closed): only TSLA +$348 (4W0L), TSM +$9.6, XOM +$12.4 positive. Worst still GOOGL −$357 (0W3), C −$308 (0W5, now locked), AMD −$240 (0W4), JPM −$231 (0W4), **MU now −$182 (0W5)** — MU lost again 06-16 (10:23), advancing 0W4→0W5.
+- C was the most-matured park candidate (0W5L) but is now **locked by an open position** → cannot park; revisit after it closes.
+- MU is now a genuinely matured candidate (0W5L) but the prior two reviews judged the cluster **broad-regime weakness, not name-specific** (book lost even on a +3.1% Nasdaq day), and the park decision is scheduled for Thu 06-18. On FOMC chop day, no churn → hold MU one more session.
+- No watchlist name has a disqualifying catalyst today (no intraday earnings, no halt/binary). No high-conviction large-cap breakout setup not already listed.
+
+### Changes applied to watchlist
+**No changes.** 29 active retained. All park triggers either un-matured (GOOGL 0W3L, WPM not yet 06-20), deferred to Thu 06-18 (MU/AMD/JPM loser cluster), or blocked by an open position (C). No adds — pre-FOMC caution.
+
+### Final watchlist
+29 active (unchanged): AAPL ABNB AMD AMZN AVGO BAC C COST CRM ENPH GOOG GOOGL INTC JPM META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT WPM XOM
+Service restarted: no (no watchlist changes).
+
+### Notes for pre-market research (next session)
+- **⚠️ Carry to daily-review TODAY:** 3 positions (AMZN/BAC/C) held overnight from 06-16 — EOD flatten failure / naked-overnight risk despite active service. Needs a code-side fix in the daily-review routine.
+- **Thu 06-18 is the loser-cluster park day** (post-FOMC). Park the persistent 0W names — **MU (0W5L)** is now first in line (C is parked-by-default once its position closes; AMD/JPM 0W4L but no new trades since 06-09/06-10). Consolidate around earners (TSLA, TSM, XOM).
+- GOOGL still 0W3L — one more loss (0W4L) triggers consolidate-to-GOOG-only.
+- WPM: park if still zero signals by Fri 06-20.
+- Warsh dot-plot/guidance digestion is the gate for any new adds; reassess Thu with a clearer regime read. Equity $7,949 (−20.5% from $10K) — flag for strategy review at −25% ($7,500).
+
+---
