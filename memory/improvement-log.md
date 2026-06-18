@@ -41,7 +41,7 @@ Entry template:
 - **Change:** `bot/broker.py` — new `close_position(symbol)` (per-symbol DELETE /v2/positions/{symbol}). `bot/exits.py` — `flatten_all` now cancels working orders FIRST, then closes each position individually (so a still-working bracket leg can't block its own liquidation). `bot/engine.py` — `eod_flatten()` returns bool: it re-queries `open_position_symbols()` after liquidation, marks a logbook trade CLOSED **only** once its broker position is confirmed gone, leaves any unconfirmed position OPEN + fires `error_alert`, and returns False; `tick()` sets `flattened_on` **only when `eod_flatten()` returns True** → an incomplete flatten retries next tick instead of stranding overnight. No risk limit altered (paper endpoint, MAX_RISK_PCT, DAILY_LOSS_HALT_PCT 8.0, MAX_CONCURRENT 3, no-overnight rules all untouched — this strengthens the no-overnight rule).
 - **Validation:** New `tests/test_eod_flatten.py` (6 tests) replays the 06-16→06-18 scenario: cancel-before-close ordering, one position raising must not stop the rest, BAC-stays-open→retry/alert, C-confirmed-flat→closed at recorded 143.765, dry-run no-op, and tick-gating retry. Full suite **35 passed**; `scripts.smoke_test` ALL GREEN; `scripts.check_engine` ALL GREEN. Service restarted clean.
 - **Expected impact:** Eliminates silent naked-overnight holds: any position that does not confirm flat at 15:55 keeps being re-liquidated each tick and raises an alert, instead of being declared flat and stranded. Directly prevents the repeat of the 06-16 two-night hold.
-- **Commit:** (filled below)
+- **Commit:** 427ab21
 - **Observed effect:** (filled in by a later review once data exists)
 
 ---
