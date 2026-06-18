@@ -279,6 +279,16 @@
 
 Ordered by expected impact; each item needs replay validation before code.
 
+0a. **EOD-flatten P&L accuracy** (from 06-18 daily review; secondary to IMP-002):
+   when the broker position is already gone at flatten time, `eod_flatten`
+   falls back to the entry price → P&L misrecorded (AMZN 06-18 = $0.00, real
+   fill lost). Look up the actual EOD market-sell fill (or run detect_exits on
+   the flatten order) instead of the entry-price fallback.
+0b. **Flatten after the 16:00 close** (from 06-18 daily review): the loop only
+   flattens while `clock.is_open`, so if every tick in 15:55–16:00 fails the
+   position strands until the next session. Add a short post-close grace window
+   that still runs `eod_flatten` until the book is confirmed flat. (IMP-002's
+   cancel-first + per-tick retry already removes the dominant failure mode.)
 1. **Breakeven stop at +0.5R** — `scripts/replay.py` (PHASE-001 harness):
    sim-to-sim +$563 over 52 trades (−$848 vs −$1,411 baseline); 27/52 trades
    reached +0.5R, 7 losers saw +1R before stopping. Implement as stop-leg

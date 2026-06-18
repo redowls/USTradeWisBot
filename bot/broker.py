@@ -75,3 +75,13 @@ def cancel_all_orders():
 def close_all_positions(cancel_orders: bool = True):
     """Liquidate all open positions at market (and optionally cancel open orders first)."""
     return trading_client().close_all_positions(cancel_orders=cancel_orders)
+
+
+def close_position(symbol: str):
+    """Liquidate a single position at market (DELETE /v2/positions/{symbol}).
+
+    Used by the EOD flatten so each position is closed explicitly and can be
+    individually verified flat afterwards, rather than relying on the bulk
+    close_all_positions (which races held_for_orders and silently leaves some
+    positions open — the 06-16 C/AMZN/BAC two-night naked hold, IMP-002)."""
+    return trading_client().close_position(symbol)

@@ -161,14 +161,24 @@ class Engine:
         return actions
 
     # --- end-of-day flatten ---
-    def eod_flatten(self) -> None:
-        """Force-close everything and mark open trades EOD_FLATTEN. Idempotent."""
+    def eod_flatten(self) -> bool:
+        """Force-close everything; mark confirmed-flat trades EOD_FLATTEN.
+
+        Returns True only when the broker is verified flat (no positions left).
+        A trade is closed in the logbook ONLY once its broker position is gone;
+        any position that did not liquidate stays OPEN and raises an alert, and
+        the caller leaves flattened_on unset so the next tick retries instead of
+        stranding it overnight (the 06-16 C/AMZN/BAC two-night naked hold). IMP-002.
+        """
         open_trades = logbook.get_open_trades()
         if self.dry_run:
             self._log(f"[dry] would flatten {len(open_trades)} open trade(s)")
-            return
+            return True
         snapshot = {s["symbol"]: s for s in exits.flatten_all("EOD_FLATTEN")}
+        remaining = {s.upper() for s in broker.open_position_symbols()}
         for t in open_trades:
+            if t["symbol"].upper() in remaining:
+                continue  # liquidation unconfirmed — leave OPEN, retry next tick
             qty = int(t["qty"]) or 0
             entry = float(t["entry_price"])
             snap = snapshot.get(t["symbol"])
@@ -181,6 +191,13 @@ class Engine:
                                "exit_price": exit_price, "realized_pl": pl,
                                "realized_pl_pct": pct, "exit_reason": "EOD_FLATTEN"})
             self._log(f"FLATTEN {t['symbol']} pl=${pl} ({pct}%)")
+        if remaining:
+            msg = (f"EOD flatten incomplete — {len(remaining)} position(s) still "
+                   f"open after liquidation: {sorted(remaining)}. Retrying next tick.")
+            self._log(msg)
+            notify.error_alert(msg)
+            return False
+        return True
 
     def post_close_summary(self) -> None:
         """Write + send the daily summary once after the close."""
@@ -201,8 +218,11 @@ class Engine:
             self.manage_exits()
             if exits.past_flatten_time(now):
                 if self.flattened_on != now.date():
-                    self.eod_flatten()
-                    self.flattened_on = now.date()
+                    # Only mark the day flattened once the broker is verified
+                    # flat; an incomplete flatten retries on the next tick rather
+                    # than stranding a position overnight (IMP-002).
+                    if self.eod_flatten():
+                        self.flattened_on = now.date()
             else:
                 self.consider_entries(now)
         except Exception as exc:  # noqa: BLE001 - one bad tick must not kill the loop

@@ -152,9 +152,23 @@ def flatten_all(reason: str = "EOD_FLATTEN") -> list[dict]:
 
     Returns a snapshot of what was flattened (taken before liquidation). The
     precise fill prices land via detect_exits() on the next loop / via Alpaca.
+
+    Cancels working orders FIRST, then closes each position individually, so a
+    still-working bracket leg can't block (held_for_orders) the liquidation of
+    its own position. The bulk close_all_positions(cancel_orders=True) raced the
+    async cancel and left C/AMZN/BAC stranded for two overnights (06-16 -> 06-18);
+    the caller (engine.eod_flatten) re-checks positions and retries until flat. IMP-002.
     """
     snapshot = _position_snapshot(reason)
-    broker.close_all_positions(cancel_orders=True)
+    try:
+        broker.cancel_all_orders()
+    except Exception:  # noqa: BLE001 - liquidation below is the priority; verified by caller
+        pass
+    for snap in snapshot:
+        try:
+            broker.close_position(snap["symbol"])
+        except Exception:  # noqa: BLE001 - any failure surfaces via the caller's position re-check
+            pass
     return snapshot
 
 
