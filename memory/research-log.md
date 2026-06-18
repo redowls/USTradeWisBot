@@ -165,3 +165,42 @@ Service restarted: no (no watchlist changes).
 - Warsh dot-plot/guidance digestion is the gate for any new adds; reassess Thu with a clearer regime read. Equity $7,949 (−20.5% from $10K) — flag for strategy review at −25% ($7,500).
 
 ---
+
+## 2026-06-18 — Pre-market Research
+
+### Market context
+**Post-FOMC relief bounce.** Wed 06-17 was a hawkish-FOMC shock: Fed held 3.50–3.75% but the dot plot lifted the year-end median to 3.8% (9/18 participants now pencil a 2026 hike, one quarter-point hike fully priced by year-end), and the S&P fell −1.21% — its worst first-Fed-day under a new chair (Warsh) since 1994; all 11 GICS sectors closed lower. Today futures rebound: S&P +0.9%, Nasdaq-100 +1.6%, Dow +0.6%. **Dominant catalyst: INTC +9% pre-market on a reported Apple deal to design/build chips in the US — the whole semi complex is bid (SOXX +3.9%, MU +4.7%, NVDA +1.2%).** US–Iran interim peace deal sent oil lower (WTI ~$75). No watchlist name reports earnings intraday today. **Reminder: market closed Fri 06-19 (Juneteenth)** → today is the last session of a 4-day week. Bounce is a relief move on a divided-Fed backdrop, not a confirmed trend.
+
+### Carried from daily/research review (06-15→06-17)
+- **Today (Thu 06-18) was the explicitly-scheduled loser-cluster park day** ("park the persistent 0W names; consolidate around earners TSLA/TSM/XOM").
+- MU "first in line" (0W5L) and AMD (0W4L) — **but both are semiconductors and today is a powerful semi-rally day on the INTC/Apple catalyst.** The losing streaks were repeatedly judged broad-regime weakness, not name quality; the sector tailwind they always lacked is finally present. Holding both one more session is a reasoned, evidence-based deferral (new material catalyst), not passive churn-avoidance. Neither added a fresh loss on Wed (MU last 06-16, AMD last 06-09).
+- C (0W5L) — **locked by an open position**, cannot park.
+- JPM (0W4L) — bank, no catalyst today, stale since 06-10: the one cluster member with no offsetting reason to wait → parked (executes the consolidation intent where it is cleanest).
+- GOOGL 0W3L — trigger is 0W**4**L; no trade since 06-12, not matured → hold.
+- WPM — park trigger is zero-signal by Fri 06-20; not yet → hold.
+
+### Watchlist review
+- **Positions: 2 OPEN — BAC (46sh, +$11.1), C (18sh, +$39.8). Both LOCKED** (cannot park). AMZN (overnight 06-16/17) has since closed. Equity $7,886.11 (last_equity $7,854.87, ACTIVE), cash $2,666, buying power $25,281, daytrade_count 0.
+- ⚠️ **BAC and C have now been held multiple nights** (open since ~06-16, through 06-17 and into 06-18 pre-market) — the 15:55 ET EOD flatten is still not closing positions despite the service being active. Repeated naked-overnight risk; **carry to daily-review/code routine** (this routine may not touch source code).
+- Per-symbol P&L (14d closed): only TSLA +$348 (4W0L), XOM +$12.4, TSM +$9.6 positive. Worst: GOOGL −$357 (0W3), C −$308 (0W5, locked), AMD −$240 (0W4), JPM −$231 (0W4, parked today), MU −$182 (0W5).
+- Watchlist is well-positioned for today's catalyst (INTC, AAPL, NVDA, AVGO, QCOM, MU, AMD, TSM all in the bid semi/tech complex). INTC +9% on the Apple deal is on-list — best-positioned name today.
+- Adds: **none.** Divided-Fed hawkish backdrop, relief bounce (not trend confirmation), account −21% from $10K. No high-conviction large-cap breakout not already listed; today's strongest names (INTC/semis) are already on the watchlist.
+
+### Changes applied to watchlist
+- **JPM: parked 2026-06-18** — 0W4L (−$231 over 4 closed trades), chronic loser, bank with no catalyst in today's semi-led tape, stale since 06-10. Executes the long-deferred loser-cluster consolidation on the cleanest member.
+- MU/AMD held (semi catalyst today); GOOGL held (0W3L, trigger not matured); WPM held (zero-signal park date is 06-20). No adds.
+
+### Final watchlist
+28 active (reduced from 29 via one park; within 30 cap):
+AAPL ABNB AMD AMZN AVGO BAC C COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT WPM XOM
+Service restarted: yes — active, clean restart 11:49:04 UTC Jun 18.
+
+### Notes for pre-market research (next session — Mon 06-22, market closed Fri 06-19 Juneteenth)
+- **MU & AMD reassessment:** held today on the semi catalyst. If they signal today (06-18) and lose again (MU→0W6L, AMD→0W5L) with no win, park them Mon 06-22 — the catalyst rationale will have been tested and failed. If they win, the regime-weakness thesis is confirmed and they stay.
+- **C (0W5L) is parked-by-default once its open position closes** — revisit the moment it is flat.
+- GOOGL still 0W3L — one more loss (0W4L) triggers consolidate-to-GOOG-only.
+- WPM: park if still zero signals by Fri 06-20 (note: 06-20 is a non-trading Saturday and 06-19 is closed → effectively decide Mon 06-22).
+- **⚠️ Carry to daily-review TODAY:** BAC + C held multiple nights — EOD-flatten failure / naked-overnight risk persists. Needs the code-side fix.
+- Hawkish, divided Fed + 4-day week + relief bounce → treat today's strength with caution; do not chase. Equity $7,886 (−21.1% from $10K) — flag for strategy review at −25% ($7,500).
+
+---
