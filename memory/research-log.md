@@ -204,3 +204,39 @@ Service restarted: yes — active, clean restart 11:49:04 UTC Jun 18.
 - Hawkish, divided Fed + 4-day week + relief bounce → treat today's strength with caution; do not chase. Equity $7,886 (−21.1% from $10K) — flag for strategy review at −25% ($7,500).
 
 ---
+
+## 2026-06-19 — Pre-market Research
+
+### Market context
+**US market CLOSED today — Juneteenth holiday.** Alpaca clock confirms `is_open=false`, next open **Mon 2026-06-22 09:30 ET**. No trading occurs today; this is a curation-only pass to set the watchlist for Monday's reopen. (Context for Monday: Wed 06-17 hawkish FOMC dot-plot shock, Thu 06-18 relief bounce led by INTC +9% on the reported Apple US-chip deal / broad semi bid; divided-Fed backdrop, one 2026 hike now priced. Treat Monday's tape on its own data — Thursday's bounce was relief, not a confirmed trend.)
+
+### Carried from daily review (2026-06-18)
+- **C (0W5L) is now FLAT** — 06-18 daily review confirms C and BAC closed at the 15:55 EOD flatten; C's open-position lock released → "the long-deferred C park can be executed." Live Alpaca check: **zero open positions** — confirmed.
+- MU/AMD: held 06-18 on the semi catalyst; neither generated a qualifying entry, so the "park if they lose again" test did not trigger → reassessment carried to Mon 06-22 (no new evidence on a holiday).
+- INTC/semis were the day's strength but produced no qualifying breakout — flagged to daily-review (gate may be slow on gap-and-go opens), not a watchlist issue.
+- IMP-002 (verified, retried EOD flatten, commit 427ab21) shipped 06-18 — should end the naked-overnight breach that ran 06-16→06-18.
+
+### Watchlist review
+- **Positions: zero open — nothing locked.** Account ACTIVE, equity **$7,838.56** (last_equity flat — no trades since 06-18 close, as expected on a holiday), cash $7,838.56, buying power $31,354, daytrade_count 0. −21.6% from $10K start.
+- **C** — chronic loser 0W5L (−$308 over 5 closed trades), breached its stated 0W4L watch line several sessions ago; the only reason it survived was the open-position lock, now released. This is the queued, well-documented park, not churn → PARK.
+- **MU (0W5L) / AMD (0W4L)** — held on the standing semi-catalyst deferral; reassess Mon 06-22 once they actually signal+lose. No new trades → hold.
+- **GOOGL (0W3L)** — park trigger is 0W4L (consolidate to GOOG only); no trade since 06-12 → not matured, hold.
+- **WPM** — park trigger is zero-signal by Fri 06-20; effectively decide Mon 06-22 → hold.
+- No disqualifying catalyst applies on a closed market. **Adds: none** — −21.6% drawdown, hawkish divided-Fed backdrop, relief-bounce (not trend), no high-conviction large-cap breakout not already listed.
+
+### Changes applied to watchlist
+- **C: parked 2026-06-19** — chronic loser 0W5L (−$308), breached 0W4L watch line; executes the long-deferred park now that its open position has closed (position lock released at the 06-18 flatten).
+
+### Final watchlist
+27 active (reduced from 28 via one park; within 30 cap):
+AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT WPM XOM
+Service restarted: yes — active, clean restart 11:47:38 UTC Jun 19 (safe: market closed for Juneteenth).
+
+### Notes for pre-market research (next session — Mon 06-22)
+- **MU & AMD reassessment is due Mon 06-22** — held twice on the semi catalyst without a fresh test. If either signals Monday and loses again (MU→0W6L, AMD→0W5L), park it; if it wins, the regime-weakness thesis is confirmed and it stays. Consolidate around earners (TSLA, TSM, XOM).
+- **WPM decision is due Mon 06-22** — park if still generating zero signals (precious-metals proxy, doesn't fit breakout strategy).
+- **GOOGL** still 0W3L — one more loss (0W4L) triggers consolidate-to-GOOG-only.
+- **Watch IMP-002 in action Mon:** first live trading session since the EOD-flatten fix — verify any position opened Monday is confirmed flat by 15:55 ET (no overnight carry into Tue 06-23).
+- TSLA remains the franchise name (only consistent earner). Equity $7,838.56 (−21.6%) — flag for strategy review at −25% ($7,500).
+
+---
