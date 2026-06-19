@@ -30,7 +30,7 @@ Entry template:
 - **Validation:** Added regression test `test_unfilled_open_trade_blocks_re_entry` (06-15 ENPH replay) to `tests/test_underlying_guard.py`; harness extended with `open_trades` param. Full suite **29 passed**, `scripts.smoke_test` ALL GREEN, `scripts.check_engine` ALL GREEN. Service restarted clean.
 - **Expected impact:** Eliminates same-symbol double-entries from fill latency. On today's data this alone removes the −$87.36 duplicate leg → day swings from −$35.61 toward roughly breakeven/positive.
 - **Commit:** 5d908bb
-- **Observed effect:** (filled in by a later review once data exists)
+- **Observed effect:** (weekly review 2026-06-19) No same-symbol double-entry has recurred since the fix. Caveat: only lightly exercised — the rest of the week produced just one fresh entry (MU 06-16, single, no dup) before the book went quiet (06-17 no entries, 06-18 only the legacy carried closes, 06-19 holiday). Confirmed not-broken, not yet stress-tested at entry volume. Re-confirm Mon 06-22+.
 
 ---
 
@@ -42,6 +42,6 @@ Entry template:
 - **Validation:** New `tests/test_eod_flatten.py` (6 tests) replays the 06-16→06-18 scenario: cancel-before-close ordering, one position raising must not stop the rest, BAC-stays-open→retry/alert, C-confirmed-flat→closed at recorded 143.765, dry-run no-op, and tick-gating retry. Full suite **35 passed**; `scripts.smoke_test` ALL GREEN; `scripts.check_engine` ALL GREEN. Service restarted clean.
 - **Expected impact:** Eliminates silent naked-overnight holds: any position that does not confirm flat at 15:55 keeps being re-liquidated each tick and raises an alert, instead of being declared flat and stranded. Directly prevents the repeat of the 06-16 two-night hold.
 - **Commit:** 427ab21
-- **Observed effect:** (filled in by a later review once data exists)
+- **Observed effect:** (weekly review 2026-06-19) NOT yet validated in production. Shipped 06-18, *after* the 06-16→06-18 breach it targets. The 06-18 15:55 flatten that finally cleared the legacy carried book (C/BAC) ran under the new code and succeeded, but that was closing stranded positions, not the real test: no position has been opened-and-flattened same-day under this logic yet (06-18 took no new entries; 06-19 Juneteenth holiday). First true test is Mon 06-22 — verify any position opened then is confirmed flat by 15:55 ET with no carry into Tue 06-23. Verdict pending.
 
 ---
