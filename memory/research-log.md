@@ -240,3 +240,38 @@ Service restarted: yes — active, clean restart 11:47:38 UTC Jun 19 (safe: mark
 - TSLA remains the franchise name (only consistent earner). Equity $7,838.56 (−21.6%) — flag for strategy review at −25% ($7,500).
 
 ---
+
+## 2026-06-22 — Pre-market Research
+
+### Market context
+Week opens cautious. Index futures slightly lower pre-open: S&P 500 −0.2%, Nasdaq-100 ~flat, Dow −0.1%. Dominant macro: US–Iran talks show "encouraging progress" (Qatar/Pakistan report a roadmap to a final deal within 60 days) → oil eases (WTI ~$75.30, Brent ~$79). Backdrop is last week's hawkish-Warsh FOMC dot-plot shock (9/18 officials now pencil ≥1 2026 hike; S&P's worst Fed-day under a new chair since 1994) followed by a Thu relief bounce — a divided-Fed, one-hike-priced tape, not a confirmed uptrend. **This week's key event: PCE inflation (Fed's preferred gauge), watched closely given the hawkish posture.** Alan Greenspan died at 100 (not market-moving). First live trading session since IMP-002 (verified/retried EOD flatten) — daily-review will validate it.
+
+### Carried from daily/research review (06-18→06-19)
+- **MU (0W5L) / AMD (0W4L) semi-catalyst reassessment due today** — but the standing plan gates the park on Monday's *actual* trade outcome ("if either signals today and loses again, park it; if it wins, the thesis holds"), which only the post-close daily-review can evaluate. Both are liquid large-cap semis that fit the strategy's liquidity/breakout profile; the losses have been judged broad-regime, not name-specific. → held this morning; daily-review parks tonight if they signal+lose. **Note: MU reports fiscal Q3 earnings Wed 06-24 AFTER the close** — no intraday-hold risk for an EOD-flatten bot, but expect a volatile gap Thu 06-25.
+- **WPM decision due today** — see below; executed.
+- **GOOGL 0W3L** — trigger is 0W4L (consolidate to GOOG only); no new trade since 06-12 → not matured, hold.
+- C (parked 06-19) and JPM (parked 06-18) remain parked.
+
+### Watchlist review
+- **Positions: zero open — nothing locked.** Account ACTIVE, equity **$7,838.56** (flat vs 06-18/06-19 close — no trades over the holiday weekend), cash $7,838.56, buying power $31,354. −21.6% from $10K. Clock `is_open=false`, next open Mon 06-22 09:30 ET (this run is pre-open).
+- **WPM** — confirmed **0 signals all-time** in the `signals` table (and 0 closed trades). Park trigger (decide Mon 06-22) is matured. WPM is a gold/silver streaming name that moves on commodity prices, not the market-momentum the breakout strategy needs → PARK.
+- Per-symbol P&L (21d closed) unchanged from Thu: only TSLA +$348 (4W0L), XOM +$12.4, TSM +$9.6 positive; worst GOOGL −$357 (0W3), C −$288 (parked), AMD −$240 (0W4), JPM −$231 (parked), MU −$182 (0W5).
+- Other rarely-signalling names (AVGO, CRM, QCOM, QQQ, SPY) are liquid large-caps/ETFs that fit the strategy and signal-droughts here reflect the regime, not name-quality — not park candidates (only WPM is a structural strategy mismatch).
+- **Adds: none** — −21.6% drawdown, hawkish divided-Fed backdrop, soft futures, PCE data looming this week; no high-conviction large-cap breakout not already on the list.
+
+### Changes applied to watchlist
+- **WPM: parked 2026-06-22** — zero signals all-time, precious-metals streaming proxy (moves on commodity prices, not market momentum) — does not fit the intraday breakout strategy. Executes the long-standing 06-20/06-22 zero-signal park trigger.
+
+### Final watchlist
+26 active (reduced from 27 via one park; within 30 cap):
+AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+Service restarted: yes — active, clean restart 11:48:39 UTC Jun 22.
+
+### Notes for pre-market research (next session — Tue 06-23)
+- **MU/AMD:** today (06-22) is the live reassessment — if either signaled and lost again, the daily-review should park it tonight; check the outcome before tomorrow. **MU earnings Wed 06-24 after close** → MU will gap Thu 06-25; treat MU's intraday action Thu with extra caution (no overnight risk, but wide ranges).
+- **GOOGL** still 0W3L — one more loss (0W4L) triggers consolidate-to-GOOG-only.
+- **Validate IMP-002:** 06-22 is the first live session under the fixed EOD flatten — confirm any position opened today is broker-confirmed flat by 15:55 ET (no carry into Tue 06-23).
+- **PCE inflation data this week** — given the hawkish Warsh posture, a hot print could whipsaw the tape; do not add names into the event.
+- TSLA remains the only consistent earner. Equity $7,838.56 (−21.6%) — strategy-review flag at −25% ($7,500), $338 of headroom.
+
+---
