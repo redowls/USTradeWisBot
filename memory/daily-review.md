@@ -174,3 +174,41 @@ None — market closed. Nothing to root-cause at the trade level.
 - Equity **$8,015.23 (−19.8%)** — climbed back above the −20% line; $515 of headroom to the −25% ($7,500) strategy-review flag.
 
 ---
+
+## 2026-06-23 — Daily Review
+
+### Stats
+- Trades: **4 closed (4W / 0L)**, win rate **100%**. Second straight positive session — first back-to-back green days of incubation.
+- Net realized P&L: **+$95.80** (day **+1.195%**). Equity close **$8,104.37** (from $8,015.20 open; +$89.17 broker truth ≈ matches realized within quote rounding). **−19.0% YTD**, $604 above the −25% ($7,500) strategy-review flag.
+- Avg winner **+$23.95** (CRM +57.69, XOM +19.57, BAC +16.56, WMT +1.98); **no losers**. Profit factor (day): ∞ (zero gross loss).
+- Exit reasons: **1 TAKE_PROFIT (CRM), 3 EOD_FLATTEN (XOM/BAC/WMT)**. **IMP-003 VERIFIED:** all 3 EOD_FLATTEN exits recorded their real Alpaca fills (XOM 140.12, BAC 57.91, WMT 119.81), not exit==entry $0.00 — the bug fixed 06-23 00:57 UTC did not recur. ✅
+- Circuit breaker NOT tripped (+1.2% nowhere near −8.0%). **Positions: 0 open on the broker — no naked overnight.** ✅ IMP-002 held a 3rd straight session. Service active all session (since 00:57:56 UTC restart); journal clean, no errors.
+
+### Trade-by-trade review
+| # | Sym | Entry (ET) | Exit (ET) | Conf | Type | Exit | P&L | Root cause |
+|---|-----|-----------|-----------|------|------|------|-----|-----------|
+| 80 | XOM | 09:36:28 @139.09 | 15:57:19 @140.12 | 62.0 | MA | EOD_FLATTEN | **+$19.57** | Clean MA breakout, mom 0.80; drifted up +0.74%, captured at flatten (never reached TP 142.22). |
+| 81 | BAC | 09:41:42 @57.55 | 15:57:19 @57.91 | 60.96 | MA | EOD_FLATTEN | **+$16.56** | Low-conf MA, mom 0.73; steady +0.63% hold to flatten. |
+| 82 | CRM | 09:46:05 @151.71 | 13:18:56 @155.15 | 61.53 | MA | TAKE_PROFIT | **+$57.69** | Day's engine: MA, mom 0.77, hit TP (+2.24%) at 13:18. Only TP of the day. |
+| 83 | WMT | 13:52:54 @119.72 | 15:57:20 @119.81 | 60.22 | MA | EOD_FLATTEN | **+$1.98** | Late entry (13:52), mom 0.68; basically a scratch (+0.08%) held to flatten. |
+
+### What worked / what didn't
+- **Worked — every winner was an MA-only signal scored conf 60–62.** XOM 62.0, BAC 61.0, CRM 61.5, WMT 60.2. This is exactly the "low-confidence MA-only drag" bucket flagged 06-15 and 06-22 as the next thing to filter out. Today it produced **100% of the trades and 100% of the profit.** Single best argument against acting on that candidate.
+- **Worked — IMP-002 (no-overnight) and IMP-003 (real-fill EOD P&L) both verified live.** 0 open positions on the broker; all 3 EOD_FLATTEN trades booked their true sell fills (no $0.00 fallback). The two most recent fixes are now confirmed in production.
+- **Didn't — capture efficiency on the EOD_FLATTEN names was thin.** XOM/BAC/WMT were carried to the 15:57 flatten rather than hitting TP; WMT (+$1.98) was a near-scratch late entry. The day was carried by one TP (CRM). Not a defect — consistent with a directionless, low-vol tape (per 06-23 research) — but a reminder that the EOD_FLATTEN bucket is low-yield. (Backlog item #1, breakeven/trailing stop, is the queued lever here; not today's change.)
+- **No losers, no bugs, no risk events.** Nothing to root-cause at the loss level today.
+
+### Lessons & improvement candidates (ranked)
+1. **[SHIPPED IMP-004]** The "raise the MA-only confidence floor to ~65" candidate (queued as "next to act on" since 06-22) is **REFUTED by the full dataset**, and today is the disproof. Bucket analysis over all 81 trades: **MA-only is the least-bad bucket (PF 0.75, exp −$4.75); no MA signal has ever scored ≥64** (MA tops ~63), so a 65 floor disables the entire MA book — killing all 16 MA winners (today's 4 + TSLA's 3 + ENPH 06-22, etc.). Simulating "drop MA<65" worsens the portfolio (exp −$19.78 → −$41.64, PF 0.45 → 0.31). The confidence→quality relationship is in fact **inverted**: the 66+ band (all BOTH) lost −$1,227 / PF 0.31 (concentrated in the 06-08/09 overtrading days), while 62–64 is ~break-even (PF 1.06). Action: institutionalize this in `scripts/report.py` (add **profit-factor per signal type** + a **confidence-band breakdown**) so the refuted candidate can't be silently reinstated and future strategy work sees the real distribution. Pure measurement/tooling — no entry logic, no risk limit touched.
+2. **Do NOT act on the MA-only bucket via confidence.** Any future MA-quality improvement must use a *non-confidence* discriminator (volume confirm, regime filter, entry-timing). Needs replay validation first — not today.
+3. **EOD_FLATTEN capture efficiency** (3 of 4 today carried to flatten, WMT near-scratch): backlog #1 (breakeven-at-+0.5R / trailing stop) remains the queued lever to convert these drift-up holds into locked gains. Replay-validated already (+$563 sim) but deferred — do NOT stack it the same day as a tooling change; act on it on a day its evidence is the day's story.
+
+### Notes for pre-market research
+- **MA-only conf 60–62 names are NOT low quality** — XOM/BAC/CRM/WMT all won today; the "park the low-conf MA-only bucket" idea is refuted (see IMP-004). Keep these liquid names on the list.
+- **CRM** was today's best (+$57.69, hit TP) after being a zero-signal name all incubation — it signaled and delivered. Note it as a fresh contributor.
+- **WMT** late entry (13:52) barely moved — a post-13:00 MA entry on a directionless tape added almost nothing; watch whether late-session entries are worth taking on flat days.
+- **MU earnings Wed 06-24 AFTER close → MU gaps Thu 06-25**; FedEx reported tonight (06-23). **PCE Thu 06-25.** Event-heavy back-half of the week — keep adds conservative.
+- **GOOGL** did not signal today — still 0W3L, park trigger (0W4L) un-matured; hold. **MU/AMD** (0W5L/0W4L) did not signal — reassessment still gated on a fresh signal+loss; carry forward.
+- TSLA did NOT trade today (no BOTH signal fired) — still the franchise name; equity $8,104.37 (−19.0%), $604 to the −25% flag.
+
+---
