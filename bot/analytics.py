@@ -30,6 +30,37 @@ def _f(value, default=0.0) -> float:
         return default
 
 
+# Confidence bands for the by-confidence breakdown. The live scoring distribution
+# tops out around the low-60s, so the bands deliberately span the actual range and
+# expose that nothing scores >=64 — a "raise the floor to 65" change would disable
+# the entire book (see daily-review 2026-06-23 / refuted improvement candidate).
+CONFIDENCE_BANDS: tuple[tuple[float, float, str], ...] = (
+    (0.0, 60.0, "<60"),
+    (60.0, 62.0, "60-62"),
+    (62.0, 64.0, "62-64"),
+    (64.0, 66.0, "64-66"),
+    (66.0, float("inf"), "66+"),
+)
+
+
+def _bucket(pls: list[float]) -> dict:
+    """Win-rate / total / expectancy / profit-factor over one slice of P&Ls."""
+    n = len(pls)
+    if n == 0:
+        return {"trades": 0, "win_rate": 0.0, "total_pl": 0.0,
+                "expectancy": 0.0, "profit_factor": None}
+    wins = [p for p in pls if p > 0]
+    losses = [p for p in pls if p <= 0]
+    gross_loss = sum(losses)  # <= 0
+    return {
+        "trades": n,
+        "win_rate": round(100 * len(wins) / n, 1),
+        "total_pl": round(sum(pls), 2),
+        "expectancy": round(mean(pls), 2),
+        "profit_factor": round(sum(wins) / abs(gross_loss), 2) if gross_loss else None,
+    }
+
+
 def load_closed_trades(since: date | None = None) -> list[dict]:
     """Closed trades joined to their signal (signal_type/confidence)."""
     sql = (
@@ -73,13 +104,15 @@ def compute_metrics(rows: list[dict]) -> dict:
     by_type: dict[str, dict] = {}
     for st in sorted({(r.get("signal_type") or "UNKNOWN") for r in closed}):
         sub = [_f(r["realized_pl"]) for r in closed if (r.get("signal_type") or "UNKNOWN") == st]
-        sub_wins = [p for p in sub if p > 0]
-        by_type[st] = {
-            "trades": len(sub),
-            "win_rate": round(100 * len(sub_wins) / len(sub), 1),
-            "total_pl": round(sum(sub), 2),
-            "expectancy": round(mean(sub), 2),
-        }
+        by_type[st] = _bucket(sub)
+
+    # By confidence band — exposes the actual scoring distribution so a "raise the
+    # MIN_CONFIDENCE floor" candidate is judged against where trades really land.
+    by_band: dict[str, dict] = {}
+    for lo, hi, label in CONFIDENCE_BANDS:
+        sub = [_f(r["realized_pl"]) for r in closed
+               if r.get("confidence") is not None and lo <= _f(r["confidence"]) < hi]
+        by_band[label] = _bucket(sub)
 
     # False-breakout rate: of breakout-driven trades, the share that stopped out.
     bo = [r for r in closed if (r.get("signal_type") in ("BREAKOUT", "BOTH"))]
@@ -98,6 +131,7 @@ def compute_metrics(rows: list[dict]) -> dict:
         "avg_loss": round(mean(losses), 2) if losses else 0.0,
         "profit_factor": round(gross_win / abs(gross_loss), 2) if gross_loss else None,
         "by_signal_type": by_type,
+        "by_confidence_band": by_band,
         "false_breakout_rate": fb_rate,
         "exit_reasons": dict(Counter(r.get("exit_reason") for r in closed)),
     }

@@ -44,11 +44,22 @@ def _print_report(since=None) -> int:
     print(f"False-breakout: {m['false_breakout_rate']}%  (breakouts that stopped out)")
     print(f"Exit reasons  : {m['exit_reasons']}")
 
+    def _pf(s):
+        return "  n/a" if s["profit_factor"] is None else f"{s['profit_factor']:5.2f}"
+
     print("\nBy signal type:")
-    print(f"  {'type':9} {'trades':>6} {'win%':>6} {'total$':>10} {'exp$':>8}")
+    print(f"  {'type':9} {'trades':>6} {'win%':>6} {'total$':>10} {'exp$':>8} {'PF':>6}")
     for st, s in m["by_signal_type"].items():
         print(f"  {st:9} {s['trades']:6d} {s['win_rate']:6.1f} "
-              f"{s['total_pl']:10.2f} {s['expectancy']:8.2f}")
+              f"{s['total_pl']:10.2f} {s['expectancy']:8.2f} {_pf(s):>6}")
+
+    print("\nBy confidence band:")
+    print(f"  {'band':9} {'trades':>6} {'win%':>6} {'total$':>10} {'exp$':>8} {'PF':>6}")
+    for band, s in m["by_confidence_band"].items():
+        if s["trades"] == 0:
+            continue
+        print(f"  {band:9} {s['trades']:6d} {s['win_rate']:6.1f} "
+              f"{s['total_pl']:10.2f} {s['expectancy']:8.2f} {_pf(s):>6}")
 
     summaries = analytics.load_daily_summaries(since)
     if summaries:

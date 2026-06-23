@@ -315,6 +315,22 @@ Ordered by expected impact; each item needs replay validation before code.
    underlyings only; watchlist also carries highly correlated pairs. Needs
    data before acting.
 
+## Refuted / closed candidates (do not reopen without new evidence)
+
+- ~~**Raise `MIN_CONFIDENCE` for the MA-only class to ~65**~~ **[REFUTED 2026-06-23]**
+  Flagged 06-15 & 06-22 as "the conf-60–63 MA-only drag." Full-history analysis
+  refutes it: **MA-only is the *least-bad* bucket** (PF 0.75 / exp −$4.75) and
+  **no MA signal has ever scored ≥64** (MA confidence tops at ~63), so a 65 floor
+  would disable the entire MA book — killing all 16 MA winners incl. all 4 of
+  06-23's winners (XOM/BAC/CRM/WMT, conf 60–62) and TSLA's 3 MA wins. Simulating
+  "drop MA<65" makes the portfolio strictly worse (exp −$19.78 → −$41.64). The
+  real signal-quality axis is *inverted* from the old read: the 66+ confidence
+  band (all BOTH) is the worst (−$1,227 / PF 0.31, though concentrated in the
+  06-08/06-09 overtrading days), while 62–64 is ~break-even (PF 1.06). Surfaced
+  permanently in `scripts/report.py` by IMP-004 (PF-per-type + confidence bands)
+  so this can't be silently reinstated. Any future MA-quality work must target a
+  *non-confidence* discriminator (volume confirm, regime, entry timing).
+
 ## Completed phases
 
 - **2026-06-11 · PHASE-001** — pytest suite (22 tests: exits gates, P&L,
