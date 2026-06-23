@@ -275,3 +275,41 @@ Service restarted: yes — active, clean restart 11:48:39 UTC Jun 22.
 - TSLA remains the only consistent earner. Equity $7,838.56 (−21.6%) — strategy-review flag at −25% ($7,500), $338 of headroom.
 
 ---
+
+## 2026-06-23 — Pre-market Research
+
+### Market context
+Directionless, two-sided tape. Monday 06-22 closed lower as megacaps slid — **Alphabet (GOOGL) led the megacap losses, Nasdaq Composite −1%** — overshadowing de-escalation optimism; chip shares were the lone tailwind. Futures had pointed lower on a rocky US–Iran talks restart (Trump's Strait-of-Hormuz "tolls" threat). The Hormuz MoU reopened the strait for a 60-day negotiating window, but Iran threatened to re-close it amid the Lebanon/Hezbollah flare-up → headline-driven, but **oil eased** (WTI ~$76.6 flat, Brent −1.45% to ~$79.4). Backdrop is the hawkish Warsh FOMC: short yields climbing, futures now price **~70% odds of a hike by September**, curve flattening. **Today's calendar is light on macro/earnings**; it ramps later — **FedEx reports late TODAY (after close, not on watchlist)**, **Micron (MU, on watchlist) late Wed 06-24**, **PCE Thu 06-25**. **No watchlist name reports during market hours today** → no intraday earnings risk on the list.
+
+### Carried from daily review (2026-06-22)
+- **IMP-002 VALIDATED in production 06-22** (first same-day open-and-flatten under the rewritten flatten: SPY/QQQ/TSM market-sold at 15:56:50 ET, Alpaca confirmed 0 open, no carry into 06-23). Live check this morning confirms **0 open positions** — the no-overnight contract held. ✅
+- **IMP-003** (EOD-flatten P&L accuracy) only went live on the 06-23 00:57 UTC restart (the 06-22 "restart" didn't take — process ran pre-fix code through the close); next EOD flatten should record real fills — verify in tonight's daily-review.
+- **MU/AMD:** NEITHER signaled 06-22, so the "park if it signals and loses again" test did NOT trigger — MU stays 0W5L, AMD 0W4L → reassessment carried forward (unchanged).
+- **GOOGL** did not signal 06-22 — still 0W3L, park trigger (0W4L) not matured → hold.
+- **Low-conf MA-only (conf 60–63) drag** flagged again (5 of 06-22's losers) — a strategy-side candidate (#2, replay validation first), not a watchlist removal; SPY/QQQ/TSM/META/AVGO are liquid and fit the strategy.
+
+### Watchlist review
+- **Positions: zero open — nothing locked.** Account ACTIVE, equity **$8,015.20** (flat vs 06-22 close $8,015.23 — no overnight change), cash $8,015.20, buying power $32,061, daytrade_count 0. **−19.8% from $10K** (above the −20% line; $515 to the −25%/$7,500 strategy-review flag). Clock `is_open=false`, next open 06-23 09:30 ET (this run is pre-open).
+- Per-symbol P&L (14d closed): positive only TSLA **+$294.36** (2W0L), XOM +$61.60, BAC +$52.20, INTC +$49.00, AAPL +$12.33, TSM +$11.75, NFLX +$7.04. Worst: C −$240.07 (parked), GOOGL −$237.50 (0W3 all-time), SE −$142.35, META −$134.00, ENPH −$63.85, MU −$59.93 (0W5 all-time), JPM −$53.60 (parked), GOOG −$50.81.
+- **GOOGL** led the megacap slide Monday — but that is a broad-market megacap drag, not a name-specific binary catalyst, and it did not signal 06-22. Still 0W3L all-time; trigger is 0W4L → hold (one more loss consolidates to GOOG only).
+- **MU (0W5L) / AMD (0W4L):** matured loss records but the standing plan gates the park on a *fresh* signal+loss, which hasn't occurred (no MU/AMD trade since the streaks were set). Both liquid large-cap semis fitting the strategy; losses judged broad-regime → hold per plan. (Reminder: **MU earnings Wed 06-24 after close → MU gaps Thu 06-25** — trade MU's intraday action Thu with extra caution; no overnight risk for an EOD-flatten bot, but wide ranges.)
+- **Zero-signal all-time: CRM, MSFT, QCOM** — all liquid large-caps that fit the strategy; the signal drought reflects the regime (most of the book under-signals), not name-quality. Only a *structural* strategy mismatch (WPM, already parked) warrants a curation park → hold all three.
+- No watchlist name has a disqualifying catalyst today (no intraday earnings, no halt/binary). 
+- **Adds: none** — directionless tape, hawkish-Fed (70% Sept-hike) backdrop, −19.8% drawdown, and FedEx (tonight)/Micron (Wed)/PCE (Thu) event risk later this week. No high-conviction large-cap breakout not already on the list; today's only relative strength (chips) is already covered (NVDA/AVGO/AMD/MU/INTC/TSM/QCOM).
+
+### Changes applied to watchlist
+**No changes.** 26 active retained. Every park trigger is either un-matured (GOOGL 0W3L < 0W4L; CRM/MSFT/QCOM are regime-droughts, not structural mismatches) or gated on a fresh signal+loss that hasn't occurred (MU/AMD). No adds into an event-heavy, directionless week. Conservative hold is the correct call — no churn.
+
+### Final watchlist
+26 active (unchanged): AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+Service restarted: no (no watchlist changes; 0 open positions — nothing locked).
+
+### Notes for pre-market research (next session — Wed 06-24)
+- **MU earnings Wed 06-24 AFTER the close** → MU gaps Thu 06-25. No overnight-hold risk for the EOD-flatten bot, but expect wide ranges Thu; treat MU intraday with extra caution. (FedEx reports tonight 06-23, not on watchlist — no direct list effect, but a soft FedEx print can pressure the broad tape Wed.)
+- **GOOGL** still 0W3L — one more loss (0W4L) triggers consolidate-to-GOOG-only. It led the megacap slide Monday; watch if weakness persists.
+- **MU/AMD** (0W5L/0W4L) — still gated on a fresh signal+loss; park if either signals and loses again.
+- **PCE inflation Thu 06-25** — given the hawkish Warsh posture and 70% Sept-hike pricing, a hot print could whipsaw the tape; do not add names into the event.
+- **Verify IMP-003 tonight:** the fix only went live on the 06-23 00:57 UTC restart — confirm any EOD_FLATTEN exit today records the real Alpaca fill (not exit==entry $0.00).
+- TSLA remains the only consistent earner (+$294 14d, 2W0L). Equity $8,015.20 (−19.8%) — $515 of headroom to the −25% ($7,500) strategy-review flag.
+
+---
