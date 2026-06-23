@@ -181,9 +181,20 @@ class Engine:
                 continue  # liquidation unconfirmed — leave OPEN, retry next tick
             qty = int(t["qty"]) or 0
             entry = float(t["entry_price"])
+            # Record the REAL liquidation fill. The prior market-value/entry
+            # fallback booked SPY/QQQ/TSM at exit==entry ($0.00) on 2026-06-22
+            # while the actual flatten sells filled at 744.12/737.18/466.222
+            # (~$60 hidden loss in one day). Order-lookup first, then the
+            # pre-flatten market-value approximation, then entry. IMP-003.
+            fill = broker.latest_filled_exit_price(t["symbol"])
             snap = snapshot.get(t["symbol"])
             mv = snap.get("market_value") if snap else None
-            exit_price = abs(mv) / qty if (mv and qty) else entry
+            if fill is not None:
+                exit_price = fill
+            elif mv and qty:
+                exit_price = abs(mv) / qty
+            else:
+                exit_price = entry
             pl, pct = exits.compute_pl(entry, exit_price, qty)
             logbook.update_trade_exit(t["trade_id"], round(exit_price, 4),
                                       exits.now_et(), pl, pct, "EOD_FLATTEN")

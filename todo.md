@@ -279,11 +279,13 @@
 
 Ordered by expected impact; each item needs replay validation before code.
 
-0a. **EOD-flatten P&L accuracy** (from 06-18 daily review; secondary to IMP-002):
-   when the broker position is already gone at flatten time, `eod_flatten`
-   falls back to the entry price → P&L misrecorded (AMZN 06-18 = $0.00, real
-   fill lost). Look up the actual EOD market-sell fill (or run detect_exits on
-   the flatten order) instead of the entry-price fallback.
+0a. ~~**EOD-flatten P&L accuracy**~~ **[SHIPPED IMP-003, 2026-06-22]** — on 06-22
+   SPY/QQQ/TSM were each booked at exit==entry ($0.00) at the flatten while the
+   real market-sells filled at 744.12/737.18/466.222 (~$60 hidden loss; day
+   reported +$238.05 vs true +$177.67). Fixed: `broker.latest_filled_exit_price()`
+   looks up the actual flatten sell; `engine.eod_flatten` records it (mv/entry
+   are now last-resort fallbacks only). Today's 3 rows + the daily_summary were
+   backfilled to the real fills.
 0b. **Flatten after the 16:00 close** (from 06-18 daily review): the loop only
    flattens while `clock.is_open`, so if every tick in 15:55–16:00 fails the
    position strands until the next session. Add a short post-close grace window

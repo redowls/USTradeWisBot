@@ -10,6 +10,8 @@ from __future__ import annotations
 from functools import lru_cache
 
 from alpaca.trading.client import TradingClient
+from alpaca.trading.enums import OrderSide, QueryOrderStatus
+from alpaca.trading.requests import GetOrdersRequest
 
 from . import secrets
 
@@ -85,3 +87,31 @@ def close_position(symbol: str):
     close_all_positions (which races held_for_orders and silently leaves some
     positions open — the 06-16 C/AMZN/BAC two-night naked hold, IMP-002)."""
     return trading_client().close_position(symbol)
+
+
+def latest_filled_exit_price(symbol: str) -> float | None:
+    """`filled_avg_price` of the most recently filled SELL for `symbol`, or None.
+
+    The EOD flatten uses this to record each liquidation at its REAL fill price
+    instead of a pre-liquidation market-value approximation that fell through to
+    the entry price. On 2026-06-22 SPY/QQQ/TSM were each booked at exit==entry
+    ($0.00 P&L) while the actual flatten sells filled at 744.12 / 737.18 /
+    466.222 — a ~$60 P&L misstatement in one day. The most recent filled sell
+    after liquidation is the flatten order (canceled bracket legs carry no
+    filled_avg_price and are skipped). IMP-003."""
+    req = GetOrdersRequest(
+        status=QueryOrderStatus.CLOSED,
+        side=OrderSide.SELL,
+        symbols=[symbol.upper()],
+        limit=50,
+        direction="desc",
+    )
+    for order in trading_client().get_orders(filter=req):
+        price = getattr(order, "filled_avg_price", None)
+        if price is None:
+            continue
+        try:
+            return float(price)
+        except (TypeError, ValueError):
+            continue
+    return None

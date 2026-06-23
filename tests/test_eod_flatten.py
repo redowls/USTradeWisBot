@@ -48,12 +48,17 @@ def test_flatten_all_closes_every_position_even_if_one_raises(monkeypatch):
 
 # --- 2/3. eod_flatten verification --------------------------------------------
 
-def _eng_with_open_trades(monkeypatch, open_trades, flatten_snapshot, remaining):
+def _eng_with_open_trades(monkeypatch, open_trades, flatten_snapshot, remaining,
+                          fills=None):
     closed: dict[int, float] = {}
     alerts: list[str] = []
+    fills = fills or {}
     monkeypatch.setattr(logbook, "get_open_trades", lambda: list(open_trades))
     monkeypatch.setattr(exits, "flatten_all", lambda reason: list(flatten_snapshot))
     monkeypatch.setattr(broker, "open_position_symbols", lambda: set(remaining))
+    # Default: no real fill found -> exercises the market-value/entry fallback.
+    monkeypatch.setattr(broker, "latest_filled_exit_price",
+                        lambda sym: fills.get(sym))
     monkeypatch.setattr(logbook, "update_trade_exit",
                         lambda tid, price, *a, **k: closed.__setitem__(tid, price))
     monkeypatch.setattr(notify, "exit_alert", lambda rec: None)
@@ -86,6 +91,38 @@ def test_eod_flatten_marks_closed_when_broker_flat(monkeypatch):
     assert eng.eod_flatten() is True
     assert closed[70] == round(2587.77 / 18, 4) == 143.765
     assert not alerts
+
+
+def test_eod_flatten_records_real_fill_not_entry_price(monkeypatch):
+    """IMP-003 — 06-22 SPY replay: the actual flatten sell filled at 744.12, so
+    the exit must be booked at 744.12 (P&L -15.06), NOT exit==entry ($0.00).
+
+    The pre-IMP-003 code used a pre-liquidation market_value/entry fallback that
+    booked SPY/QQQ/TSM at exit==entry ($0.00) while they really lost ~$60."""
+    open_trades = [{"trade_id": 77, "symbol": "SPY", "qty": 3, "entry_price": 749.14}]
+    # No market_value in the snapshot (the path that fell to entry on 06-22)...
+    snapshot = [{"symbol": "SPY"}]
+    # ...but the broker has the real flatten fill.
+    eng, closed, alerts = _eng_with_open_trades(
+        monkeypatch, open_trades, snapshot, remaining=set(),
+        fills={"SPY": 744.12})
+    assert eng.eod_flatten() is True
+    assert closed[77] == 744.12                       # real fill, not 749.14
+    assert closed[77] != 749.14                        # never the entry-price $0.00
+    pl, _ = exits.compute_pl(749.14, 744.12, 3)
+    assert pl == round((744.12 - 749.14) * 3, 4) == -15.06
+    assert not alerts
+
+
+def test_eod_flatten_real_fill_overrides_market_value(monkeypatch):
+    """The real liquidation fill takes priority over the market_value estimate."""
+    open_trades = [{"trade_id": 79, "symbol": "TSM", "qty": 5, "entry_price": 470.75}]
+    snapshot = [{"symbol": "TSM", "market_value": 470.75 * 5}]  # stale estimate
+    eng, closed, _ = _eng_with_open_trades(
+        monkeypatch, open_trades, snapshot, remaining=set(),
+        fills={"TSM": 466.222})
+    assert eng.eod_flatten() is True
+    assert closed[79] == 466.222                       # fill wins over mv estimate
 
 
 def test_eod_flatten_dry_run_is_noop(monkeypatch):
