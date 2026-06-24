@@ -313,3 +313,39 @@ Service restarted: no (no watchlist changes; 0 open positions — nothing locked
 - TSLA remains the only consistent earner (+$294 14d, 2W0L). Equity $8,015.20 (−19.8%) — $515 of headroom to the −25% ($7,500) strategy-review flag.
 
 ---
+
+## 2026-06-24 — Pre-market Research
+
+### Market context
+Wed futures **mixed** — Dow lower, Nasdaq 100 / S&P 500 modestly higher, a fragile rebound attempt after **Tuesday's >2% Nasdaq drop on a semiconductor plunge** (Micron, SanDisk hit hardest; Greed Index in 'Fear'). AI-trade concerns and chip weakness still the dominant theme. Macro: easing Iran tensions vs. a still-live Fed hike risk (≈70% Sept-hike pricing). **Earnings: MU reports fiscal Q3 today AFTER the close (~4:30 PM ET), options pricing a ~14% move.** **PCE inflation Thu 06-25** — event-heavy back half of week.
+
+### Carried from daily review (06-23)
+- "MA-only conf 60–62 names are NOT low quality" (IMP-004 refuted the floor-raise) — **kept** XOM/BAC/CRM/WMT and the whole MA-only book; no parks on the conf-60–62 thesis.
+- **MU/AMD** (0W5L / 0W4L) — reassessment gated on a *fresh signal+loss*; **GOOGL** 0W3L, park trigger un-matured (0W4L). Honored below.
+- 06-22 reminder: "MU earnings Wed 06-24 after close → gaps Thu 06-25, trade with caution" — acted on (park, see below).
+
+### Watchlist review
+- Account: equity **$8,104.34**, ACTIVE, **0 open positions → nothing locked.** 14-day book net **+$17.05** across 21 names.
+- **MU** — 0W5L all-time (−$182.3; all losses STOP), last signal 06-16 (−$35.5). **Earnings tonight after close (~14% implied move)** and already in the eye of Tuesday's semi plunge → erratic, news-driven, low-quality breakout tape today. Chronic loser + binary event TODAY = the one clear park. **→ PARK** (re-enable after 06-25 gap settles).
+- **AMD** — 0W4L all-time (−$239.8, worst net), but all 4 losses are 06-09 (the flagged overtrading day) and it has NOT signaled in 15 days. No fresh signal+loss → trigger un-matured. **→ HOLD** per standing discipline.
+- **GOOGL** — 0W3L (−$356.7), no signal since 06-12. Park trigger (0W4L) not reached; GOOG (sister, 1W3L, has a TP winner) still carried as the better vehicle. **→ HOLD** (one more loss consolidates to GOOG-only).
+- **SE** — 1 trade, −$142.3 (06-12); single sample, reasonably liquid ADR → insufficient evidence. **→ HOLD.**
+- Semis broadly (NVDA/AVGO/TSM/QCOM/INTC) weak on the sector down-day, but liquid and strategy-fit — a one-day sector dip is not a park trigger; the gate self-throttles. **→ HOLD all.**
+- Recent winners (TSLA +$294, GOOG +$120, CRM +$58, INTC +$49, XOM, AAPL, TSM, BAC) all retained.
+
+### Changes applied to watchlist
+- **PARK MU** — "parked 2026-06-24: 0W5L chronic loser (−$182 all-time) + earnings AFTER close tonight (~14% implied move) amid Tue semi plunge; re-enable after 06-25 gap settles".
+- No adds (event-heavy, directionless rebound tape — adds stay conservative per 06-23 note). No re-enables.
+
+### Final watchlist
+**25 active** (was 26): AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM. (Parked: MU.)
+Service **restarted: yes** — 11:48:32 UTC, active, clean startup ("USTradeWisBot starting", sleeping until 09:30 ET open), no errors. 0 positions locked.
+
+### Notes for pre-market research (next session — Thu 06-25)
+- **Re-enable MU** once Thursday's post-earnings gap settles (likely Thu/Fri) — it's a structurally fine liquid large-cap, parked only for the binary event.
+- **PCE inflation Thu 06-25** — hot print could whipsaw the tape; do not add names into the event; watch for a hawkish repricing.
+- **MU gaps Thu 06-25** on tonight's report (~14% implied) — note direction for whether to re-enable immediately or wait a session.
+- **GOOGL** still 0W3L / **AMD** 0W4L — both gated on a fresh signal+loss; park if either signals and loses again.
+- TSLA remains the franchise earner (+$294 14d, 2W0L). Equity $8,104.34 (−19.0%), $604 to the −25% ($7,500) flag.
+
+---
