@@ -212,3 +212,40 @@ None — market closed. Nothing to root-cause at the trade level.
 - TSLA did NOT trade today (no BOTH signal fired) — still the franchise name; equity $8,104.37 (−19.0%), $604 to the −25% flag.
 
 ---
+
+## 2026-06-24 — Daily Review
+
+### Stats
+- Trades: **3 closed (0W / 3L)**, win rate **0%**. First red session since 06-16; ends the 2-day green streak.
+- Net realized P&L: **−$87.08** (day **−1.075%**). Equity close **$8,017.26** (from $8,104.34 open; **−$87.08 broker truth — matches exactly**). **−19.8% YTD**, $517 above the −25% ($7,500) strategy-review flag.
+- ⚠️ **The DB first reported −$61.34 — that was WRONG (an ENTRY-fill recording bug, root-caused & fixed today as IMP-005).** BAC/CRM/WMT were each booked at their *signal* entry price, not the actual bracket fill (which slipped 0.04–0.69 higher on a fast open), hiding ~$25.74 (42%) of the day's loss. Corrected in the DB to the true −$87.08 / equity-matched.
+- Avg loser **−$29.03** (CRM −41.48, WMT −27.41, BAC −18.19); no winners. Profit factor (day): **0.00** (zero gross win).
+- Exit reasons: **3 EOD_FLATTEN** (none hit STOP, none hit TP — all 3 drifted and were flattened). Circuit breaker NOT tripped (−1.07% nowhere near −8.0%). **Positions: 0 open on the broker — no naked overnight.** ✅ IMP-002 held a 4th straight session. Service active all session (since 11:48:31 UTC restart); one pre-open transient `APIError <html>` at 05:33 EDT (non-fatal, loop survived), no in-session errors.
+
+### Trade-by-trade review
+*(entry = real Alpaca bracket fill; R measured off the real fill; MFE/MFE from IEX 5-min bars)*
+| # | Sym | Entry (ET) | Exit (ET) | Conf | Type | Exit | P&L | MFE / MAE | Root cause |
+|---|-----|-----------|-----------|------|------|------|-----|-----------|-----------|
+| 84 | BAC | 09:30 @**58.215** (sig 57.93) | 15:57 @57.82 | 60.32 | MA | EOD_FLATTEN | **−$18.19** | +0.10R / −0.71R | Low-conf MA at the open; never went anywhere positive, drifted down with the tape, flattened. |
+| 85 | CRM | 09:38 @**155.17** (sig 154.48) | 15:57 @152.73 | 68.99 | BREAKOUT | EOD_FLATTEN | **−$41.48** | **+0.59R** / −1.35R | Real breakout (broke 154.285), popped to 156.94 (+0.59R) then **fully round-tripped** and faded to flatten (−1.57%). Day's worst. (IEX low 151.11 < stop 152.16 but the broker stop never filled — thin-IEX print vs SIP; flattened EOD instead.) |
+| 86 | WMT | 09:41 @**120.33** (sig 120.29) | 15:57 @119.08 | 62.31 | MA | EOD_FLATTEN | **−$27.41** | +0.03R / −0.76R | Low-conf MA at the open; faded with the tape, never positive, flattened. |
+
+### What worked / what didn't
+- **Worked — capital protection held cleanly on a losing day.** IMP-002 fired exactly as designed: the 15:55 & 15:56 liquidations reported "incomplete — 3 positions still open" (the `held_for_orders` race), retried, and all three confirmed flat by 15:57 — Alpaca shows **0 open positions, no naked overnight** (4th straight clean session). IMP-003's real-exit-fill recording also held (exits booked at 57.82/152.73/119.0841). No circuit-breaker, no risk event; each loss was small and controlled (worst −1.57%).
+- **Didn't — 3-for-3 longs into a falling tape.** The day was a broad **−0.76% down session** (semis still weak after Tue's −2% plunge); the bot opened three long breakouts/MA-stacks in the first 11 minutes and all three faded with the market. None hit its stop (3×ATR/1.5% floor stops are wide → trades survive noise but ride the drift down to the flatten), none hit TP. This is the **EOD_FLATTEN-drift bucket on a red day** — the mirror image of 06-23 (same bucket, but the tape was green so they drifted *up* into small wins). The strategy has **no down-day / regime gate**: it takes longs at the open regardless of broad direction.
+- **Didn't — the entry-fill measurement bug (IMP-005).** The DB recorded entries at the signal price, so the flatten path computed P&L off 57.93/154.48/120.29 instead of the real fills 58.215/155.17/120.33 — booking −$61.34 vs the broker's −$87.08 (a 42% understatement in one day). This corrupted the evidence base the same way the IMP-003 exit bug did; STOP/TP exits were already immune (they price off the parent fill), so the hole was the flatten path only.
+
+### Lessons & improvement candidates (ranked)
+1. **[SHIPPED IMP-005]** ENTRY-fill P&L accuracy on the EOD_FLATTEN path. `eod_flatten` priced the entry off the stored *signal* price (`t["entry_price"]`); on a fast open the bracket buy slips (today 0.04–0.69 higher), so realized P&L was understated by $25.74 (42%) today and silently on every prior slipped flatten. Fix: new `broker.entry_fill_price(order_id)` looks up the parent bracket's real `filled_avg_price`; `eod_flatten` now prices the entry off it (falling back to the recorded entry) and corrects the stored `entry_price` so the row stays self-consistent. This is the unfinished half of IMP-003 (which fixed the *exit* fill) — `detect_exits` already priced STOP/TP off the real parent fill, so only the flatten path was wrong. Pure measurement-integrity fix; **no risk limit, no entry logic touched** (paper endpoint, MAX_RISK_PCT, DAILY_LOSS_HALT_PCT 8.0, MAX_CONCURRENT 3, no-overnight all unchanged). Backfilled today's 3 rows + daily_summary to the true −$87.08.
+2. **Down-day / market-regime gate — the recurring strategy lever.** Today is the cleanest illustration yet: 3 longs at the open on a −0.76% tape, all faded; 06-23 was the same bucket on a green tape and won. The edge is **directional-with-the-tape, not symbol-specific** — a broad-regime filter (e.g. only take longs when SPY/QQQ are above a short intraday MA, or skip the first N minutes on a gap-down open) is the highest-potential *strategy* change. **NOT acted on today** — it changes entry behavior and needs a `scripts/replay.py` pass over history (does a SPY-above-VWAP/MA long-only gate cut red-day losers without killing green-day winners like 06-23?). One run to validate first; do not stack a behavior change on the same day as a measurement fix.
+3. **Breakeven stop at +0.5R (backlog #1)** — CRM hit +0.59R (156.94) then round-tripped to −1.57%: a breakeven-at-+0.5R stop would have saved ~$41 on CRM. But BAC (+0.10R) and WMT (+0.03R) never reached +0.5R, so it helps only 1 of 3 today — today is *not* cleanly "the breakeven day." Remains replay-validated (+$563 sim) and queued; act on it on a day its evidence is the dominant story, and not stacked with another change.
+
+### Notes for pre-market research
+- **CRM** was a genuine BREAKOUT (conf 69, broke 154.285) that popped +1.1% then **fully round-tripped** to a −1.57% flatten — breakouts are failing/mean-reverting on this choppy, semi-led-down tape. Watch CRM; it was 06-23's hero (+$57.69 TP) and 06-24's worst (−$41.48) — same name, opposite regime.
+- **BAC / WMT** were low-conf (60–62) MA drifters that simply faded with the broad tape — no name-specific problem, pure down-day regime. Keep on the list.
+- **All 3 entries fired 09:30–09:41** (open cycle) on a red open and rode the drift down all day — note for whether early longs on a gap-down/weak open are worth taking (ties to the regime-gate candidate #2).
+- **MU** stays **parked** (earnings tonight after close, ~14% implied move) — re-enable Thu/Fri once the 06-25 gap settles, per the standing plan. **PCE inflation Thu 06-25** — do not add names into the event.
+- **GOOGL** 0W3L / **AMD** 0W4L — still gated on a fresh signal+loss; neither signaled today → hold.
+- TSLA did NOT trade today (no BOTH signal). Equity **$8,017.26 (−19.8%)**, $517 to the −25% ($7,500) flag.
+
+---
