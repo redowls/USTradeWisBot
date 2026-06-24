@@ -115,3 +115,27 @@ def latest_filled_exit_price(symbol: str) -> float | None:
         except (TypeError, ValueError):
             continue
     return None
+
+
+def entry_fill_price(order_id: str | None) -> float | None:
+    """`filled_avg_price` of the bracket entry (parent) order, or None.
+
+    The EOD flatten computes P&L from the trade's stored entry_price, which is
+    the *signal/intended* price at submission — not the actual market fill. On a
+    fast open the bracket buy can slip materially: 2026-06-24 CRM was recorded
+    154.48 but filled 155.17, BAC recorded 57.93 but filled 58.2154, so the DB
+    booked the day at -$61.34 while the broker truth was -$87.08 (~42% of the
+    loss hidden). detect_exits already prices STOP/TP exits off the parent's
+    filled_avg_price; this gives eod_flatten the same real entry basis. IMP-005.
+    """
+    if not order_id:
+        return None
+    try:
+        order = trading_client().get_order_by_id(order_id)
+    except Exception:  # noqa: BLE001 - a lookup failure must not block the flatten
+        return None
+    price = getattr(order, "filled_avg_price", None)
+    try:
+        return float(price) if price is not None else None
+    except (TypeError, ValueError):
+        return None

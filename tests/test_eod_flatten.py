@@ -49,21 +49,32 @@ def test_flatten_all_closes_every_position_even_if_one_raises(monkeypatch):
 # --- 2/3. eod_flatten verification --------------------------------------------
 
 def _eng_with_open_trades(monkeypatch, open_trades, flatten_snapshot, remaining,
-                          fills=None):
+                          fills=None, entry_fills=None):
     closed: dict[int, float] = {}
+    booked: dict[int, dict] = {}
     alerts: list[str] = []
     fills = fills or {}
+    entry_fills = entry_fills or {}
     monkeypatch.setattr(logbook, "get_open_trades", lambda: list(open_trades))
     monkeypatch.setattr(exits, "flatten_all", lambda reason: list(flatten_snapshot))
     monkeypatch.setattr(broker, "open_position_symbols", lambda: set(remaining))
     # Default: no real fill found -> exercises the market-value/entry fallback.
     monkeypatch.setattr(broker, "latest_filled_exit_price",
                         lambda sym: fills.get(sym))
-    monkeypatch.setattr(logbook, "update_trade_exit",
-                        lambda tid, price, *a, **k: closed.__setitem__(tid, price))
+    # Default: no entry-fill lookup -> falls back to the recorded entry price.
+    monkeypatch.setattr(broker, "entry_fill_price",
+                        lambda oid: entry_fills.get(oid))
+
+    def _upd(tid, price, exit_time, pl, pct, reason, status="CLOSED", entry_price=None):
+        closed[tid] = price
+        booked[tid] = {"exit_price": price, "pl": pl, "pct": pct,
+                       "entry_price": entry_price}
+    monkeypatch.setattr(logbook, "update_trade_exit", _upd)
     monkeypatch.setattr(notify, "exit_alert", lambda rec: None)
     monkeypatch.setattr(notify, "error_alert", lambda msg: alerts.append(msg))
-    return engine.Engine(dry_run=False), closed, alerts
+    eng = engine.Engine(dry_run=False)
+    eng._booked = booked  # expose the full booked record for assertions
+    return eng, closed, alerts
 
 
 def test_eod_flatten_leaves_unconfirmed_position_open(monkeypatch):
@@ -123,6 +134,41 @@ def test_eod_flatten_real_fill_overrides_market_value(monkeypatch):
         fills={"TSM": 466.222})
     assert eng.eod_flatten() is True
     assert closed[79] == 466.222                       # fill wins over mv estimate
+
+
+def test_eod_flatten_prices_entry_off_real_fill(monkeypatch):
+    """IMP-005 — 06-24 CRM replay: recorded entry 154.48 (signal price) but the
+    bracket buy actually filled 155.17. P&L must be computed from the REAL entry
+    fill (-$41.48), not the recorded signal price (-$29.75), and the stored
+    entry_price corrected to 155.17 so the row stays internally consistent."""
+    open_trades = [{"trade_id": 85, "symbol": "CRM", "qty": 17,
+                    "entry_price": 154.48, "alpaca_order_id": "ord-crm"}]
+    snapshot = [{"symbol": "CRM"}]
+    eng, closed, alerts = _eng_with_open_trades(
+        monkeypatch, open_trades, snapshot, remaining=set(),
+        fills={"CRM": 152.73}, entry_fills={"ord-crm": 155.17})
+    assert eng.eod_flatten() is True
+    assert closed[85] == 152.73                          # real exit fill
+    rec = eng._booked[85]
+    assert rec["pl"] == round((152.73 - 155.17) * 17, 4) == -41.48
+    assert rec["pl"] != round((152.73 - 154.48) * 17, 4)  # not the -29.75 signal-price P&L
+    assert rec["entry_price"] == 155.17                  # entry corrected to the real fill
+    assert not alerts
+
+
+def test_eod_flatten_keeps_recorded_entry_when_no_fill(monkeypatch):
+    """Fallback: with no entry-fill lookup the recorded entry price is used and
+    NOT overwritten (entry_price correction stays None) — prior behavior intact."""
+    open_trades = [{"trade_id": 80, "symbol": "XOM", "qty": 19,
+                    "entry_price": 139.09, "alpaca_order_id": "ord-xom"}]
+    snapshot = [{"symbol": "XOM"}]
+    eng, closed, _ = _eng_with_open_trades(
+        monkeypatch, open_trades, snapshot, remaining=set(),
+        fills={"XOM": 140.12})                            # entry_fills empty -> None
+    assert eng.eod_flatten() is True
+    rec = eng._booked[80]
+    assert rec["pl"] == round((140.12 - 139.09) * 19, 4)  # uses recorded entry
+    assert rec["entry_price"] is None                     # recorded entry left untouched
 
 
 def test_eod_flatten_dry_run_is_noop(monkeypatch):

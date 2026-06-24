@@ -180,7 +180,15 @@ class Engine:
             if t["symbol"].upper() in remaining:
                 continue  # liquidation unconfirmed — leave OPEN, retry next tick
             qty = int(t["qty"]) or 0
-            entry = float(t["entry_price"])
+            recorded_entry = float(t["entry_price"])
+            # Price the entry off the REAL bracket fill, not the recorded signal
+            # price. On 2026-06-24 BAC/CRM/WMT filled 0.04-0.69 above their
+            # recorded entries, so the DB booked -$61.34 while the broker truth
+            # was -$87.08 (~42% of the loss hidden). detect_exits already prices
+            # STOP/TP off the parent fill; this gives the flatten path parity.
+            # Falls back to the recorded entry if the lookup yields nothing. IMP-005.
+            entry_fill = broker.entry_fill_price(t.get("alpaca_order_id"))
+            entry = entry_fill if entry_fill is not None else recorded_entry
             # Record the REAL liquidation fill. The prior market-value/entry
             # fallback booked SPY/QQQ/TSM at exit==entry ($0.00) on 2026-06-22
             # while the actual flatten sells filled at 744.12/737.18/466.222
@@ -196,8 +204,12 @@ class Engine:
             else:
                 exit_price = entry
             pl, pct = exits.compute_pl(entry, exit_price, qty)
+            corrected_entry = (round(entry, 4)
+                               if entry_fill is not None and round(entry, 4) != round(recorded_entry, 4)
+                               else None)
             logbook.update_trade_exit(t["trade_id"], round(exit_price, 4),
-                                      exits.now_et(), pl, pct, "EOD_FLATTEN")
+                                      exits.now_et(), pl, pct, "EOD_FLATTEN",
+                                      entry_price=corrected_entry)
             notify.exit_alert({"symbol": t["symbol"], "qty": qty,
                                "exit_price": exit_price, "realized_pl": pl,
                                "realized_pl_pct": pct, "exit_reason": "EOD_FLATTEN"})

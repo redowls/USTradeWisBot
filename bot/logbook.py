@@ -102,8 +102,26 @@ def update_trade_exit(
     realized_pl_pct: float,
     exit_reason: str,
     status: str = "CLOSED",
+    entry_price: float | None = None,
 ) -> int:
-    """Update a trade row on exit. Returns rows affected."""
+    """Update a trade row on exit. Returns rows affected.
+
+    ``entry_price`` is optionally corrected to the real broker entry fill so the
+    row stays internally consistent (entry/exit/realized_pl agree). The EOD
+    flatten passes it when the actual bracket fill differs from the recorded
+    signal price (IMP-005); other paths leave the recorded entry untouched.
+    """
+    if entry_price is not None:
+        return db.execute(
+            """
+            UPDATE trades
+            SET entry_price = ?, exit_price = ?, exit_time = ?,
+                realized_pl = ?, realized_pl_pct = ?, status = ?, exit_reason = ?
+            WHERE trade_id = ?
+            """,
+            [entry_price, exit_price, _et_naive(exit_time), realized_pl,
+             realized_pl_pct, status, exit_reason, trade_id],
+        )
     return db.execute(
         """
         UPDATE trades
