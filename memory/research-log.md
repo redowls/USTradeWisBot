@@ -349,3 +349,38 @@ Service **restarted: yes** — 11:48:32 UTC, active, clean startup ("USTradeWisB
 - TSLA remains the franchise earner (+$294 14d, 2W0L). Equity $8,104.34 (−19.0%), $604 to the −25% ($7,500) flag.
 
 ---
+
+## 2026-06-25 — Pre-market Research
+
+### Market context
+**Micron-led AI/chip rally into PCE.** MU reported fiscal Q3 Wed 06-24 after close — a blowout: revenue $41.46B (vs ~$36B est, >4x YoY), EPS $25.11 (vs $20.20), gross margin 84.9%, and a **~$50B current-quarter revenue guide** (vs $43.6B est) on locked-in AI/data-center memory demand (16 multi-year customer agreements). Stock **+15% AH / +17% pre-market**; whole semi complex bid in sympathy — **QCOM +11.7%** (raised FY29 non-handset guide; on-list), SanDisk/WDC/LRCX/KLA/AMAT all up, SMH +3% AH. Futures: **Nasdaq-100 +2.1%, S&P 500 +0.7%, Dow +0.2%.** **Main event: May PCE (Fed's preferred gauge) at 8:30 ET** — consensus hotter (headline +0.5% m/m, ~4.1% y/y; **core +0.3% m/m, 3.4% y/y**, both above April) on a hawkish-Warsh backdrop (~half the FOMC pencils a 2026 hike, markets price ~+0.5% over 12m). Also Q1 GDP final, May durable orders; DRI earnings. A hot PCE print can whipsaw the tape, so treat the open with caution.
+
+### Carried from daily review (2026-06-24)
+- **Re-enable MU once Thursday's gap settles** (standing plan from 06-24 park: "parked only for the binary earnings event; re-enable Thu/Fri once the 06-25 gap settles, note direction"). Direction is **strongly bullish** (+15–17% on a fundamental beat + blowout guide), MU is the day's market driver and a >$1T liquid AI-memory leader → re-enabled today (see below). The park reason (binary event) is resolved.
+- **MA-only conf 60–62 names are NOT low quality** (IMP-004/06-23 disproof; 06-24 review re-affirmed) — XOM/BAC/CRM/WMT kept; no conf-floor parks.
+- **GOOGL 0W3L / AMD 0W4L** — both gated on a *fresh* signal+loss; neither signaled 06-24 → triggers un-matured, **hold both**.
+- **PCE Thu 06-25 → do not add NEW names into the event** — honored (MU is an event-park restore, not a new momentum chase).
+
+### Watchlist review
+- **Positions: 0 open — nothing locked.** Account ACTIVE, equity **$8,017.23** (flat vs 06-24 close $8,017.26 — no overnight change), cash $8,017.23, buying power $32,069, daytrade_count 0. **−19.8% from $10K**, $517 to the −25% ($7,500) strategy-review flag. Clock `is_open=false`, next open 06-25 09:30 ET (pre-open run).
+- Per-symbol P&L (12d closed): positive TSLA **+$294.36 (2W0L)**, XOM +$19.57, CRM +$16.21, NFLX +$7.04, C +$4.32. Worst small: ENPH −$63.85 (1W3), MU −$35.50 (1 trade), WMT −$25.43, QQQ/TSM/BAC/SPY/META/AVGO each <−$23. 12d net **+$120.35** (carried by TSLA). All names liquid large-caps/ETFs that fit the strategy; no chronic-loser park matured.
+- **MU** — verified on Alpaca `/v2/assets/MU` → **tradable:true, status:active**. Earnings binary resolved bullishly; liquid, now in a powerful uptrend with massive volume and a fresh sector tailwind — exactly the trending/liquid profile the breakout strategy wants. Gap-day + PCE volatility is bounded by ATR-based sizing (large post-gap ATR → small qty → small $ risk) and the no-overnight EOD flatten. **→ RE-ENABLE.**
+- **GOOGL** (0W3L) / **AMD** (0W4L) — no fresh signal+loss; **hold** (GOOGL one more loss → consolidate-to-GOOG-only). **SE** (1 trade −$142) single-sample → hold. Zero-signal liquid names (MSFT/QCOM/CRM history) reflect regime, not name-quality → hold.
+- **Adds: none** — hot-PCE risk + hawkish Fed + −19.8% drawdown; do not chase new names into the 8:30 ET print. Today's strength (semis) is already fully covered on-list (MU/NVDA/AVGO/AMD/TSM/INTC/QCOM).
+
+### Changes applied to watchlist
+- **MU: re-enabled 2026-06-25** — earnings event (parked 06-24) resolved bullish (+15% beat, ~$50B Q4 guide); liquid AI-memory large-cap, today's market driver. (Restore of an event-park, not a new add — consistent with the "no new names into PCE" guidance.)
+
+### Final watchlist
+**26 active** (was 25, +1 re-enable; within 30 cap):
+AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+Service **restarted: yes** — active (running), Main PID 3628083, clean startup 11:49:25 UTC Jun 25, no errors. 0 positions locked.
+
+### Notes for pre-market research (next session — Fri 06-26)
+- **Watch MU's first live session back:** today is its +15% earnings-gap day — confirm any MU trade taken is ATR-sized small and flattened by 15:55 ET; review whether gap-day breakouts on MU are clean or choppy. If MU signals and loses badly on the gap, note it (it was re-enabled on conviction, not yet trade-proven post-earnings).
+- **PCE digestion:** if the 8:30 ET print ran hot and the tape whipsawed, factor the regime read into Friday's adds (still none unless a high-conviction trending large-cap emerges).
+- **GOOGL** still 0W3L / **AMD** 0W4L — both gated on a fresh signal+loss; park the one that signals and loses again. GOOGL one more loss → consolidate-to-GOOG-only.
+- **QCOM** (+11.7% on raised guidance) — already on-list; watch whether it produces a clean breakout today (fresh fundamental catalyst, unlike its long signal-drought).
+- TSLA remains the franchise earner (+$294 12d, 2W0L). Equity $8,017.23 (−19.8%), $517 to the −25% ($7,500) flag.
+
+---
