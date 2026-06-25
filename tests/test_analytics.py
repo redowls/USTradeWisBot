@@ -72,3 +72,61 @@ def test_profit_factor_distinguishes_ma_from_both():
 
 def test_empty_input_has_no_bands():
     assert analytics.compute_metrics([]) == {"trades": 0}
+
+
+# --- IMP-006: by-exit-reason P&L attribution ------------------------------
+#
+# Regression anchor: 2026-06-25 closed 2W/1L for -$3.69, and all three exits were
+# EOD_FLATTEN (QCOM +9.62, AMD +19.61, TSM -32.92). The day reignited the recurring
+# "EOD_FLATTEN drift is a low-yield drag" framing. The all-time by-exit-reason split
+# refutes that: STOP exits (48 trades) carry the ENTIRE bleed (-$2,739.74, PF ~0.01,
+# 2.1% win — the false breakouts), while EOD_FLATTEN (27 trades) is net POSITIVE
+# (+$72.53, PF ~1.29). The report previously showed only exit-reason *counts*, hiding
+# this. These tests keep the attribution visible so the queued "convert EOD_FLATTEN
+# drift via breakeven/trailing" candidate is judged against the real leak (STOP), not
+# the bucket that already makes money.
+
+# The three real 2026-06-25 EOD_FLATTEN trades.
+TODAY_20260625 = [
+    {"realized_pl": 9.62, "realized_pl_pct": 0.6743, "exit_reason": "EOD_FLATTEN", "signal_type": "BOTH", "confidence": 76.92},
+    {"realized_pl": -32.92, "realized_pl_pct": -1.8597, "exit_reason": "EOD_FLATTEN", "signal_type": "BREAKOUT", "confidence": 67.98},
+    {"realized_pl": 19.61, "realized_pl_pct": 1.8824, "exit_reason": "EOD_FLATTEN", "signal_type": "BREAKOUT", "confidence": 60.75},
+]
+
+
+def test_by_exit_reason_present_and_buckets_today():
+    m = analytics.compute_metrics(TODAY_20260625)
+    by_exit = m["by_exit_reason"]
+    assert set(by_exit) == {"EOD_FLATTEN"}
+    flat = by_exit["EOD_FLATTEN"]
+    assert flat["trades"] == 3
+    assert flat["total_pl"] == -3.69            # matches the broker equity move exactly
+    assert flat["win_rate"] == round(100 * 2 / 3, 1)
+
+
+def test_by_exit_reason_separates_stop_bleed_from_flatten():
+    """All-time shape: STOP is the leak (PF < 1), EOD_FLATTEN is net positive (PF > 1)."""
+    rows = [
+        # EOD_FLATTEN bucket: net positive across the book despite the 06-25 trio
+        # netting slightly red (these extra winners mirror the all-time +$72.53 shape).
+        *TODAY_20260625,
+        {"realized_pl": 19.57, "realized_pl_pct": 0.74, "exit_reason": "EOD_FLATTEN", "signal_type": "MA", "confidence": 62.0},
+        {"realized_pl": 16.56, "realized_pl_pct": 0.63, "exit_reason": "EOD_FLATTEN", "signal_type": "MA", "confidence": 61.0},
+        # STOP bucket: the false-breakout bleed — almost never recovers.
+        {"realized_pl": -57.0, "realized_pl_pct": -1.5, "exit_reason": "STOP", "signal_type": "BOTH", "confidence": 66.0},
+        {"realized_pl": -49.0, "realized_pl_pct": -1.4, "exit_reason": "STOP", "signal_type": "BREAKOUT", "confidence": 61.0},
+        {"realized_pl": 2.0, "realized_pl_pct": 0.1, "exit_reason": "STOP", "signal_type": "MA", "confidence": 60.5},
+        # TAKE_PROFIT bucket: pure winners.
+        {"realized_pl": 81.0, "realized_pl_pct": 2.2, "exit_reason": "TAKE_PROFIT", "signal_type": "BOTH", "confidence": 70.0},
+    ]
+    m = analytics.compute_metrics(rows)
+    be = m["by_exit_reason"]
+    assert be["STOP"]["total_pl"] < 0
+    assert be["STOP"]["profit_factor"] < 1.0          # the leak
+    assert be["EOD_FLATTEN"]["profit_factor"] > 1.0   # already profitable
+    # The queued lever targets the wrong bucket: flatten is fine, STOP is the bleed.
+    assert be["STOP"]["total_pl"] < be["EOD_FLATTEN"]["total_pl"]
+
+
+def test_by_exit_reason_empty_safe():
+    assert analytics.compute_metrics([])["trades"] == 0  # no crash, no by_exit_reason key needed

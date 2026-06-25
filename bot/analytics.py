@@ -114,6 +114,16 @@ def compute_metrics(rows: list[dict]) -> dict:
                if r.get("confidence") is not None and lo <= _f(r["confidence"]) < hi]
         by_band[label] = _bucket(sub)
 
+    # By exit reason — separates WHERE the P&L actually comes from. The all-time
+    # shape (2026-06-25): STOP exits carry the entire bleed (PF ~0.01, the
+    # false-breakout losses), while EOD_FLATTEN is net positive (PF ~1.3). This
+    # keeps the queued "convert EOD_FLATTEN drift via breakeven/trailing" candidate
+    # honest — it targets the one already-profitable bucket, not the real leak.
+    by_exit: dict[str, dict] = {}
+    for er in sorted({(r.get("exit_reason") or "UNKNOWN") for r in closed}):
+        sub = [_f(r["realized_pl"]) for r in closed if (r.get("exit_reason") or "UNKNOWN") == er]
+        by_exit[er] = _bucket(sub)
+
     # False-breakout rate: of breakout-driven trades, the share that stopped out.
     bo = [r for r in closed if (r.get("signal_type") in ("BREAKOUT", "BOTH"))]
     fb_rate = (round(100 * sum(1 for r in bo if r.get("exit_reason") == "STOP") / len(bo), 1)
@@ -132,6 +142,7 @@ def compute_metrics(rows: list[dict]) -> dict:
         "profit_factor": round(gross_win / abs(gross_loss), 2) if gross_loss else None,
         "by_signal_type": by_type,
         "by_confidence_band": by_band,
+        "by_exit_reason": by_exit,
         "false_breakout_rate": fb_rate,
         "exit_reasons": dict(Counter(r.get("exit_reason") for r in closed)),
     }

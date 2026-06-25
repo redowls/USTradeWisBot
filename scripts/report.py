@@ -61,6 +61,12 @@ def _print_report(since=None) -> int:
         print(f"  {band:9} {s['trades']:6d} {s['win_rate']:6.1f} "
               f"{s['total_pl']:10.2f} {s['expectancy']:8.2f} {_pf(s):>6}")
 
+    print("\nBy exit reason:")
+    print(f"  {'reason':12} {'trades':>6} {'win%':>6} {'total$':>10} {'exp$':>8} {'PF':>6}")
+    for er, s in m.get("by_exit_reason", {}).items():
+        print(f"  {er:12} {s['trades']:6d} {s['win_rate']:6.1f} "
+              f"{s['total_pl']:10.2f} {s['expectancy']:8.2f} {_pf(s):>6}")
+
     summaries = analytics.load_daily_summaries(since)
     if summaries:
         print("\nDaily summaries:")
