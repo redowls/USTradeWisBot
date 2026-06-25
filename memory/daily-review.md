@@ -249,3 +249,39 @@ None — market closed. Nothing to root-cause at the trade level.
 - TSLA did NOT trade today (no BOTH signal). Equity **$8,017.26 (−19.8%)**, $517 to the −25% ($7,500) flag.
 
 ---
+
+## 2026-06-25 — Daily Review
+
+### Stats
+- Trades: **3 closed (2W / 1L)**, win rate **66.7%**. Day essentially flat.
+- Net realized P&L: **−$3.69** (day **−0.046%**). Equity close **$8,013.54** (from $8,017.23 open; **−$3.69 broker truth — matches to the penny**, last_equity confirms). **−19.9% YTD**, $514 above the −25% ($7,500) strategy-review flag.
+- Avg winner **+$14.62** (AMD +19.61, QCOM +9.62); single loser **−$32.92** (TSM). Profit factor (day): 29.23 / 32.92 = **0.89**.
+- Exit reasons: **3 EOD_FLATTEN** (none hit STOP, none hit TP — all three drifted to the 15:55 ET flatten). Circuit breaker NOT tripped (−0.05% nowhere near −8.0%). **Positions: 0 open on the broker — no naked overnight.** ✅ IMP-002 held a **5th straight session**.
+- **Fill accuracy verified live again:** the day's gross (−$3.69) equals the broker equity move exactly because entries AND exits were booked at the real Alpaca fills — QCOM buy 203.815715 / sell 205.19, TSM 442.55 / 434.32, AMD 520.87 / 530.675 (matches DB). IMP-003 (exit) + IMP-005 (entry) both confirmed. Service active all session (since 11:49:25 UTC pre-market restart); no in-session errors.
+
+### Trade-by-trade review
+*(entry/exit = real Alpaca bracket fills; R measured off the real fill)*
+| # | Sym | Entry (ET) | Exit (ET) | Conf | Type | Exit | P&L | Root cause |
+|---|-----|-----------|-----------|------|------|------|-----|-----------|
+| 87 | QCOM | 10:04:55 @203.8157 | 15:56:55 @205.19 | 76.92 | BOTH | EOD_FLATTEN | **+$9.62** | Day's gap-up name (+11.7% pre-mkt on raised guide). Broke 203.68 *34 min after the open* — most of the gap move was already gone; drifted +0.67% and was captured at flatten. TP 221.22 (+8.5%) never remotely in play on a post-gap day. Highest-conf signal (BOTH 76.92) → it won. |
+| 88 | TSM | 10:10:12 @442.55 | 15:56:55 @434.32 | 67.98 | BREAKOUT | EOD_FLATTEN | **−$32.92** | Day's only loser. Broke 440.065, immediately reversed and faded to −1.86%. Stop 431.92 (−2.40%, the wide 3×ATR/1.5% floor) never filled → rode the drift down to flatten. Classic **false breakout**; semis were bid (MU-led) but TSM did not participate. |
+| 89 | AMD | 10:10:13 @520.87 | 15:56:56 @530.675 | 60.75 | BREAKOUT | EOD_FLATTEN | **+$19.61** | Broke 515.70, drifted +1.88% and captured at flatten. **AMD's first signal since 06-09 — it WON.** The standing "park AMD if it signals and loses again" trigger is therefore NOT triggered (signaled + won → thesis holds, AMD stays). TP 548.07 (+5.2%) not reached. |
+
+### What worked / what didn't
+- **Worked — capital protection + fill accuracy, a 5th clean session.** 0 open positions on Alpaca (no naked overnight); the 15:55 flatten canceled the working bracket legs first, then market-sold all three (IMP-002). Day gross == broker equity move to the penny (IMP-003 exit fills + IMP-005 entry fills both verified). No circuit-breaker, no risk event, each loss small/controlled.
+- **Worked — the highest-confidence signal won.** QCOM (BOTH 76.92) and AMD both green; only the mid-conf BREAKOUT (TSM 67.98) failed.
+- **Didn't — flat on a +2.1% Nasdaq up-day.** A strong semi-rally tape (MU blowout) and the bot netted ~$0 from 3 longs — the recurring "entries don't capture broad up-moves" theme (first flagged 06-16). All 3 entries fired 10:04–10:10 ET, **34–40 min after the open**, after the gap-and-go had largely played out (QCOM had only +0.67% left in it). The gate is slow on gap opens (standing observation since 06-18).
+- **Didn't — TSM false breakout.** Broke 440.065 and reversed instantly; the (correctly) wide stop meant it bled to flatten rather than stopping out — the −$32.92 wiped the two small winners.
+
+### Lessons & improvement candidates (ranked)
+1. **[SHIPPED IMP-006] By-exit-reason P&L attribution.** Today's 3/3 EOD_FLATTEN exits reignited the recurring "EOD_FLATTEN drift is a low-yield drag" framing (06-23/06-24) and primed the queued "convert flatten holds via breakeven/trailing" lever. The report only showed exit-reason *counts*, so I computed the all-time split for the first time — and it **refutes the framing**: **STOP exits (48 trades) carry the ENTIRE bleed: −$2,739.74, PF 0.01, 2.1% win** (the false-breakout losses), while **EOD_FLATTEN (27 trades) is net POSITIVE: +$72.53, PF 1.29**, and TAKE_PROFIT +$974.44. The queued breakeven/trailing candidate targets the one already-profitable bucket; the real leak is false breakouts that hit the stop. Added `by_exit_reason` to `analytics.compute_metrics` (reusing IMP-004's `_bucket`) + a "By exit reason" section to `scripts/report.py`, so this attribution is institutionalised — exactly the IMP-004 pattern (surface the metric so a mis-aimed candidate can't be silently acted on). Pure measurement/tooling: **no entry logic, no sizing, no stop, no risk limit touched.**
+2. **The real strategy problem is the false-breakout STOP bucket (PF 0.01), not the flatten bucket.** Any future strategy work should attack breakout *quality* (volume/momentum confirm, regime filter) to cut the −$2,739 STOP bleed — NOT chase flatten-drift capture. Needs `scripts/replay.py` validation; not today's change.
+3. **Down-day/regime gate + entry-timing-on-gap-opens** remain queued strategy levers (need replay). Today (mixed-up tape, flat result, late gap entries) supports the "late entry misses the move" half but isn't a clean down-day case. Defer.
+
+### Notes for pre-market research
+- **AMD signaled (first since 06-09) and WON (+$19.61)** — the "park AMD if it signals and loses again" trigger did NOT fire; AMD stays, thesis (broad-regime, not name-quality) supported. Drop the AMD park watch.
+- **MU re-enabled today did NOT signal** — no MU trade fired on its +15% earnings-gap day; the gap-day-breakout question is still untested. Keep MU; watch tomorrow.
+- **QCOM** broke out (+catalyst, BOTH 76.92) but the bot entered 34 min late and captured only +0.67% — note the gate is slow to catch gap-and-go opens (recurring). **TSM** false-broke and faded −1.86% — semis were mixed (MU/QCOM/AMD up, TSM down); not a name-park, just a failed breakout.
+- No watchlist change warranted by today. Equity **$8,013.54 (−19.9%)**, $514 to the −25% ($7,500) flag.
+
+---
