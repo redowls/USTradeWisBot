@@ -384,3 +384,38 @@ Service **restarted: yes** — active (running), Main PID 3628083, clean startup
 - TSLA remains the franchise earner (+$294 12d, 2W0L). Equity $8,017.23 (−19.8%), $517 to the −25% ($7,500) flag.
 
 ---
+
+## 2026-06-26 — Pre-market Research
+
+### Market context
+**Cautious, tech-vs-chips split tape after an in-line PCE.** Thu 06-25 May PCE printed roughly in line (headline +0.4% m/m / 4.1% y/y — highest since Apr-2023; core +0.3% m/m / 3.4% y/y — highest since Oct-2023); markets took relief that it wasn't hotter (10y eased to ~4.40%), but the Fed stays hawkish (Goolsbee: core "too high, trending the wrong way"; a majority of FOMC favors a 2026 hike). Friday futures slightly lower (S&P/Nasdaq red) as the relief is offset by a continued **rotation OUT of megacap tech**: Thu close had AAPL −6.1% (announced MacBook/iPad/iPhone price hikes; led the Nasdaq's first 4-day losing streak since Feb), NVDA −1.6%, MSFT −3.5%, AMZN −3.1%, META −2.7% — all on-list. Offsetting bid in **memory/chips**: MU +15.7% (blowout, on-list), AMAT +13.4%, SanDisk/WDC up. **Oil +2% back above $70** on a Strait-of-Hormuz vessel attack (Iran IRGC) → XOM tailwind, geopolitical headline risk live. Structural note: **GOOGL replaces Verizon in the Dow before the 06-29 open** (mild positive for GOOG/GOOGL, both on-list). Today's only macro item is the final UMich June consumer sentiment; **no watchlist name reports earnings during market hours** → no intraday earnings risk on the list.
+
+### Carried from daily review (2026-06-25)
+- **AMD signaled (first since 06-09) and WON (+$19.61)** → the "park AMD if it signals and loses again" trigger did NOT fire; AMD stays, broad-regime (not name-quality) thesis supported. **AMD park watch dropped** — honored, no action.
+- **MU re-enabled 06-25 did NOT signal** on its +15% gap day — gap-day-breakout question still untested; keep MU and watch (it's bid again today, +15.7% sympathy). Honored.
+- **MA-only conf 60–62 names are NOT low quality** (IMP-004 refutation, re-affirmed) — XOM/BAC/CRM/WMT kept; no conf-floor parks.
+- **GOOGL** did not signal 06-25 → still 0W3L, park trigger (0W4L) un-matured → hold. **PCE digestion → adds stay none** unless a high-conviction trending large-cap emerges (06-25 note). Honored.
+
+### Watchlist review
+- **Positions: 0 open — nothing locked.** Account ACTIVE, equity **$8,013.52** (flat vs 06-25 close $8,013.54 — no overnight change), cash $8,013.52, buying power $32,054, daytrade_count 0. **−19.9% from $10K**, $514 above the −25% ($7,500) strategy-review flag.
+- Per-symbol P&L (closed, since 06-12): positive **TSLA +$294.36 (2W0L)**, GOOG +$119.97, INTC +$49.00, AMD +$19.61, XOM +$19.57, CRM +$16.21, QCOM +$9.62, NFLX +$7.04, BAC +$6.44, C +$4.32. Worst: SE −$142.35 (1t), META −$134.00 (0W2), GOOGL −$128.79 (0W1 in-window / 0W3 all-time), ENPH −$63.85. All liquid large-caps/ETFs that fit the strategy; **no chronic-loser park trigger matured today.**
+- **GOOGL** (0W3L all-time, −$356.67) — park trigger is 0W**4**L (consolidate to GOOG-only); it has not signaled since 06-12, so the 4th loss hasn't occurred → **HOLD**. (Mild offsetting positive: Dow inclusion 06-29.)
+- **AAPL** (−6.1% Thu on price-hike news, soft into today) — a one-day megacap rotation move, not a binary intraday event (no earnings/halt); liquid mega-cap that fits the strategy and is ~flat all-time (−$9.21/3t). A down day is not a park trigger — the gate self-throttles. **HOLD.** Same logic for NVDA/MSFT/AMZN/META (one-day rotation, all liquid mega-caps). META 0W2L is too small a sample (2 trades) for a name-specific park.
+- **SE** (1 trade −$142.35) single-sample, reasonably liquid ADR → insufficient evidence → **HOLD.** Zero-signal liquid names (MSFT/QCOM-history/CRM-history) reflect the regime, not name-quality → **HOLD.**
+- **Adds: none** — −19.9% drawdown, hawkish-Fed backdrop, two-sided megacap-tech-rotation tape, live Hormuz/oil geopolitical risk, and a Friday. Today's only real momentum (memory chips) is already covered on-list (MU/NVDA/AVGO/AMD/TSM/INTC/QCOM); MU is the cleanest expression and already active. No high-conviction trending large-cap absent from the list. (06-25 standing note: "still none unless a high-conviction trending large-cap emerges" — none did.)
+
+### Changes applied to watchlist
+**No changes.** 26 active retained. Every park trigger is un-matured (GOOGL 0W3L < 0W4L and hasn't signaled; AMD watch dropped after its 06-25 win; SE/META small-sample; the rest are regime-droughts or one-day rotation, not structural mismatches). No adds into a hawkish, rotation-driven, geopolitically-charged Friday. Conservative hold is the correct call — no churn.
+
+### Final watchlist
+26 active (unchanged): AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+Service restarted: **no** (no watchlist changes; 0 open positions — nothing locked).
+
+### Notes for pre-market research (next session — Mon 06-29)
+- **GOOGL joins the Dow before the 06-29 open** (replaces VZ) — watch for an index-inclusion bid/volume bump on GOOG/GOOGL Monday; GOOGL still 0W3L (one more loss → consolidate-to-GOOG-only), so a clean GOOGL win Monday would also help resolve that watch.
+- **MU** still has not produced a live signal since its 06-24 blowout — its gap/post-earnings breakout behavior remains untested; keep watching whether it signals cleanly now that the gap has settled.
+- **Megacap-tech rotation:** AAPL (−6.1% on price hikes) led a 4-day Nasdaq slide; if the megacaps (AAPL/NVDA/MSFT/AMZN/META) keep bleeding into next week, watch whether any becomes a genuine name-specific park candidate vs a regime move (currently regime — all held).
+- **Oil/Hormuz geopolitical risk is live** (IRGC vessel attack, oil >$70) — XOM has a tailwind but headline-driven gaps are possible; do not chase energy on a single oil spike.
+- **Hawkish Fed holds** (majority pencils a 2026 hike) — keep adds conservative; no new names without a high-conviction trending large-cap. TSLA remains the franchise earner (+$294, 2W0L). Equity $8,013.52 (−19.9%), $514 to the −25% ($7,500) flag.
+
+---
