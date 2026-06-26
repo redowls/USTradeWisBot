@@ -279,6 +279,26 @@
 
 Ordered by expected impact; each item needs replay validation before code.
 
+★ **(TOP STRATEGY LEVER, elevated 2026-06-26) Market-regime / breakout-quality
+   entry gate.** The entire all-time loss lives in STOP exits / false breakouts
+   (PF 0.01, −$2,872; IMP-006) and the breakout-containing book (BOTH+BREAKOUT,
+   38 trades = −$1,552 of the −$1,833 total). 06-24/06-25/06-26 keep showing the
+   edge is **directional-with-the-tape, not symbol- or score-specific**: longs at
+   the open on a weak/two-sided tape fade (06-26 ENPH false-broke −3.2%, COST/META
+   drifted down with the megacap rotation), and the SAME setups win on a green
+   tape. Crucially, **no pre-trade score discriminates a false breakout** —
+   confidence (refuted IMP-004), value/momentum (06-26 losers and winners overlap),
+   and volume (refuted 06-26: SE broke on 6.15× vol and lost −$142; AMD on 0.59×
+   and won) all fail. So the lever is a *market-level* filter, e.g. only take longs
+   when SPY/QQQ are above a short intraday MA/VWAP, and/or skip the first N minutes
+   on a gap-down open. **Build (multi-run, not a one-shot post-close hack):**
+   (1) ingest an intraday index-regime series (SPY/QQQ bars already fetchable);
+   (2) extend `scripts/replay.py` to tag each historical entry with the regime at
+   entry and simulate "long-only when regime bullish"; (3) verify it cuts red-day
+   losers (06-24, 06-26 ENPH) WITHOUT killing green-day winners (06-23). Pure
+   *tightening* (skips entries) — never widens risk. This is the work that should
+   replace one-day entry/exit tweaks.
+
 0a. ~~**EOD-flatten P&L accuracy**~~ **[SHIPPED IMP-003, 2026-06-22]** — on 06-22
    SPY/QQQ/TSM were each booked at exit==entry ($0.00) at the flatten while the
    real market-sells filled at 744.12/737.18/466.222 (~$60 hidden loss; day
@@ -291,10 +311,16 @@ Ordered by expected impact; each item needs replay validation before code.
    position strands until the next session. Add a short post-close grace window
    that still runs `eod_flatten` until the book is confirmed flat. (IMP-002's
    cancel-first + per-tick retry already removes the dominant failure mode.)
-1. **Breakeven stop at +0.5R** — `scripts/replay.py` (PHASE-001 harness):
-   sim-to-sim +$563 over 52 trades (−$848 vs −$1,411 baseline); 27/52 trades
-   reached +0.5R, 7 losers saw +1R before stopping. Implement as stop-leg
-   replace in the engine loop (beware Alpaca's rotating order id on replace).
+1. **Breakeven stop at +0.5R** — **DEMOTED 2026-06-26 (noise on post-fix data).**
+   The old "+$563 over 52 trades" sim was the **pre-fix** window (06-08→06-12
+   overtrading days dominate it). Re-run 06-26 on the 44 trades that still have
+   bars: only **1 loser ever saw +1R** before stopping, and the +0.5R sim delta
+   (+$103) sits *inside* the simulation noise budget (sum|error| $714) — i.e. not
+   signal. IMP-006 also showed the EOD_FLATTEN bucket it targets is already
+   profitable (PF 1.29) while the leak is STOP exits (PF 0.01). False-breakout
+   losers (e.g. ENPH 06-26) reverse immediately and never reach +0.5R, so a
+   breakeven/trailing stop cannot rescue them. **Do not implement** unless a
+   future regime shows losers routinely running favorably first.
 2. **Entry-near-day-high veto / pullback confirmation** — COST 06-11 entered
    985.93 at 09:47 near the session high, MFE −0.17% (never positive).
    Quantify across history with the replay harness first.
@@ -330,6 +356,27 @@ Ordered by expected impact; each item needs replay validation before code.
   permanently in `scripts/report.py` by IMP-004 (PF-per-type + confidence bands)
   so this can't be silently reinstated. Any future MA-quality work must target a
   *non-confidence* discriminator (volume confirm, regime, entry timing).
+
+- ~~**Flatten / size-down the `CONFIDENCE_RISK_TABLE` (cut the high-conf risk
+  tier)**~~ **[REFUTED 2026-06-26 — regime-overfit].** Tempting because the risk
+  tiers run inverted to performance (60-70/0.5% avg −$8.94; 70-80/1.0% −$48.41;
+  80-90/1.5% −$60.32; 90+/2.0% +$69.94 on only 2 trades) and 06-26's ENPH (conf
+  81.9 → 1.5% → qty 86) was sized 3× the day's MA trades and lost 3×. But
+  simulating flat-0.5% only improves **all-time** (−$1,832 → −$1,076) by shrinking
+  the **pre-fix 06-08→06-12 overtrading blowups**; on the **post-06-15 regime it is
+  WORSE** (−$23 → −$85) because there the high-conf trades were TSLA's big winners.
+  The circuit-breaker/throttle/dedup already fixed the regime that made the
+  high-conf tier toxic, so re-sizing now optimizes a dead regime. Do not touch the
+  sizing table without fresh post-fix evidence that high-conf trades lose at scale.
+- ~~**Require volume confirmation (rel_vol ≥ threshold) to TRIGGER a breakout
+  entry**~~ **[REFUTED 2026-06-26 — non-discriminating].** rel_vol at entry does
+  not separate breakout winners from losers: SE #59 broke on **6.15× and lost
+  −$142**, META #60 on 2.26× lost −$122, GOOGL #62 on 1.53× lost −$129; meanwhile
+  AMD #89 on **0.59× won +$20** and TSM #57 on 0.43× won +$34. A rel_vol≥1.0 gate
+  would skip 06-26 ENPH (0.40×) but also two real winners and would miss the
+  biggest (high-volume) losers; the "low-vol loses" read is driven by ENPH itself
+  (overfit) and only 17 of 38 breakout trades even have reconstructable bars.
+  Volume stays a *soft* score input (it already is), not a hard gate.
 
 ## Completed phases
 

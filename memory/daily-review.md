@@ -285,3 +285,43 @@ None — market closed. Nothing to root-cause at the trade level.
 - No watchlist change warranted by today. Equity **$8,013.54 (−19.9%)**, $514 to the −25% ($7,500) flag.
 
 ---
+
+## 2026-06-26 — Daily Review
+
+### Stats
+- Trades: **4 closed (1W / 3L)**, win rate **25%**.
+- Net realized P&L: **−$139.98** (day **−1.747%**). Equity close **$7,873.54** (from $8,013.52 open; Alpaca last_equity 8013.52 → equity 7873.54 = **−$139.98 broker truth, matches to the penny**). **−21.3% YTD**, $374 above the −25% ($7,500) strategy-review flag.
+- The **entire day is one trade: ENPH STOP −$132.44** (95% of the loss). The other 3 (COST/META/TSLA) netted −$7.54 combined — drift-to-flatten noise.
+- Avg loser **−$48.54** (ENPH −132.44, COST −7.50, META −5.69); single winner **+$5.65** (TSLA). Profit factor (day): 5.65 / 145.63 = **0.04**.
+- Exit reasons: **1 STOP (ENPH), 3 EOD_FLATTEN** (COST/META/TSLA, all drifted, none hit TP). Circuit breaker NOT tripped (−1.75% nowhere near −8.0%). **Positions: 0 open on the broker — no naked overnight.** ✅ IMP-002 held a **6th straight session**. Fill accuracy: realized_pl computed off the real Alpaca fills (ENPH buy 48.11/sell-stop 46.57 → −132.44; matches broker move). Service active all session (since 06-25 21:34 UTC restart); no in-session errors.
+
+### Trade-by-trade review
+*(entry/exit = real Alpaca bracket fills; R measured off the real fill)*
+| # | Sym | Entry (ET) | Exit (ET) | Conf | Type | Exit | P&L | Root cause |
+|---|-----|-----------|-----------|------|------|------|-----|-----------|
+| 90 | COST | 09:42:01 @953.49 | 15:56:18 @949.74 | 60.23 | MA | EOD_FLATTEN | **−$7.50** | Low-conf MA (qty 2 @ 0.5% risk); drifted −0.39% with the megacap-tech rotation, flattened. Tiny. |
+| 91 | ENPH | 09:44:21 @**48.11** (sig 48.04) | 11:12:14 @46.57 | **81.89** | **BOTH** | **STOP** | **−$132.44** | **The day.** BOTH signal broke 47.985 on **below-average volume (rel_vol ~0.40)**, fully reversed, stopped −3.20% at 11:12. Textbook **false breakout**. Conf 81.89 → 1.5% risk tier → qty 86 (3× the other trades) → 3× the loss. |
+| 92 | META | 10:51:47 @552.31 | 15:57:21 @550.89 | 60.84 | MA | EOD_FLATTEN | **−$5.69** | Low-conf MA (qty 4 @ 0.5% risk); −0.26% drift into the megacap bleed (META −2.7% tape), flattened. Tiny. |
+| 93 | TSLA | 11:14:30 @379.715 | 15:57:31 @380.66 | 60.14 | MA | EOD_FLATTEN | **+$5.65** | Low-conf MA (qty 6 @ 0.5% risk); +0.25% scratch, the only green. |
+
+### What worked / what didn't
+- **Worked — capital protection + fill accuracy, a 6th clean session.** 0 open positions on Alpaca (no naked overnight); the 15:56 flatten cleared COST/META/TSLA, ENPH's stop fired correctly at 11:12. Day gross == broker equity move to the penny. No circuit-breaker, no risk event. ENPH's −3.20% is the worst single loss of incubation but was still bounded by the stop and the 1.5% risk tier (~−1.6% of equity).
+- **Didn't — one high-confidence false-breakout STOP carried the whole loss.** ENPH (conf 81.89, BOTH) broke 47.985 and instantly round-tripped through its stop. This is the **STOP/false-breakout bucket** that IMP-006 proved is the *entire* all-time leak (STOP exits PF 0.01, −$2,872). The 3 MA-only trades behaved exactly as the least-bad bucket does — small drift, ~scratch.
+- **Didn't — the sizing table amplified the worst bucket.** ENPH got the 80-90 conf tier (1.5% risk → qty 86) while the three MA trades got 0.5% (qty 2/4/6). So the single trade in the empirically-worst bucket (per IMP-004, 66+ band PF 0.28) was sized 3× the others and produced 95% of the loss. The confidence→quality relationship is inverted, yet `CONFIDENCE_RISK_TABLE` still escalates risk with confidence.
+
+### Lessons & improvement candidates (ranked)
+**No code change today — "reviewed, no change warranted."** Today's loss is a single high-confidence false-breakout STOP, and I rigorously tested all three actionable levers against the full record and **refuted every one** — shipping any of them would be overfitting to one trade / one dead regime, violating "protect capital, never random, never overfit":
+
+1. **Breakeven-stop at +0.5R (backlog #1) — REFUTED on post-fix data.** `scripts/replay` over the 44 trades with bars: only **1 loser ever saw +1R before stopping**, and the +0.5R sim delta (+$103) is far *inside* the simulation noise budget (sum|error| $714). False-breakout losers (ENPH today included) reverse immediately — they don't run favorably first, so a breakeven/trailing stop can't rescue them. The old "+$563 sim" was on the pre-fix 52-trade window dominated by the 06-08→06-12 overtrading days. Demoted in todo.md.
+2. **Flatten the `CONFIDENCE_RISK_TABLE` (size down the high-conf tier) — REFUTED as regime-overfit.** Simulating flat-0.5% risk improves *all-time* P&L (−$1,832 → −$1,076, saving $756) — BUT that gain comes **entirely from shrinking the pre-fix 06-08/09/10/12 overtrading-regime blowups** (AMD/C/GOOGL/SE/META, all conf 80-90). On the **post-06-15 regime it makes things WORSE** (−$23 → −$85), because there the high-conf trades were TSLA's big winners (+$203 / +$91). The circuit-breaker + re-entry-throttle + dedup already structurally fixed the regime that made the high-conf tier toxic. Acting now = fighting the last war. Recorded refuted in todo.md.
+3. **Volume-confirmation gate on breakouts — REFUTED as non-discriminating.** Reconstructed rel_vol at entry for every breakout-containing trade: volume does **not** separate winners from losers. SE #59 broke out on **6.15× volume and lost −$142**; META #60 on 2.26× lost −$122; AMD #89 on 0.59× **won +$20**; TSM #57 on 0.43× **won +$34**. A rel_vol≥1.0 gate would have skipped ENPH today (0.40) but also two real winners, and missed the biggest losers (all high-volume). Only 17 of 38 breakout trades even have reconstructable bars, and the "low-vol loses" read is driven by today's ENPH itself. Recorded refuted in todo.md.
+4. **The genuine remaining lever is a market-regime / breakout-quality entry gate** (recurring since 06-24/06-25) — the edge is directional-with-the-tape, not symbol- or score-specific, and no *pre-trade* score (confidence, value, momentum, volume) reliably flags a false breakout. This needs intraday SPY/QQQ regime infrastructure + a proper multi-day replay, i.e. a deliberate build, **not** a one-shot post-close change. Elevated to the top of the strategy backlog in todo.md with the validation plan. Do NOT hack it from one day's ENPH.
+
+### Notes for pre-market research
+- **ENPH** was a genuine BOTH breakout (conf 81.89, broke 47.985) that **fully round-tripped −3.20% to a stop** on weak (~0.40×) volume — a clean false breakout on a two-sided tape. Same failure mode it showed 06-15 (chopped, stopped) and the opposite of its 06-22 fast-TP win — name behaves with the regime, not a name-specific park (1W/4L all-time, −$249, but every loss is a regime/false-breakout event, not a liquidity/quality defect). Keep, watch.
+- **COST / META / TSLA** were all low-conf (60) MA drifters — COST/META faded with the megacap-tech rotation (AAPL/MSFT/AMZN/META all red), TSLA scratched green. No name-specific signal; pure regime. Keep all.
+- **Two-sided megacap-rotation tape played out as the 06-26 pre-market expected** — megacaps bled, the bot's longs into them drifted down (COST/META), and the one aggressive breakout (ENPH) failed. This is the *down/choppy-day, longs-fade* regime case again (06-24 was the cleanest prior instance) — reinforces the regime-gate as the #1 strategy lever, NOT any single-day entry/exit tweak.
+- **GOOGL joins the Dow before the 06-29 open** (per 06-26 research) — watch Monday for an inclusion bid; GOOGL still 0W3L (one more loss → consolidate-to-GOOG-only). **MU** still has not produced a live signal since its 06-24 blowout — gap/post-earnings breakout behavior still untested.
+- Equity **$7,873.54 (−21.3%)**, **$374 to the −25% ($7,500) strategy-review flag** — the cushion has thinned (was $514); a regime-gate that cuts red-day/false-breakout entries is now the most important capital-protective work.
+
+---
