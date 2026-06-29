@@ -67,6 +67,16 @@ def _print_report(since=None) -> int:
         print(f"  {er:12} {s['trades']:6d} {s['win_rate']:6.1f} "
               f"{s['total_pl']:10.2f} {s['expectancy']:8.2f} {_pf(s):>6}")
 
+    ext = m.get("by_entry_extension", {})
+    if ext:
+        print("\nBy entry extension (breakout fills, % above broken level):")
+        print(f"  {'band':9} {'trades':>6} {'win%':>6} {'total$':>10} {'exp$':>8} {'PF':>6}")
+        for band, s in ext.items():
+            if s["trades"] == 0:
+                continue
+            print(f"  {band:9} {s['trades']:6d} {s['win_rate']:6.1f} "
+                  f"{s['total_pl']:10.2f} {s['expectancy']:8.2f} {_pf(s):>6}")
+
     summaries = analytics.load_daily_summaries(since)
     if summaries:
         print("\nDaily summaries:")

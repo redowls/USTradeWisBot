@@ -130,3 +130,75 @@ def test_by_exit_reason_separates_stop_bleed_from_flatten():
 
 def test_by_exit_reason_empty_safe():
     assert analytics.compute_metrics([])["trades"] == 0  # no crash, no by_exit_reason key needed
+
+
+# --- IMP-007: by-entry-extension breakdown --------------------------------
+#
+# Regression anchor: 2026-06-29 closed 4W/1L for +$126.49. The single loser was
+# AAPL (BOTH, conf 81.5), which filled at 286.37 — 1.62% ABOVE its broken level
+# (281.81) — and reversed straight to its stop (-$116.55), while the two winning
+# breakout trades filled tight to their levels (TSLA 0.30% -> +$106.87 TP, INTC
+# 0.13% -> +$85.79). That anecdote suggests "cap entry extension to stop chasing,"
+# but the full book refutes it: the tightest (<=0.5%) bucket carries the WORST
+# stop rate (67.9%), so extension is not a safety signal and a cap would not touch
+# the false-breakout leak. These tests keep that evidence in the report so the
+# extension-cap candidate cannot be silently reopened.
+
+# The three real 2026-06-29 breakout-type trades (have a broke_level). The two
+# MA-only trades that day (SPY/GOOG) have no broke_level and must be excluded.
+TODAY_20260629 = [
+    {"realized_pl": -116.55, "realized_pl_pct": -1.9371, "exit_reason": "STOP",
+     "signal_type": "BOTH", "confidence": 81.52, "entry_price": 286.37, "broke_level": 281.81},
+    {"realized_pl": 106.87, "realized_pl_pct": 2.4511, "exit_reason": "TAKE_PROFIT",
+     "signal_type": "BOTH", "confidence": 71.39, "entry_price": 395.47, "broke_level": 394.27},
+    {"realized_pl": 85.79, "realized_pl_pct": 1.1808, "exit_reason": "EOD_FLATTEN",
+     "signal_type": "BOTH", "confidence": 84.05, "entry_price": 129.7407, "broke_level": 129.5767},
+    # MA-only — no broken level, so it must not appear in the extension breakdown.
+    {"realized_pl": 40.90, "realized_pl_pct": 1.9776, "exit_reason": "EOD_FLATTEN",
+     "signal_type": "MA", "confidence": 61.34, "entry_price": 344.70, "broke_level": None},
+]
+
+
+def test_entry_extension_buckets_today():
+    m = analytics.compute_metrics(TODAY_20260629)
+    ext = m["by_entry_extension"]
+    # AAPL filled 1.62% above its level -> the >1.0% band, and it was the loser.
+    assert ext[">1.0%"]["trades"] == 1
+    assert ext[">1.0%"]["win_rate"] == 0.0
+    # TSLA (0.30%) + INTC (0.13%) filled tight -> the <=0.5% band, both winners.
+    assert ext["<=0.5%"]["trades"] == 2
+    assert ext["<=0.5%"]["win_rate"] == 100.0
+
+
+def test_entry_extension_excludes_rows_without_broke_level():
+    """MA-only signals have no broke_level and must not land in any extension band."""
+    m = analytics.compute_metrics(TODAY_20260629)
+    total_in_bands = sum(s["trades"] for s in m["by_entry_extension"].values())
+    assert total_in_bands == 3  # the 3 breakout trades, not the MA-only GOOG
+
+
+def test_entry_extension_cap_does_not_address_the_leak():
+    """All-time shape: the tightest entries stop out at least as often as the
+    extended ones, so an extension cap would not remove the false-breakout leak."""
+    # Real 2026-06 breakout-type trades, abbreviated to (extension band) members.
+    rows = [
+        # Tight (<=0.5%) entries that STILL stopped out — the bulk of the bleed.
+        {"realized_pl": -73.00, "realized_pl_pct": -1.0, "exit_reason": "STOP",
+         "signal_type": "BOTH", "confidence": 80.8, "entry_price": 100.25, "broke_level": 100.0},
+        {"realized_pl": -132.92, "realized_pl_pct": -2.0, "exit_reason": "STOP",
+         "signal_type": "BOTH", "confidence": 86.0, "entry_price": 100.12, "broke_level": 100.0},
+        {"realized_pl": -119.17, "realized_pl_pct": -2.0, "exit_reason": "STOP",
+         "signal_type": "BOTH", "confidence": 86.0, "entry_price": 100.21, "broke_level": 100.0},
+        {"realized_pl": 106.87, "realized_pl_pct": 2.4, "exit_reason": "TAKE_PROFIT",
+         "signal_type": "BOTH", "confidence": 71.4, "entry_price": 100.30, "broke_level": 100.0},
+        # Extended (>1.0%) entries — far fewer, and not uniformly losers.
+        {"realized_pl": -116.55, "realized_pl_pct": -1.9, "exit_reason": "STOP",
+         "signal_type": "BOTH", "confidence": 81.5, "entry_price": 101.62, "broke_level": 100.0},
+        {"realized_pl": 19.61, "realized_pl_pct": 1.9, "exit_reason": "EOD_FLATTEN",
+         "signal_type": "BREAKOUT", "confidence": 60.8, "entry_price": 101.00, "broke_level": 100.0},
+    ]
+    m = analytics.compute_metrics(rows)
+    ext = m["by_entry_extension"]
+    # The tight bucket stops out at least as often as the extended bucket, so the
+    # leak is not concentrated in "chased" entries — an extension cap is refuted.
+    assert ext["<=0.5%"]["win_rate"] <= ext[">1.0%"]["win_rate"]

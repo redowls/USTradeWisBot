@@ -42,6 +42,20 @@ CONFIDENCE_BANDS: tuple[tuple[float, float, str], ...] = (
     (66.0, float("inf"), "66+"),
 )
 
+# Entry-extension bands for breakout-driven trades: how far ABOVE the broken
+# level (broke_level) the bot actually filled, as a % of the level. The
+# 2026-06-29 review proposed "cap extension to avoid chasing" after AAPL stopped
+# out having filled 1.62% above its level — but the full book refutes it: the
+# tightest bucket (<=0.5%) carries the WORST stop rate, so extension is not a
+# safety signal and a cap would not touch the false-breakout leak (see
+# daily-review 2026-06-29 / refuted improvement candidate). Only trades with a
+# non-null broke_level (BREAKOUT/BOTH signals) land here.
+EXTENSION_BANDS: tuple[tuple[float, float, str], ...] = (
+    (float("-inf"), 0.5, "<=0.5%"),
+    (0.5, 1.0, "0.5-1.0%"),
+    (1.0, float("inf"), ">1.0%"),
+)
+
 
 def _bucket(pls: list[float]) -> dict:
     """Win-rate / total / expectancy / profit-factor over one slice of P&Ls."""
@@ -61,11 +75,29 @@ def _bucket(pls: list[float]) -> dict:
     }
 
 
+def _extension_pct(row: dict) -> float | None:
+    """How far above the broken level a breakout filled, as a % of the level.
+
+    Returns None for trades with no broke_level (MA-only signals) or no usable
+    entry price, so those rows are simply excluded from the extension breakdown.
+    """
+    bl = row.get("broke_level")
+    ep = row.get("entry_price")
+    if bl is None or ep is None:
+        return None
+    bl_f = _f(bl, default=0.0)
+    ep_f = _f(ep, default=0.0)
+    if bl_f <= 0:
+        return None
+    return (ep_f - bl_f) / bl_f * 100.0
+
+
 def load_closed_trades(since: date | None = None) -> list[dict]:
-    """Closed trades joined to their signal (signal_type/confidence)."""
+    """Closed trades joined to their signal (signal_type/confidence/broke_level)."""
     sql = (
         "SELECT t.trade_id, t.symbol, t.realized_pl, t.realized_pl_pct, "
-        "t.exit_reason, t.entry_time, t.exit_time, s.signal_type, s.confidence "
+        "t.exit_reason, t.entry_time, t.exit_time, t.entry_price, "
+        "s.signal_type, s.confidence, s.broke_level "
         "FROM trades t LEFT JOIN signals s ON s.trade_id = t.trade_id "
         "WHERE t.status = 'CLOSED' AND t.realized_pl IS NOT NULL"
     )
@@ -124,6 +156,18 @@ def compute_metrics(rows: list[dict]) -> dict:
         sub = [_f(r["realized_pl"]) for r in closed if (r.get("exit_reason") or "UNKNOWN") == er]
         by_exit[er] = _bucket(sub)
 
+    # By entry extension — for breakout-driven trades (those with a broke_level),
+    # how far above the broken level the fill landed. Surfaces that "chasing"
+    # (large extension) is NOT what drives the stop-outs: the tightest bucket
+    # carries the worst stop rate, so an extension cap is a refuted candidate.
+    by_extension: dict[str, dict] = {}
+    ext_pairs = [(r, _extension_pct(r)) for r in closed]
+    ext_pairs = [(r, e) for r, e in ext_pairs if e is not None]
+    if ext_pairs:
+        for lo, hi, label in EXTENSION_BANDS:
+            sub = [_f(r["realized_pl"]) for r, e in ext_pairs if lo <= e < hi]
+            by_extension[label] = _bucket(sub)
+
     # False-breakout rate: of breakout-driven trades, the share that stopped out.
     bo = [r for r in closed if (r.get("signal_type") in ("BREAKOUT", "BOTH"))]
     fb_rate = (round(100 * sum(1 for r in bo if r.get("exit_reason") == "STOP") / len(bo), 1)
@@ -143,6 +187,7 @@ def compute_metrics(rows: list[dict]) -> dict:
         "by_signal_type": by_type,
         "by_confidence_band": by_band,
         "by_exit_reason": by_exit,
+        "by_entry_extension": by_extension,
         "false_breakout_rate": fb_rate,
         "exit_reasons": dict(Counter(r.get("exit_reason") for r in closed)),
     }

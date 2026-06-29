@@ -377,6 +377,18 @@ Ordered by expected impact; each item needs replay validation before code.
   biggest (high-volume) losers; the "low-vol loses" read is driven by ENPH itself
   (overfit) and only 17 of 38 breakout trades even have reconstructable bars.
   Volume stays a *soft* score input (it already is), not a hard gate.
+- ~~**Cap entry extension above the broken level (don't "chase" the breakout)**~~
+  **[REFUTED 2026-06-29 — non-discriminating].** Prompted by AAPL #94 (filled 1.62%
+  above its 281.81 level, false-broke, −$116.55) being the lone loser on a 4W day
+  whose two winning breakouts filled tight (TSLA 0.30%, INTC 0.13%). But the full
+  book inverts the read: of 41 breakout-type trades the **tightest** bucket is the
+  WORST — ≤0.5%: 28 trades, 32.1% win, −$1,047, PF 0.36; 0.5-1.0%: 11, 18.2% win,
+  −$331; **only 2 trades ever exceeded 1.0% extension**. False breakouts stop out at
+  *tight* entries too, so an extension cap would overfit AAPL, cut tight winners, and
+  leave the leak untouched. Surfaced permanently as `by_entry_extension` in
+  `scripts/report.py` (IMP-007). Third failed per-trade discriminator after
+  confidence (IMP-004) and volume — reinforces backlog ★ (market-regime gate) as the
+  only viable lever.
 
 ## Completed phases
 
