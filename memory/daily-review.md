@@ -325,3 +325,39 @@ None — market closed. Nothing to root-cause at the trade level.
 - Equity **$7,873.54 (−21.3%)**, **$374 to the −25% ($7,500) strategy-review flag** — the cushion has thinned (was $514); a regime-gate that cuts red-day/false-breakout entries is now the most important capital-protective work.
 
 ---
+
+## 2026-06-29 — Daily Review
+
+### Stats
+- Trades: 5 closed (**4W / 1L**), win rate **80%**.
+- Net P&L: **+$126.49** (day **+1.607%**). Equity close **$8,000.00** (from $7,873.54). Best day since 06-23.
+- Avg winner **+$60.76** (TSLA +106.87, INTC +85.79, GOOG +40.90, SPY +9.48); the single loser −$116.55 (AAPL).
+- Profit factor (day): 243.04 / 116.55 = **2.09**.
+- Circuit breaker NOT tripped (+1.61% vs −8.0% halt). Service active all session, no errors. **0 open positions — no overnight carry (Alpaca confirmed).** DB equity_close $8,000.00 == broker equity to the penny; all 5 exit fills tie to Alpaca.
+- Exit reasons: 1 STOP (AAPL), 1 TAKE_PROFIT (TSLA), 3 EOD_FLATTEN (SPY/GOOG/INTC).
+
+### Trade-by-trade review
+| # | Sym | Entry (ET) | Exit (ET) | Conf/type | Exit | P&L | Root cause |
+|---|-----|-----------|-----------|-----------|------|-----|-----------|
+| 94 | AAPL | 09:31:25 @286.37 (fill 286.51) | 10:27:18 @280.96 | 81.5 BOTH | STOP | **−$116.55** | False breakout at the open on a gapped-up megacap; filled **1.62% above** broken level 281.81 (day's most-extended fill) and reversed straight to its 1.88%-ATR stop. Lone loser. |
+| 95 | SPY | 09:36:54 @737.22 | 15:56 @740.38 | 63.0 MA | EOD_FLATTEN | +$9.48 | Weak MA-only; rode the green tape, small gain held to flatten. |
+| 96 | GOOG | 09:36:55 @344.70 | 15:56 @351.52 | 61.3 MA | EOD_FLATTEN | +$40.90 | MA-only; Dow-inclusion bid + risk-on, ran +1.98% but never reached TP 354.00 → held to close. |
+| 97 | TSLA | 10:29:23 @395.47 (fill 396.36) | 13:08:39 @406.08 | 71.4 BOTH | TAKE_PROFIT | **+$106.87** | Clean breakout (broke 394.27, tight **0.30%** entry), ran to +TP. Day's best. |
+| 98 | INTC | 13:14:33 @129.74 | 15:56 @131.27 | 84.0 BOTH | EOD_FLATTEN | +$85.79 | Tight breakout (**0.13%** above 129.58), trended up, held to close. |
+
+### What worked / what didn't
+- **Worked:** the *directional-with-the-tape* thesis again — on a green/risk-on open (NDX +1.1%, US–Iran de-escalation) the same breakout setups followed through (4/5 winners, +$243 gross). TSLA the clean BOTH→TP winner; GOOG/INTC trended and held to flatten. The two **tight** breakout entries (TSLA 0.30%, INTC 0.13% above level) won. Risk controls held; flatten confirmed flat, 0 overnight.
+- **Didn't:** AAPL — lone loser, a gapped-up megacap that false-broke at the open and reversed within an hour. It was also the day's most-*extended* fill (1.62% above level), which *tempts* a "stop chasing / cap extension" read — but the full book refutes that (see candidate 1).
+- GOOG ran +1.98% yet TP 354.00 (RR target) was never hit → winners riding to the EOD flatten rather than booking the target; consistent with all-time EOD_FLATTEN PF 1.77.
+
+### Lessons & improvement candidates
+1. **(ACTED → IMP-007) Entry extension is NOT a usable false-breakout discriminator.** AAPL's 1.62% extension is today's anecdote, but across all 41 breakout-type trades the **tightest** bucket (≤0.5%) carries the **worst** stop rate (67.9%, −$1,047), and only 2 trades ever exceeded 1.0% extension. An extension cap would overfit one trade and miss the leak (and would also cut tight winners). Recorded as a **refuted candidate** and surfaced as a permanent report metric (`by_entry_extension`) so it can't be silently reopened — same precedent as IMP-004 (confidence) and IMP-006 (volume).
+2. **(STANDING #1 lever) Market-regime entry gate** remains the real work. Today corroborates it: AAPL false-broke at the open while the *same* setup class (TSLA/INTC) won on the green tape — the discriminator is **tape direction**, not any per-trade score. Confidence (IMP-004), value/momentum & volume (06-26) and now **entry extension** (IMP-007) have all failed to separate the false breakout. The lever must be a market-level filter (long-only when SPY/QQQ above an intraday MA/VWAP; skip the first N min on a gap-down). Multi-run replay work, not a one-day tweak.
+3. **(Note, no action)** For STOP/TP trades the stored `entry_price` is the *signal* price (AAPL 286.37 vs fill 286.51; TSLA 395.47 vs fill 396.36) while `realized_pl` is correctly computed off the real fill — an internal-consistency wrinkle, P&L is right. Already tracked as backlog #5; left there.
+
+### Notes for pre-market research
+- **AAPL** — gapped up, false-broke at the open and reversed to stop within the hour: the megacap open-fade pattern persists. Not a quality park (no other read today), but flag the open-fade risk on gap-up megacaps.
+- **GOOGL** still **0W3L** and did **not** signal today (only GOOG traded — an MA win +$40.90); park trigger (0W4L) un-matured → **hold**. GOOG caught the Dow-inclusion + risk-on bid.
+- **MU** still produced **no live signal** (untested since the 06-24 blowout) — keep and watch.
+- SPY/GOOG/INTC all rode the green tape to a positive EOD flatten; TSLA the only target hit. XOM/energy did not signal despite firmer oil. Watchlist healthy, no parks suggested.
+- **Equity recovered to $8,000.00 (+1.61%)** — now **$500 above** the −25% ($7,500) review flag (cushion restored from $374). 4-day week (closed Fri 07-03); JOLTS Tue, ADP/ISM Wed, **payrolls Thu 07-02** → expect event-driven, thinner liquidity.
