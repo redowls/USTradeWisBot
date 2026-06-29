@@ -419,3 +419,38 @@ Service restarted: **no** (no watchlist changes; 0 open positions — nothing lo
 - **Hawkish Fed holds** (majority pencils a 2026 hike) — keep adds conservative; no new names without a high-conviction trending large-cap. TSLA remains the franchise earner (+$294, 2W0L). Equity $8,013.52 (−19.9%), $514 to the −25% ($7,500) flag.
 
 ---
+
+## 2026-06-29 — Pre-market Research
+
+### Market context
+**Risk-on relief open after a brutal June.** Futures higher to start a holiday-shortened week: Dow +0.4%, S&P 500 +0.8%, **Nasdaq-100 +1.1%** — tech rebounding on a **US–Iran "stand down" de-escalation** (both sides traded fire near the Strait of Hormuz over the weekend testing the 60-day truce, but officials say talks remain "on track" ahead of a Tuesday Doha summit; Polymarket put ~86% odds on an up-open). The bounce follows a rough month — as of Fri's close **S&P −3% / Nasdaq −6% for June**, Dow +1%. **Market CLOSED Fri Jul 3 (Independence Day)** → 4-day week. **No economic data today;** the week is back-loaded and labor-heavy: Case-Shiller / Conf. Board confidence / **JOLTS Tue**, **ADP + ISM manufacturing Wed**, **nonfarm payrolls Thu 07-02**. Oil firmer (WTI ~$69.82 +0.85%, Brent ~$72.39) on the Hormuz fire-exchange; gold/silver pulled back. Deutsche Bank cautions geopolitical tail-risk stays hard to price — treat the bounce as relief, not a confirmed trend.
+
+### Carried from daily review (2026-06-26)
+- **GOOGL joins the Dow today (06-29, replaces VZ)** — mild index-inclusion positive for GOOG/GOOGL; GOOGL still **0W3L**, park trigger is 0W**4**L (consolidate-to-GOOG-only). It has not signaled since 06-12 → trigger un-matured, **hold**; a clean GOOGL win today would help resolve the watch.
+- **MU** still has not produced a live signal since its 06-24 blowout (re-enabled 06-25) — gap/post-earnings breakout behavior remains untested → keep and watch.
+- **Megacap-tech rotation** (AAPL/NVDA/MSFT/AMZN/META bled into a 4-day Nasdaq slide last week) — judged regime, not name-quality; all rebounding on today's risk-on tape → **hold all**, no name-specific park.
+- **Oil/Hormuz risk live** — XOM tailwind but headline-gap prone; don't chase energy on a single oil spike. **Hawkish-Fed backdrop → adds stay conservative.** Honored below.
+
+### Watchlist review
+- **Positions: 0 open — nothing locked.** Account ACTIVE, equity **$7,873.51** (flat vs 06-26 close $7,873.54 — no overnight change), cash $7,873.51, buying power $31,494, daytrade_count 0. **−21.3% from $10K**, **$374 above the −25% ($7,500) strategy-review flag** (cushion thinned — watch). Clock `is_open=false`, next open 06-29 09:30 ET (pre-open run).
+- Per-symbol P&L (14d closed): positive only **TSLA +$300.01 (3W0L)**, AMD +$19.61, XOM +$19.57, CRM +$16.21, QCOM +$9.62, NFLX +$7.04, C +$4.32. Worst small: ENPH −$78.70, TSM −$55.56, MU −$35.50, WMT −$25.43, QQQ −$22.68, META −$17.83, BAC −$16.81. All liquid large-caps/ETFs that fit the strategy; **no chronic-loser park trigger matured.**
+- **No watchlist name reports earnings during market hours today** (week's earnings — NKE/STZ Tue, GIS Wed — are off-list). No halt/binary catalyst on any name. Today's premarket headliners (Comcast +25% spin-off, SpaceX Nasdaq-100 add, Viridian +11%) are event-driven one-offs, **not** clean trending large-caps that fit an intraday breakout strategy → not add candidates.
+- Today's relative strength is chips (Intel +1.1% premkt, Arm/Marvell bid) — **already fully covered on-list** (NVDA/AVGO/AMD/MU/TSM/INTC/QCOM). Samsung/SK Hynix down on $1T+ capex plans is mild memory-supply noise, not a list catalyst.
+- **Adds: none** — relief-bounce (not trend) after a −6% Nasdaq month, −21.3% drawdown with the cushion thinned to $374, and a labor-data-heavy 4-day week culminating in **NFP Thu**. No high-conviction trending large-cap absent from the list; conservative-adds guidance honored.
+
+### Changes applied to watchlist
+**No changes.** 26 active retained. Every park trigger is un-matured (GOOGL 0W3L < 0W4L and hasn't signaled; AMD watch dropped after its 06-25 win; SE/META small-sample; the rest are regime-droughts or last-week's one-day rotation, not structural mismatches) and 0 positions are open (nothing locked). No adds into a relief-bounce, geopolitically-charged, labor-data-heavy holiday week. Conservative hold is the correct call — no churn.
+
+### Final watchlist
+26 active (unchanged): AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+Service restarted: **no** (no watchlist changes; 0 open positions — nothing locked).
+
+### Notes for pre-market research (next session — Tue 06-30)
+- **Labor-data week is the macro driver:** JOLTS + Conf. Board confidence Tue 06-30, ADP + ISM mfg Wed 07-01, **NFP Thu 07-02** — hot/cold prints can whipsaw the hawkish-Fed tape; **do not add names into the data**, especially ahead of Thursday's payrolls. Market closed Fri 07-03 (Independence Day).
+- **GOOGL** joined the Dow 06-29 — watch for an inclusion bid/volume bump and whether it finally signals; still 0W3L (one more loss → consolidate-to-GOOG-only).
+- **MU** gap/post-earnings breakout behavior still untested (no live signal since 06-24) — keep watching whether it signals cleanly now the gap has settled.
+- **Megacaps** rebounded on Monday's risk-on tape — if the relief fails and they roll back over into the data, re-check whether any (AAPL/NVDA/MSFT/AMZN/META) becomes name-specific vs regime (currently regime, all held).
+- **Oil/Hormuz** geopolitical tail-risk stays live (DB: "expect more policy volatility, not less") — XOM tailwind but don't chase energy on a headline spike.
+- TSLA remains the franchise earner (**+$300 14d, 3W0L**). Equity $7,873.51 (−21.3%), **$374 to the −25% ($7,500) flag** — cushion thin; flag for strategy review if breached.
+
+---
