@@ -57,6 +57,21 @@ def _round_tick(price: float) -> float:
     return round(price, 2)
 
 
+def entry_slippage_pct(live_price: float | None, entry_price: float | None) -> float | None:
+    """Percent the live price sits ABOVE the signal-bar entry, or None if unknown.
+
+    Positive = the market ran up since the signal (a chase); negative = it pulled
+    back toward the level. The engine's stale-signal guard (IMP-008) skips an
+    entry when this exceeds MAX_ENTRY_SLIPPAGE_PCT, because the bracket's
+    stop/take-profit are anchored to the signal close while the order fills live —
+    a large gap mis-prices the bracket (and can 422 the take-profit). Returns None
+    when either price is missing/invalid so the guard fails open (no skip).
+    """
+    if live_price is None or entry_price is None or entry_price <= 0:
+        return None
+    return (live_price - entry_price) / entry_price * 100.0
+
+
 def _skip(symbol: str, confidence: float, entry: float, reason: str) -> PositionPlan:
     return PositionPlan(
         symbol=symbol, confidence=confidence, tradable=False, skip_reason=reason,

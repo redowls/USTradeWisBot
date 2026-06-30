@@ -19,7 +19,7 @@ from math import ceil
 import pandas as pd
 from alpaca.data.enums import DataFeed
 from alpaca.data.historical import StockHistoricalDataClient
-from alpaca.data.requests import StockBarsRequest
+from alpaca.data.requests import StockBarsRequest, StockLatestTradeRequest
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
 from . import config, db, secrets
@@ -187,6 +187,29 @@ def get_bars(
         [symbol], n_bars=n_bars, timeframe=timeframe,
         regular_hours_only=regular_hours_only,
     ).get(symbol.strip().upper(), pd.DataFrame(columns=OHLCV_COLUMNS))
+
+
+def latest_trade_price(symbol: str) -> float | None:
+    """Most recent trade price for `symbol` from the configured feed, or None.
+
+    The engine's stale-signal entry guard (IMP-008) compares this live price
+    against the signal-bar close before submitting a market bracket: the plan's
+    stop/take-profit are anchored to the signal close, so a gap up between signal
+    and submission mis-prices the bracket (AMD 2026-06-30 422'd the take-profit
+    and the entry was silently lost). Fails OPEN (returns None) on any error, so a
+    data hiccup can never block an entry — the guard then leaves prior behavior.
+    """
+    symbol = symbol.strip().upper()
+    if not symbol:
+        return None
+    try:
+        req = StockLatestTradeRequest(symbol_or_symbols=symbol, feed=_feed())
+        trade = data_client().get_stock_latest_trade(req)
+        t = trade.get(symbol) if isinstance(trade, dict) else trade
+        price = getattr(t, "price", None)
+        return float(price) if price is not None else None
+    except Exception:  # noqa: BLE001 - fail open; never block an entry on data
+        return None
 
 
 def get_watchlist_bars(

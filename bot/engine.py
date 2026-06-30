@@ -20,7 +20,8 @@ import traceback
 from datetime import date, datetime
 
 from . import (
-    broker, config, confidence, exits, execution, logbook, notify, signals, sizing,
+    broker, config, confidence, data, exits, execution, logbook, notify, signals,
+    sizing,
 )
 
 
@@ -135,6 +136,26 @@ class Engine:
             if not plan.tradable:
                 actions.append({"symbol": plan.symbol, "confidence": conf,
                                 "action": "skip", "detail": plan.skip_reason})
+                continue
+            # --- Stale-signal / gap guard (IMP-008) ---
+            # entry/stop/TP are anchored to the signal-bar close, but the order
+            # is a MARKET buy filling at the live price. If the symbol has run
+            # > MAX_ENTRY_SLIPPAGE_PCT above the signal close, the bracket TP
+            # (>= ~entry*1.0225) can land below the live price and Alpaca 422s
+            # the whole bracket (AMD 06-30: signal ~542, live 554.29, entry
+            # silently lost); even when accepted the stop sits that much further
+            # from the real fill, inflating risk above plan. Skip the chase.
+            # Fail-open: a missing live price leaves prior behavior unchanged.
+            live = data.latest_trade_price(plan.symbol)
+            slip = sizing.entry_slippage_pct(live, plan.entry_price)
+            if slip is not None and slip > config.MAX_ENTRY_SLIPPAGE_PCT:
+                actions.append({"symbol": plan.symbol, "confidence": conf,
+                                "action": "skip",
+                                "detail": f"stale_signal_gap_{slip:.2f}%"})
+                self._log(f"ENTRY SKIPPED {plan.symbol}: live {live:.2f} is "
+                          f"+{slip:.2f}% above signal entry {plan.entry_price:.2f} "
+                          f"(>{config.MAX_ENTRY_SLIPPAGE_PCT}% — stale-signal gap; "
+                          f"stop/TP would be mispriced)")
                 continue
             if self.dry_run:
                 actions.append({"symbol": plan.symbol, "confidence": conf,

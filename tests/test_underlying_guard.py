@@ -9,7 +9,7 @@ the daily entry cap.
 
 from datetime import timedelta
 
-from bot import broker, config, confidence, engine, exits, logbook, signals
+from bot import broker, config, confidence, data, engine, exits, logbook, signals
 
 
 def test_equivalent_symbols_groups_share_classes():
@@ -35,6 +35,9 @@ def _run(monkeypatch, symbol: str, *, held: set[str], activity: dict,
     monkeypatch.setattr(logbook, "get_symbol_activity_today", lambda _d: activity)
     monkeypatch.setattr(signals, "evaluate_watchlist", lambda: [_ev(symbol)])
     monkeypatch.setattr(confidence, "score", lambda _ev: 90.0)
+    # Keep these tests offline and isolate them from the IMP-008 slippage guard:
+    # no live-price gap -> the guard never fires (fail-open default behavior).
+    monkeypatch.setattr(data, "latest_trade_price", lambda _s: None)
     actions = engine.Engine(dry_run=True).consider_entries(now=now)
     assert len(actions) == 1
     return actions[0]
