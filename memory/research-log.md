@@ -454,3 +454,38 @@ Service restarted: **no** (no watchlist changes; 0 open positions — nothing lo
 - TSLA remains the franchise earner (**+$300 14d, 3W0L**). Equity $7,873.51 (−21.3%), **$374 to the −25% ($7,500) flag** — cushion thin; flag for strategy review if breached.
 
 ---
+
+## 2026-06-30 — Pre-market Research
+
+### Market context
+**Risk-on continuation into the labor-data block.** Monday 06-29 snapped a 5-day losing streak: **Dow closed at a record 52,182.74 (+0.59%), S&P 500 +1.18% (7,440.43), Nasdaq Composite +2.07% (25,820.14)** on US–Iran de-escalation (Strait of Hormuz reopened to commercial vessels) + a broad Magnificent-Seven rebound — **GOOG rose ~5% in its first session as a Dow member** (on-list), the single biggest Dow contributor. Tue futures edge higher again; semis bid (SMH +0.8% pre-mkt), MAGS +0.25%. **Today 10:00 ET: JOLTS (May job openings, prior 7.6M) + Conference Board Consumer Confidence (prior 93.1)** — first of a labor-heavy, holiday-shortened week: **ADP + ISM mfg Wed 07-01, nonfarm payrolls Thu 07-02, market/bond-close Fri 07-03 (Independence Day)**. 10y ~4.38%. **Earnings: NKE reports AFTER the close today (the only Dow name reporting this week) — off-list and post-close → no intraday earnings risk on the watchlist.** Treat the bounce as momentum-into-data, not a confirmed trend; hot/cold prints can whipsaw the still-hawkish-Fed tape.
+
+### Carried from daily review (2026-06-29)
+- **AAPL** false-broke at the open 06-29 and reversed to its stop (−$116.55, lone loser) — judged the megacap open-fade/regime pattern, not a quality park; AAPL is rebounding on today's risk-on tape → **hold** (flag the gap-up-megacap open-fade risk, but no name action). Same logic holds the rest of the megacaps (NVDA/MSFT/AMZN/META) — all bid today.
+- **GOOGL** still **0W3L** and did **not** signal 06-29 (only GOOG traded, an MA win +$40.90); park trigger is 0W**4**L (consolidate-to-GOOG-only) → un-matured, **hold**. GOOG caught the Dow-inclusion + risk-on bid (+~5% Mon).
+- **MU** still produced **no live signal** (untested since the 06-24 blowout, re-enabled 06-25) → keep and watch.
+- Watchlist judged healthy with no parks suggested; **adds stay conservative into the labor data** (06-29 note: no new names into JOLTS/ADP/NFP). Honored below.
+
+### Watchlist review
+- **Positions: 0 open — nothing locked.** Account ACTIVE, equity **$7,999.97** (flat vs 06-29 close $8,000.00 — no overnight change), cash $7,999.97, buying power $31,999.88, daytrade_count 0. **−20.0% from $10K**, **$500 above the −25% ($7,500) strategy-review flag** (cushion restored from $374 by Monday's +$126 day). Clock `is_open=false`, next open 06-30 09:30 ET (pre-open run).
+- Per-symbol P&L (14d closed, 29 trades, net **+$174.28**): positive **TSLA +$316.01 (3W0L)**, INTC +$85.79, GOOG +$40.90, C +$20.25, AMD +$19.61, XOM +$19.57, CRM +$16.21, QCOM +$9.62. Worst: AAPL −$116.55 (06-29 false breakout), ENPH −$78.70, TSM −$55.56, WMT −$25.43, QQQ −$22.68, META −$17.83, BAC −$16.81. All liquid large-caps/ETFs that fit the strategy; **no chronic-loser park trigger matured** (the book is net green over 14d, carried by TSLA + Monday's INTC/GOOG/TSLA winners).
+- **No watchlist name reports earnings during market hours today** (NKE is after the close, off-list; no other on-list name reports). No halt/binary catalyst on any name. Today's premarket headliner (SpaceX fast-tracked into the Nasdaq-100 for ~Jul 7) is an index-mechanics one-off, not a tradable on-list catalyst.
+- Today's relative strength is again semis (SMH bid) + Mag7 — **already fully covered on-list** (NVDA/AVGO/AMD/MU/TSM/INTC/QCOM + AAPL/MSFT/AMZN/META/GOOG/GOOGL/TSLA). No high-conviction trending large-cap absent from the list.
+- **Adds: none** — momentum-into-data (JOLTS/confidence at 10:00 today, ADP Wed, **NFP Thu**), still-hawkish Fed, −20.0% drawdown, and a 4-day holiday week. Conservative-adds guidance (06-29) honored; no chasing into the print.
+
+### Changes applied to watchlist
+**No changes.** 26 active retained. Every park trigger is un-matured (GOOGL 0W3L < 0W4L and hasn't signaled; AMD watch dropped after its 06-25 win; AAPL/megacaps are regime open-fade not name-quality; SE/META small-sample; the rest are regime droughts, not structural mismatches), and 0 positions are open (nothing locked). No adds into a labor-data-heavy holiday week. Conservative hold is the correct call — no churn.
+
+### Final watchlist
+26 active (unchanged): AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+Service restarted: **no** (no watchlist changes; 0 open positions — nothing locked).
+
+### Notes for pre-market research (next session — Wed 07-01)
+- **Labor data is the macro driver all week:** JOLTS + Conf. Board confidence today 06-30, **ADP + ISM mfg Wed 07-01, NFP Thu 07-02**; **market/bond closed Fri 07-03**. Do NOT add names into the data, especially ahead of Thursday's payrolls; a hot/cold print can whipsaw the hawkish-Fed tape.
+- **NKE reports after the close today** (only Dow name this week, off-list) — will gap Wed 07-01 but has no direct watchlist effect; a sharp NKE move can color consumer-discretionary sentiment.
+- **GOOGL** still 0W3L — one more loss (0W4L) triggers consolidate-to-GOOG-only; GOOG remains the stronger vehicle (Dow-inclusion bid, +$40.90 Mon). Watch whether GOOGL finally signals.
+- **MU** gap/post-earnings breakout behavior still untested (no live signal since 06-24) — keep watching whether it signals cleanly now the gap has settled.
+- **AAPL/megacap open-fade:** AAPL false-broke and stopped 06-29 on a gap-up; if gap-up megacaps keep fading at the open into the data, that's the recurring regime case (the #1 strategy lever, regime gate) — not a watchlist park.
+- TSLA remains the franchise earner (**+$316 14d, 3W0L**). Equity $7,999.97 (−20.0%), **$500 to the −25% ($7,500) flag** — cushion restored; flag for strategy review if breached.
+
+---
