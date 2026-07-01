@@ -489,3 +489,37 @@ Service restarted: **no** (no watchlist changes; 0 open positions — nothing lo
 - TSLA remains the franchise earner (**+$316 14d, 3W0L**). Equity $7,999.97 (−20.0%), **$500 to the −25% ($7,500) flag** — cushion restored; flag for strategy review if breached.
 
 ---
+
+## 2026-07-01 — Pre-market Research
+
+### Market context
+**Breather to open H2 after a blockbuster first half.** Futures slip: Dow −0.4% (−202), S&P 500 −0.4%, Nasdaq 100 −0.6% pre-open — a pause, not a reversal, after H1 gains (Dow +8.9%, S&P +9.6%, Nasdaq +12.8%; Q2 S&P +14.9%, best since Q2-2020). The rally was chip/AI-led — a record chip run added ~$2T of combined cap to MU/INTC/AMD in Q2 (all on-list). **Labor-data block dominates:** ADP private payrolls 8:15 ET (cons. 122k vs 117k prior), **ISM Manufacturing 10:00 ET (high importance, ~53.8–54.0)**, and Fed Chair **Warsh speaks 9:30 ET** at the ECB Sintra forum — then **June NFP Thu 07-02; market/bond closed Fri 07-03**. 10y ~4.38%, still-hawkish Fed. Retail sentiment: SPY bearish / QQQ bullish. **No watchlist name reports today** — today's earnings (GIS, FDS, MSM, UNF, GBX) are all off-list; NKE reported yesterday (−4% pre-mkt on China weakness, off-list).
+
+### Carried from daily review (2026-06-30)
+- **Best incubation day by P&L: 5W/1L, +$297.04**, equity close **$8,297.01 (−17.0%)** — cushion widened to **$797** above the −25% ($7,500) flag. 0 open positions, no overnight carry. Directional-with-the-tape thesis paid in full (3 TAKE_PROFIT: INTC/TSM/TSLA).
+- **AMD** — day's strongest mover but bot could not enter (bracket 422 on the >2% open gap); now handled by **IMP-008** gap-skip guard. Order mechanics, **not** the name — high-quality momentum leader, **hold, no park**.
+- **TSM** flipped 06-29 false-break → +1.92% TP win (regime-dependence); **MU** produced its first live signal since the 06-24 blowout and won (+1.78%) — post-earnings gap settled, keep. **TSLA now 4W0L (+$375 14d)**, franchise earner. **AAPL** rebounded +1.29% (opposite of its 06-29 open-fade → regime, not name).
+- **GOOGL** still **0W3L**, did not signal — park trigger (0W4L) un-matured → hold. Adds stay conservative into the labor data. Honored below.
+
+### Watchlist review
+- **Positions: 0 open — nothing locked.** Account ACTIVE, equity **$8,296.98** (flat vs 06-30 close $8,297.01 — no overnight change), cash $8,296.98, buying power $33,187.92, daytrade_count 0. **−17.0% from $10K**, **$797 above** the −25% ($7,500) strategy-review flag (best cushion since early incubation — protect it into the labor data).
+- Per-symbol P&L (14d closed): positive **TSLA +$375.11 (4W0L)**, INTC +$176.12 (2W0L), TSM +$41.02, GOOG +$40.90, MU +$20.27, AMD +$19.61, XOM +$19.57, CRM +$16.21, QCOM +$9.62. Worst small: AAPL −$83.46 (1W1L), ENPH −$78.70 (1W1L), WMT −$25.43, QQQ −$22.68 (0W1L), META −$17.83 (0W2L), AVGO −$9.37 (incl. the 06-30 −$2.33 scratch), COST −$7.50, SPY −$5.58, BAC −$1.63. All liquid large-caps/ETFs that fit the strategy; **no chronic-loser park trigger matured** — AAPL/ENPH are 1W1L small samples, AAPL explicitly regime open-fade (held), and the book is strongly net-green over 14d (TSLA + INTC).
+- **No watchlist name reports during market hours today** (GIS/FDS/MSM/UNF/GBX off-list; NKE reported yesterday). No halt/binary catalyst on any on-list name. Pre-market movers (LUNR +8%, ASTS +20%, NIO −4%, defense AVAV/KTOS on initiations, NKE −4%) are event/small-cap one-offs — **not** clean trending liquid large-caps that fit an intraday breakout strategy → **not add candidates**.
+- Today's relative strength story is again chips/AI — **already fully covered on-list** (NVDA/AVGO/AMD/MU/TSM/INTC/QCOM). No high-conviction trending large-cap absent from the list.
+- **Adds: none** — futures lower into a labor-data-heavy, holiday-shortened week (ADP + ISM + Warsh today, **NFP Thu**, closed Fri), still-hawkish Fed, and a −17% drawdown to protect. Conservative-adds guidance (06-30) honored; no chasing into the print.
+
+### Changes applied to watchlist
+**No changes.** 26 active retained. Every park trigger is un-matured (GOOGL 0W3L < 0W4L and hasn't signaled; AAPL/megacaps are regime open-fade not name-quality; ENPH/META/AVGO small-sample noise; AMD's 06-30 miss was order mechanics fixed by IMP-008, not the name; the rest are regime droughts, not structural mismatches), and 0 positions are open (nothing locked). No adds into the labor data on a lower-futures breather. Conservative hold is the correct call — no churn.
+
+### Final watchlist
+26 active (unchanged): AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+Service restarted: **no** (no watchlist changes; 0 open positions — nothing locked).
+
+### Notes for pre-market research (next session — Thu 07-02)
+- **NFP DAY (June payrolls, 8:30 ET) is the single biggest macro event of the week** — do NOT add names into the print; a hot/cold number can whipsaw the hawkish-Fed tape. **Market/bond closed Fri 07-03 (Independence Day)** → Thu is the last full session of the week; expect thinner post-lunch liquidity ahead of the long weekend and flatten cleanly.
+- Watch how today's ADP/ISM + Warsh set the tone: if the H2-open breather deepens into a down tape, the megacap open-fade (AAPL-style) risk returns (the #1 strategy lever, regime gate); if the chip/AI leadership resumes, the on-list semis (NVDA/AVGO/AMD/MU/TSM/INTC/QCOM) are the vehicles.
+- **GOOGL** still 0W3L and untested — one more loss (0W4L) triggers consolidate-to-GOOG-only; GOOG remains the stronger vehicle. Watch whether GOOGL finally signals.
+- **TSLA 4W0L (+$375 14d)** and **INTC 2W0L (+$176)** are carrying the book — the franchise earners; no action, just the anchors of the current green-tape edge.
+- Equity **$8,296.98 (−17.0%)**, **$797 above** the −25% ($7,500) flag — best cushion of incubation; protect it through NFP.
+
+---
