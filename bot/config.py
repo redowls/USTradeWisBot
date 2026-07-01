@@ -55,18 +55,21 @@ RR_RATIO = 1.5                  # take-profit = stop distance * this; with the w
                                 # winners run longer instead of capping out in minutes.
 MAX_RISK_PCT = 2.0              # HARD CAP on per-trade risk (% of equity)
 MAX_CONCURRENT_POSITIONS = 3    # exposure limit
-MAX_ENTRY_SLIPPAGE_PCT = 1.0    # skip an entry if the LIVE price has run more than
-                                # this % above the signal-bar close before the market
-                                # bracket is submitted. The plan's entry/stop/TP are
-                                # anchored to the signal close, but the order fills
-                                # live; a big gap up makes the TP (>= ~entry*1.0225)
-                                # land below the live price -> Alpaca 422s the whole
-                                # bracket (AMD 2026-06-30: signal ~542, live 554.29,
-                                # entry silently lost), and even when accepted the
-                                # stop sits that much further from the real fill,
-                                # inflating per-share risk above plan. Recorded fills
-                                # are <=0.5% off the signal, so 1.0% only catches the
-                                # gap-chase. A NEW skip (tightening) — widens nothing.
+MAX_ENTRY_SLIPPAGE_PCT = 1.0    # skip an entry if the LIVE price has moved more than
+                                # this % from the signal-bar close (in EITHER direction)
+                                # before the market bracket is submitted. The plan's
+                                # entry/stop/TP are anchored to the signal close, but the
+                                # order fills live; a big gap UP makes the TP
+                                # (>= ~entry*1.0225) land below the live price
+                                # (AMD 2026-06-30: signal ~542, live 554.29), and a big
+                                # gap DOWN makes the stop (~1.5% below the signal close)
+                                # land at/above the live price (NVDA 2026-07-01:
+                                # base_price 195.02) -> Alpaca 422s the whole bracket and
+                                # the entry is silently lost. Even when a smaller gap is
+                                # accepted the stop is mispriced vs the real fill.
+                                # Recorded fills are <=0.5% off the signal, so 1.0% only
+                                # catches the gap-chase. A NEW skip (tightening) — widens
+                                # nothing (IMP-008 up-side; IMP-009 down-side symmetry).
                                 # IMP-008.
 
 # --- Daily-loss circuit breaker (#1) ---

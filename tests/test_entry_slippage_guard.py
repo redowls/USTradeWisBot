@@ -1,17 +1,23 @@
-"""IMP-008 regression tests — stale-signal / entry-slippage guard.
+"""IMP-008 / IMP-009 regression tests — stale-signal / entry-slippage guard.
 
-2026-06-30 09:30:22 ET: AMD was the day's first entry attempt but Alpaca
-rejected the whole bracket with a 422 ("take_profit.limit_price must be >=
-base_price + 0.01", base_price 554.29). The plan's entry/stop/take-profit are
+2026-06-30 09:30:22 ET (IMP-008): AMD was the day's first entry attempt but
+Alpaca rejected the whole bracket with a 422 ("take_profit.limit_price must be
+>= base_price + 0.01", base_price 554.29). The plan's entry/stop/take-profit are
 anchored to the signal-bar close (~542), but the order is a MARKET buy that
 filled live at 554.29 — a >2% gap up between signal and submission pushed the
 take-profit (>= ~entry*1.0225) below the live price, so the entry was silently
 lost and never even reached the DB.
 
+2026-07-01 09:30:26 ET (IMP-009): NVDA was the day's first entry attempt and
+Alpaca rejected the bracket with the MIRROR 422 ("stop_loss.stop_price must be
+<= base_price - 0.01", base_price 195.02) — NVDA gapped DOWN between the signal
+and submission, so the stop (anchored ~1.5% below the higher signal close) landed
+at/above the live price. Same silent lost entry, opposite direction.
+
 These tests pin the pre-submit guard that skips an entry when the live price has
-run more than MAX_ENTRY_SLIPPAGE_PCT above the signal close — both to avoid the
-doomed bracket and because, even when accepted, the stop would sit far further
-from the real fill than planned (inflated per-share risk).
+moved more than MAX_ENTRY_SLIPPAGE_PCT from the signal close in EITHER direction
+— avoiding both doomed brackets and, for smaller gaps that would be accepted, the
+stop/TP mispriced against the real fill (inflated risk / hair-trigger stop).
 """
 
 from bot import broker, config, confidence, data, engine, exits, logbook, signals, sizing
@@ -32,8 +38,15 @@ def test_entry_slippage_pct_normal_fill_small():
 
 
 def test_entry_slippage_pct_pullback_is_negative():
-    """Live below the signal (a dip into the level) is negative, never skipped."""
+    """Live below the signal (a dip into the level) is negative."""
     assert sizing.entry_slippage_pct(99.0, 100.0) < 0
+
+
+def test_entry_slippage_pct_nvda_gap_down():
+    """NVDA 07-01: signal ~198.0 vs live 195.02 -> ~-1.5% below (a gap down)."""
+    slip = sizing.entry_slippage_pct(195.02, 198.0)
+    assert slip is not None and -1.6 < slip < -1.4
+    assert abs(slip) > config.MAX_ENTRY_SLIPPAGE_PCT
 
 
 def test_entry_slippage_pct_none_when_no_live_price():
@@ -86,6 +99,13 @@ def test_missing_live_price_fails_open(monkeypatch):
 
 
 def test_pullback_below_signal_still_buys(monkeypatch):
-    """Live below the signal close (a dip) is not a chase -> entry proceeds."""
-    act = _run(monkeypatch, "TSLA", signal_close=411.72, live_price=409.00)
+    """A small dip below the signal close (<1%) is not a chase -> entry proceeds."""
+    act = _run(monkeypatch, "TSLA", signal_close=411.72, live_price=409.00)  # -0.66%
     assert act["action"] == "would_buy"
+
+
+def test_nvda_gap_down_is_skipped(monkeypatch):
+    """NVDA 07-01 replay: signal 198.0, live 195.02 (-1.5%) -> skip, not a 422."""
+    act = _run(monkeypatch, "NVDA", signal_close=198.0, live_price=195.02)
+    assert act["action"] == "skip"
+    assert act["detail"].startswith("stale_signal_gap_down_")

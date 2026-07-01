@@ -137,25 +137,33 @@ class Engine:
                 actions.append({"symbol": plan.symbol, "confidence": conf,
                                 "action": "skip", "detail": plan.skip_reason})
                 continue
-            # --- Stale-signal / gap guard (IMP-008) ---
+            # --- Stale-signal / gap guard (IMP-008; symmetric IMP-009) ---
             # entry/stop/TP are anchored to the signal-bar close, but the order
-            # is a MARKET buy filling at the live price. If the symbol has run
-            # > MAX_ENTRY_SLIPPAGE_PCT above the signal close, the bracket TP
-            # (>= ~entry*1.0225) can land below the live price and Alpaca 422s
-            # the whole bracket (AMD 06-30: signal ~542, live 554.29, entry
-            # silently lost); even when accepted the stop sits that much further
-            # from the real fill, inflating risk above plan. Skip the chase.
-            # Fail-open: a missing live price leaves prior behavior unchanged.
+            # is a MARKET buy filling at the live price. If the live price has
+            # moved more than MAX_ENTRY_SLIPPAGE_PCT from the signal close in
+            # EITHER direction the bracket is mispriced against the real fill:
+            #   * gap UP   -> the TP (>= ~entry*1.0225) can land below the live
+            #     price and Alpaca 422s the whole bracket (AMD 06-30: signal
+            #     ~542, live 554.29, entry silently lost).
+            #   * gap DOWN -> the stop (anchored ~1.5% below the signal close)
+            #     lands at/above the live price and Alpaca 422s it just the same
+            #     (NVDA 07-01: base_price 195.02, "stop_loss.stop_price must be
+            #     <= base_price - 0.01"); a shallower down-gap is accepted but
+            #     the stop is compressed to a hair-trigger AND the breakout
+            #     premise has already failed (price back below the level).
+            # Either way skip the chase. Fail-open: a missing live price leaves
+            # prior behavior unchanged.
             live = data.latest_trade_price(plan.symbol)
             slip = sizing.entry_slippage_pct(live, plan.entry_price)
-            if slip is not None and slip > config.MAX_ENTRY_SLIPPAGE_PCT:
+            if slip is not None and abs(slip) > config.MAX_ENTRY_SLIPPAGE_PCT:
+                direction = "up" if slip > 0 else "down"
                 actions.append({"symbol": plan.symbol, "confidence": conf,
                                 "action": "skip",
-                                "detail": f"stale_signal_gap_{slip:.2f}%"})
+                                "detail": f"stale_signal_gap_{direction}_{slip:+.2f}%"})
                 self._log(f"ENTRY SKIPPED {plan.symbol}: live {live:.2f} is "
-                          f"+{slip:.2f}% above signal entry {plan.entry_price:.2f} "
-                          f"(>{config.MAX_ENTRY_SLIPPAGE_PCT}% — stale-signal gap; "
-                          f"stop/TP would be mispriced)")
+                          f"{slip:+.2f}% vs signal entry {plan.entry_price:.2f} "
+                          f"(|move|>{config.MAX_ENTRY_SLIPPAGE_PCT}% — stale-signal "
+                          f"gap {direction}; stop/TP would be mispriced)")
                 continue
             if self.dry_run:
                 actions.append({"symbol": plan.symbol, "confidence": conf,
