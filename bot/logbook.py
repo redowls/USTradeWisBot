@@ -150,6 +150,13 @@ def record_exit(exit_record: dict) -> int | None:
         realized_pl=exit_record["realized_pl"],
         realized_pl_pct=exit_record["realized_pl_pct"],
         exit_reason=exit_record["exit_reason"],
+        # Correct the stored entry to the real bracket fill. build_exit_record
+        # already prices P&L off the parent order's filled_avg_price, so without
+        # this the entry_price column keeps the stale plan/signal price and the
+        # row (and the by-entry-extension analytic) no longer reconciles with
+        # realized_pl. STOP/TP analog of the EOD-flatten fix (IMP-005); GOOGL
+        # 2026-07-02 stored 361.19 while it filled 360.84. IMP-010.
+        entry_price=exit_record.get("entry_price"),
     )
     return trade_id
 
