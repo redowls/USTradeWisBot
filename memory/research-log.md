@@ -523,3 +523,36 @@ Service restarted: **no** (no watchlist changes; 0 open positions — nothing lo
 - Equity **$8,296.98 (−17.0%)**, **$797 above** the −25% ($7,500) flag — best cushion of incubation; protect it through NFP.
 
 ---
+
+## 2026-07-02 — Pre-market Research
+
+### Market context
+**NFP DAY — the week's single biggest macro event.** June nonfarm payrolls print **8:30 ET (before the open)**, pulled forward to Thursday because **market/bond closed Fri 07-03 (Independence Day observed)** → today is the last full session of the week. Consensus ~110–115k jobs (slowdown from May's 172k), unemployment ~4.3%. Wednesday's tells were mixed: **ADP soft at 98k** private (below consensus), JOLTS upbeat. The tension is good-news-is-bad-news: a hot print reinforces the still-hawkish Warsh Fed (core PCE 3.4%, highest since Oct-2023; some desks positioning for hikes) and can whipsaw the tape. Futures softening into the release; S&P at record highs but growth slowing + U.Mich sentiment at an all-time low + U.S.–Iran tensions underneath. 10y ~4.38%. **No watchlist name reports during market hours today** — early July is pre-Q2-earnings-season (banks kick it off ~mid-July); no on-list earnings/halt/binary catalyst.
+
+### Carried from daily review (2026-07-01)
+- **Third straight green day: 5W/1L, +$152.38 (+1.84%)**, equity close **$8,449.36 (−15.5%)** — best 3-day run and **best cushion of incubation ($949 above the −25% flag)**. 0 open positions, no overnight carry (IMP-002 retry-until-confirmed flatten held again). Directional-with-the-tape thesis paid a third session (2 TP: SE/MSFT).
+- **NVDA** — bot tried it first (09:30:26) but the bracket 422'd on an open **gap-down** (base 195.02); now handled by **IMP-009** (symmetric down-gap skip). Order mechanics, **not** the name → **hold, no park**.
+- **GOOGL park watch RESOLVED in its favor** — signaled (BOTH, conf 72.83) and **won +$42.41**, its first live signal in weeks. The 0W3L→consolidate-to-GOOG watch does NOT fire → **drop the park watch; keep both GOOG and GOOGL**.
+- **ENPH** — genuine BOTH breakout that round-tripped −1.85% to a stop in ~6 min: recurring false-breakout mode (06-15/06-26), behaves with the regime → **no park** (the leak is the regime-wide STOP bucket PF 0.01, the #1 strategy-lever gate — not name-specific). **SE/MSFT** hit TP on low-conf MA (MSFT's first winner) → MA-floor-raise candidate stays refuted; keep all.
+
+### Watchlist review
+- **Positions: 0 open — nothing locked.** Account ACTIVE, equity **$8,449.32** (flat vs 07-01 close $8,449.36 — no overnight change), cash $8,449.32, buying power $33,797.28, daytrade_count 0. **−15.5% from $10K**, **$949 above** the −25% ($7,500) strategy-review flag — **best cushion of incubation; protect it into the payrolls print.**
+- Per-symbol P&L (14d closed, net **+$623.70**): positive **TSLA +$375.11 (4W0L)**, INTC +$176.12 (2W2L→2W0L), SE +$60.30, MSFT +$58.52, GOOGL +$42.41, TSM +$41.02, GOOG +$40.90, MU +$20.27, C +$20.25, AMD +$19.61, XOM +$19.57, CRM +$16.21, QCOM +$9.62, AMZN +$4.59. Worst: **ENPH −$126.54 (3t,1W)**, AAPL −$49.06 (3t,2W), WMT −$25.43, QQQ −$22.68, META −$17.83 (0W2L), BAC −$16.81, AVGO −$9.37, COST −$7.50, SPY −$5.58. All liquid large-caps/ETFs that fit the strategy; **no chronic-loser park trigger matured** — ENPH is the biggest loser but explicitly the regime-wide false-breakout leak, NOT a name defect (07-01 note: no park); AAPL 2W/3t is regime open-fade; book is strongly net-green (+$624) over 14d.
+- Pre-market movers into NFP are event/macro one-offs, not clean trending liquid large-caps that fit an intraday breakout strategy → **not add candidates**. Today's leadership (chips/AI + megacaps) is **already fully covered on-list** (NVDA/AVGO/AMD/MU/TSM/INTC/QCOM + AAPL/MSFT/AMZN/META/GOOG/GOOGL/TSLA). No high-conviction trending large-cap absent from the list.
+- **Adds: none** — NFP-day whipsaw risk on a hot/cold print, hawkish Fed, holiday-shortened week (closed Fri), and a −15.5% drawdown with the best cushion of incubation to protect. Standing "do NOT add into the payrolls print" guidance (07-01) honored; no chasing into the print.
+
+### Changes applied to watchlist
+**No changes.** 26 active retained. No park trigger matured (ENPH/regime-wide STOP-bucket leak = strategy-gate work not a name park; AAPL/megacaps regime open-fade; META/AVGO small-sample noise; NVDA's 07-01 miss was order mechanics fixed by IMP-009; GOOGL park watch resolved in its favor and dropped; the rest are regime droughts, not structural mismatches). 0 positions open (nothing locked). No adds into the labor data. Conservative hold is the correct call — no churn.
+
+### Final watchlist
+26 active (unchanged): AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+Service restarted: **no** (no watchlist changes; 0 open positions — nothing locked).
+
+### Notes for pre-market research (next session — Mon 07-06)
+- **Market closed Fri 07-03; next session Mon 07-06.** Review how the NFP print + the long-weekend tape resolved: a hot number that whipsaws into a down tape brings back the megacap open-fade (AAPL-style) risk (the #1 strategy-lever regime gate); if chip/AI leadership resumes, on-list semis (NVDA/AVGO/AMD/MU/TSM/INTC/QCOM) are the vehicles.
+- **GOOGL park watch is CLOSED** (signaled + won 07-01) — keep both GOOG and GOOGL; no lingering 0W3L trigger.
+- **ENPH remains the single biggest 14d loser (−$126.54)** and the recurring false-breakout name — but it is the regime-wide STOP-bucket leak (PF 0.01), addressed by the deliberate intraday-regime entry gate (post-close work), NOT a pre-market name park. Re-flag only if a name-specific pattern separates from the regime.
+- **TSLA 4W0L (+$375 14d)** and **INTC 2W0L (+$176)** remain the book's anchors; **SE/MSFT** joined the winners' column 07-01 (low-conf MA). No action — just the current green-tape earners.
+- Equity **$8,449.32 (−15.5%)**, **$949 above** the −25% ($7,500) flag — best cushion of incubation; protect it.
+
+---
