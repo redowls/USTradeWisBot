@@ -476,3 +476,32 @@ None — market closed. Nothing to root-cause at the trade level.
 - **GOOGL** — MA open-fade stop (−$35.58). Park watch already CLOSED (07-01 win); keep both GOOG and GOOGL. No new concern beyond regime.
 - **CRM / BAC** — low-conf MA, no follow-through (−$12.94 / scratch). Nothing name-specific; dead-tape drift/flat.
 - **Market CLOSED Fri 07-03; next session Mon 07-06.** Review how the NFP print + long-weekend tape resolved: if the fade regime persists, megacap/MA open-fades (today's GOOGL, prior AAPL) stay the risk — the #1 strategy-lever regime gate. If chip/AI leadership resumes, on-list semis are the vehicles. Equity **$8,301.08 (−17.0%)**, **$801 above** the −25% ($7,500) flag — cushion trimmed by one fade day but intact; protect it.
+
+---
+
+## 2026-07-03 — Daily Review
+
+### Stats
+- **No trades today — US market CLOSED (Independence Day observed).** July 4 2026 falls on a Saturday, so the NYSE/Nasdaq holiday is observed **Fri 07-03** (this was pre-declared in the 07-02 review: "Market CLOSED Fri 07-03; next session Mon 07-06"). `daily_summary` ends at 07-02; **0 rows in `trades` touch 07-03** (verified: entry_time/exit_time on 2026-07-03 → count 0); journal has **no entries today**; the service has been running since the **07-02 21:33:52 UTC** restart (no pre-market restart today — the market was closed and the `uswisbot-premarket` cron itself no-op'd/failed on an expired Claude OAuth token, unrelated to the trading service).
+- Equity **$8,301.08 (−17.0% YTD)**, carried unchanged from the 07-02 close (no trading on a closed market → no P&L, no equity move). **$801 above** the −25% ($7,500) strategy-review flag.
+- **Positions: necessarily flat.** The 07-02 15:57 flatten confirmed 0 open on Alpaca (IMP-002 held its 9th+ session), and no order could be placed today → 0 open, **no naked-overnight carry into the 3-day weekend.** ✅ (Live Alpaca re-query could not run this session — the sandboxed-HTTP path was permission-gated in this unattended run — but with zero possible trades the broker state is unchanged from the 07-02 flat book; nothing to reconcile.)
+- Circuit breaker not engaged (no trading). Service **active** all day; no in-session errors.
+
+### Trade-by-trade review
+None — market closed. Nothing to root-cause at the trade level.
+
+### What worked / what didn't
+- **Nothing to fault:** the bot correctly did nothing on a closed market — no spurious entries, no errors, no stranded positions. The book is flat going into the long weekend, exactly as the no-overnight design intends.
+- **Root cause of zero trades:** calendar (federal holiday observed), not a strategy/gate/watchlist defect. This is the expected and desired outcome; **no improvement is warranted by today's (non-existent) data.** Manufacturing a code change here would be overfitting with zero supporting evidence — explicitly declined (same call as the 06-19 Juneteenth holiday).
+- IMP-009 (symmetric down-gap slippage guard, 07-01) and IMP-010 (STOP/TP entry_price = real fill, 07-02) remain **pending their first post-ship observation** — both need a live session to confirm (IMP-009: a gap-down open logs `ENTRY SKIPPED … stale_signal_gap_down` instead of a 422; IMP-010: a slipped STOP/TP row stores the real buy fill and reconciles). First test is Mon 07-06.
+
+### Lessons & improvement candidates (ranked)
+- **No code change this run.** "Reviewed, no change warranted" — today produced no trade evidence, and the capital-protection invariants + recent fixes are all in place. Acting today would be a random/unjustified change.
+- Standing candidates carried (NOT acted on today, awaiting live data): (1) **verify IMP-009 & IMP-010 in production Mon 07-06** (first live sessions since they shipped); (2) **the #1 strategy lever remains the intraday market-regime entry gate** (long-only when SPY/QQQ above an intraday MA/VWAP) — the deliberate multi-run `scripts/replay.py` build, unchanged; every per-trade discriminator (confidence IMP-004, volume 06-26, entry-extension IMP-007) is refuted, and the STOP/false-breakout bucket (all-time PF 0.01, −$3,072) is the entire leak the gate targets; (3) the report's own verdict still reads **NEEDS WORK** (expectancy not positive; false-breakout rate 58.3%) — the regime gate is the path to flip it, not a post-close tweak.
+
+### Notes for pre-market research
+- **Holiday — no new trade-level observations.** Watchlist state is exactly as the prior pre-market curation left it (last known: 25–26 active; MU re-enabled 06-25; C/JPM/WPM parked; GOOGL park watch CLOSED 07-01 after it signaled + won).
+- **Mon 07-06 is the first live session since IMP-009/IMP-010** — on any gap-down open, confirm the guard logs a clean `stale_signal_gap_down` skip (no 422); on any slipped STOP/TP, confirm the stored `entry_price` matches the Alpaca buy fill and the row reconciles.
+- **Regime is the watch item.** 07-02 was an NFP open-fade (3/4 no-follow-through); review how the post-NFP + long-weekend tape resolves Monday. If the fade regime persists, megacap/MA open-fades (GOOGL/AAPL) stay the risk; if chip/AI leadership resumes, on-list semis (NVDA/MU/TSM/AVGO/AMD/INTC/QCOM) are the vehicles. TSLA remains the franchise earner (4W0L, +$375 14d).
+- **Infra note (not a bot defect):** the `uswisbot-premarket` Claude routine failed this morning on an expired Claude OAuth token (credentials refreshed 07-03 17:24 UTC). It does not affect the trading service (which trades autonomously), but the token expires ~2026-07-04 01:24 UTC — re-login before Monday's pre-market cron so the 07-06 premarket routine runs.
+- Equity **$8,301.08 (−17.0%)**, **$801 above** the −25% ($7,500) flag — protect the cushion into the reopen.
