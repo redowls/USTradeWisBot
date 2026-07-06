@@ -202,3 +202,73 @@ def test_entry_extension_cap_does_not_address_the_leak():
     # The tight bucket stops out at least as often as the extended bucket, so the
     # leak is not concentrated in "chased" entries — an extension cap is refuted.
     assert ext["<=0.5%"]["win_rate"] <= ext[">1.0%"]["win_rate"]
+
+
+# --- Market-regime tagging (IMP-011) -----------------------------------------
+#
+# Regression anchor: 2026-07-06 closed 2W/3L for -$70.51; the entire loss was two
+# false-breakout STOPs (SE -55.64, INTC -74.16), while the two winners (GOOGL
+# +44.62, META +22.48) and the small COST drift (-7.81) held. Every per-trade
+# discriminator is already refuted, so IMP-011 measures the MARKET-LEVEL lever:
+# tag each entry with the SPY intraday regime and bucket P&L. These tests pin the
+# pure tagging/bucketing math (the live SPY fetch lives in scripts/regime_analysis
+# and is not exercised here — offline only).
+
+TODAY_20260706 = [
+    {"trade_id": 115, "realized_pl": 44.62, "exit_reason": "TAKE_PROFIT", "signal_type": "MA"},
+    {"trade_id": 116, "realized_pl": -7.81, "exit_reason": "EOD_FLATTEN", "signal_type": "MA"},
+    {"trade_id": 117, "realized_pl": -55.64, "exit_reason": "STOP", "signal_type": "MA"},
+    {"trade_id": 118, "realized_pl": -74.16, "exit_reason": "STOP", "signal_type": "BOTH"},
+    {"trade_id": 119, "realized_pl": 22.48, "exit_reason": "EOD_FLATTEN", "signal_type": "MA"},
+]
+
+
+def test_classify_index_regime_price_vs_ema():
+    assert analytics.classify_index_regime(100.0, 99.0) == analytics.REGIME_BULLISH
+    assert analytics.classify_index_regime(99.0, 100.0) == analytics.REGIME_BEARISH
+    # At/above the EMA counts as bullish (>=), boundary is inclusive.
+    assert analytics.classify_index_regime(100.0, 100.0) == analytics.REGIME_BULLISH
+
+
+def test_classify_index_regime_missing_data_is_unknown():
+    # A data gap (no aligned index bar) must never fabricate a regime.
+    assert analytics.classify_index_regime(None, 100.0) == analytics.REGIME_UNKNOWN
+    assert analytics.classify_index_regime(100.0, None) == analytics.REGIME_UNKNOWN
+    assert analytics.classify_index_regime(None, None) == analytics.REGIME_UNKNOWN
+
+
+def test_by_market_regime_buckets_and_skip_bearish_whatif():
+    # Hypothetical tag: the two STOP losers hit while SPY was below its EMA
+    # (bearish); the winners while above (bullish); COST drift left untagged.
+    regime = {
+        115: analytics.REGIME_BULLISH,   # GOOGL +44.62
+        119: analytics.REGIME_BULLISH,   # META  +22.48
+        117: analytics.REGIME_BEARISH,   # SE    -55.64
+        118: analytics.REGIME_BEARISH,   # INTC  -74.16
+        # 116 (COST) intentionally absent -> defaults to 'unknown'
+    }
+    res = analytics.by_market_regime(TODAY_20260706, regime)
+    b = res["buckets"]
+    assert b[analytics.REGIME_BULLISH]["trades"] == 2
+    assert b[analytics.REGIME_BULLISH]["total_pl"] == 67.10
+    assert b[analytics.REGIME_BEARISH]["trades"] == 2
+    assert b[analytics.REGIME_BEARISH]["total_pl"] == -129.80
+    assert b[analytics.REGIME_UNKNOWN]["trades"] == 1  # COST, defaulted
+
+    # Skip-bearish what-if: drop the two bearish STOPs, keep bullish + unknown.
+    sk = res["skip_bearish"]
+    assert sk["skipped_trades"] == 2
+    assert sk["skipped_total_pl"] == -129.80
+    assert sk["kept_trades"] == 3
+    assert sk["kept_total_pl"] == 59.29  # 44.62 + 22.48 - 7.81
+
+
+def test_by_market_regime_empty_and_all_unknown_safe():
+    # No rows -> empty buckets, zeroed what-if (no crash).
+    empty = analytics.by_market_regime([], {})
+    assert empty["buckets"] == {}
+    assert empty["skip_bearish"]["kept_trades"] == 0
+    # All trades unknown (no regime map) -> nothing skipped, book fully kept.
+    allu = analytics.by_market_regime(TODAY_20260706, {})
+    assert allu["skip_bearish"]["skipped_trades"] == 0
+    assert allu["skip_bearish"]["kept_trades"] == 5

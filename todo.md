@@ -298,6 +298,20 @@ Ordered by expected impact; each item needs replay validation before code.
    losers (06-24, 06-26 ENPH) WITHOUT killing green-day winners (06-23). Pure
    *tightening* (skips entries) — never widens risk. This is the work that should
    replace one-day entry/exit tweaks.
+   **→ STEP 1 SHIPPED (IMP-011, 2026-07-06): the measurement now exists** —
+   `bot/analytics.by_market_regime`/`classify_index_regime` + standalone
+   `scripts/regime_analysis.py` tag each closed trade with the SPY intraday regime
+   (SPY close vs EMA9 on 5-min bars) at its entry minute and bucket P&L + a
+   skip-bearish what-if (offline-tested; NOT wired into the always-on report).
+   **First read:** the edge is *regime-dependent* — ALL-TIME it has NO edge
+   (bullish PF 0.56 vs bearish PF 0.71, because the pre-fix 06-08→06-12 blowups
+   dominate and were regime-agnostic), but on the **post-06-15 live regime it
+   separates: bullish 43t +$339 / PF 1.45 vs bearish 13t −$5 / PF 0.98**, and
+   skip-bearish keeps the winners while removing a net-negative tail. NOT yet a
+   live gate (bearish n=13 small; EMA9 is one proxy). **Next (still multi-run):**
+   (a) grow the post-06-15 bearish sample; (b) compare EMA9 vs VWAP vs QQQ vs
+   "skip first N min on a red open" as the proxy in regime_analysis/replay;
+   (c) only then gate the engine (long-only when bullish) as a tightening.
 
 0a. ~~**EOD-flatten P&L accuracy**~~ **[SHIPPED IMP-003, 2026-06-22]** — on 06-22
    SPY/QQQ/TSM were each booked at exit==entry ($0.00) at the flatten while the

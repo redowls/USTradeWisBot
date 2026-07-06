@@ -92,6 +92,73 @@ def _extension_pct(row: dict) -> float | None:
     return (ep_f - bl_f) / bl_f * 100.0
 
 
+# --- Market-regime tagging (todo.md backlog ★ — the top strategy lever) --------
+#
+# Every per-trade discriminator is refuted (confidence IMP-004, volume 2026-06-26,
+# entry-extension IMP-007): no pre-trade SCORE separates a false breakout from a
+# real one, so the entire STOP-exit bleed (all-time PF ~0.01) is not a scoring
+# problem. The one lever left is MARKET-LEVEL — only take longs when the index
+# (SPY) is itself trending up intraday. These pure helpers are the FIRST
+# measurement of that hypothesis: tag each closed trade with the index regime at
+# its entry minute (SPY close vs a short intraday EMA) and bucket realized P&L,
+# so the gate can be judged on evidence before any engine change (the
+# measurement-first pattern of IMP-004/006/007). Offline/pure — the SPY series is
+# fetched by the standalone scripts/regime_analysis.py, never by the always-on
+# report, so a data hiccup can never break the incubation report.
+
+INDEX_REGIME_SYMBOL = "SPY"
+INDEX_REGIME_EMA_SPAN = 9          # 9 × 5-min ≈ 45-min intraday trend filter
+
+REGIME_BULLISH = "bullish"
+REGIME_BEARISH = "bearish"
+REGIME_UNKNOWN = "unknown"
+
+
+def classify_index_regime(index_price, index_ema) -> str:
+    """Tag the intraday market regime from the index price vs its short EMA.
+
+    bullish = index at/above its intraday EMA (take longs); bearish = below it;
+    unknown when either input is missing (no index bar aligned to the entry) so a
+    data gap never fabricates a regime. Pure — no network, no DB.
+    """
+    if index_price is None or index_ema is None:
+        return REGIME_UNKNOWN
+    return REGIME_BULLISH if _f(index_price) >= _f(index_ema) else REGIME_BEARISH
+
+
+def by_market_regime(rows: list[dict], regime_by_trade_id: dict) -> dict:
+    """Bucket closed-trade P&L by the index regime tagged at each entry.
+
+    `regime_by_trade_id` maps trade_id -> a REGIME_* label (from
+    classify_index_regime). Returns a `buckets` dict {label: _bucket(...)} for the
+    labels present, plus a `skip_bearish` what-if: what the book becomes if every
+    BEARISH-regime entry had been skipped (the gate's effect), keeping bullish AND
+    unknown trades (never skip on missing data — fail open). Lets the lever be
+    valued without touching the engine. Pure.
+    """
+    closed = [r for r in rows if r.get("realized_pl") is not None]
+    buckets: dict[str, dict] = {}
+    for label in (REGIME_BULLISH, REGIME_BEARISH, REGIME_UNKNOWN):
+        sub = [_f(r["realized_pl"]) for r in closed
+               if regime_by_trade_id.get(r.get("trade_id"), REGIME_UNKNOWN) == label]
+        if sub:
+            buckets[label] = _bucket(sub)
+
+    kept = [_f(r["realized_pl"]) for r in closed
+            if regime_by_trade_id.get(r.get("trade_id"), REGIME_UNKNOWN) != REGIME_BEARISH]
+    skipped = [_f(r["realized_pl"]) for r in closed
+               if regime_by_trade_id.get(r.get("trade_id"), REGIME_UNKNOWN) == REGIME_BEARISH]
+    return {
+        "buckets": buckets,
+        "skip_bearish": {
+            "kept_trades": len(kept),
+            "kept_total_pl": round(sum(kept), 2),
+            "skipped_trades": len(skipped),
+            "skipped_total_pl": round(sum(skipped), 2),
+        },
+    }
+
+
 def load_closed_trades(since: date | None = None) -> list[dict]:
     """Closed trades joined to their signal (signal_type/confidence/broke_level)."""
     sql = (
