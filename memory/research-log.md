@@ -556,3 +556,41 @@ Service restarted: **no** (no watchlist changes; 0 open positions — nothing lo
 - Equity **$8,449.32 (−15.5%)**, **$949 above** the −25% ($7,500) flag — best cushion of incubation; protect it.
 
 ---
+
+## 2026-07-06 — Pre-market Research
+
+### Market context
+**Holiday-return rebound; tech/semis bid after a two-day chip plunge.** First full session after the long weekend (market closed Fri 07-03, Independence Day observed). Pre-market: **S&P 500 +0.49%, Nasdaq-100 +1.12%, Dow +0.10%, Russell +0.14%** — tech leading the bounce. Backdrop is a **soft June NFP** (released Thu 07-02): +57k jobs vs +113k expected, unemployment 4.2% — a cooler labor market that breaks a three-month hot streak and supports Fed patience (risk-on read). Thu 07-02 closed split: **Dow at a record 52,900**, but **Nasdaq −0.8% as semis fell a 2nd day** (SMH −4.5%, MU −5.5%, NVDA −1.4%, Teradyne −13.6%, KLA −11.5%; Korea's Kospi −7.9% on chip weakness). Today's rebound is that chip rotation trying to stabilize. **Meta +1.4% pre-mkt** (Bloomberg: entering cloud/AI-compute business). Today's macro: **ISM June Services PMI**. **Q2 earnings season is kicking off** (Samsung prelim Q2 today, off-list; US banks start ~mid-July) — **no watchlist name reports during market hours today** → no intraday earnings risk on the list. Other overhangs: USMCA not renewed (annual reviews instead), US–Iran talks "positive" (oil lower). Treat the bounce as a relief/rotation-stabilization move, not a confirmed trend.
+
+### Carried from daily review (2026-07-03)
+- **07-03 was a holiday — no trade-level observations.** Watchlist state is exactly as prior curation left it (26 active; MU re-enabled 06-25; C/JPM/WPM/BABA/BIRD parked; **GOOGL park watch CLOSED 07-01** after it signaled + won). Live check confirms 26 active, 0 open, nothing to reconcile.
+- **Mon 07-06 is the first live session since IMP-009 (symmetric down-gap skip) & IMP-010 (STOP/TP real-fill entry_price)** — pre-market curation cannot verify these (they trigger intraday); flagged to the daily-review routine to confirm a clean `stale_signal_gap_down` skip on any gap-down open and a reconciling STOP/TP row. Relevant to today given the chip-gap volatility.
+- **Regime is the watch item** (07-02 was an NFP open-fade, 3/4 no follow-through). If the fade regime persists, megacap/MA open-fades (AAPL/GOOGL) stay the risk; if chip/AI leadership resumes, on-list semis (NVDA/MU/TSM/AVGO/AMD/INTC/QCOM) are the vehicles. This is a strategy-gate item (post-close #1 lever), not a watchlist action.
+- **Infra note resolved:** the 07-03 premarket cron failed on an expired Claude OAuth token (refreshed 07-03 17:24 UTC); this 07-06 run executed, confirming the token is live.
+
+### Watchlist review
+- **Positions: 0 open — nothing locked.** Account ACTIVE, equity **$8,301.04** (flat vs 07-02/07-03 close $8,301.08 — no trading over the holiday), cash $8,301.04, buying power $33,204, daytrade_count 0. **−17.0% from $10K**, **$801 above** the −25% ($7,500) strategy-review flag. Clock `is_open=false`, next open 07-06 09:30 ET (pre-open run).
+- Per-symbol P&L (14d closed, 39 trades, net **+$232.34**): positive **INTC +$176.12 (2W0L)**, **TSLA +$171.62 (3W0L)**, MSFT +$58.52, TSM +$41.02, GOOG +$40.90, MU +$20.27, AMD +$19.61, XOM +$19.57, QCOM +$9.62, GOOGL +$6.83, AMZN +$4.59, CRM +$3.27. Worst: **ENPH −$180.28 (0W2)**, AAPL −$49.06 (2W3), SE −$39.42 (1W2), WMT −$25.43, QQQ −$22.68, COST −$7.50, META −$5.69, SPY −$5.58, AVGO −$2.33, BAC −$1.63. All liquid large-caps/ETFs that fit the strategy; **no chronic-loser park trigger matured** — the book is net-green over 14d, carried by INTC + TSLA.
+- **ENPH** — the single biggest 14d loser (−$180, 0W2, both STOP) — but it is the recurring **regime-wide false-breakout leak** (all-time STOP bucket PF 0.01), the target of the deliberate intraday-regime entry gate (post-close #1 lever), **NOT** a name-specific defect. Consistent standing judgment (06-15/06-26/07-01/07-02): no park; re-flag only if a name-specific pattern separates from the regime. **HOLD.**
+- **AAPL** (2W3L, −$49) — regime open-fade small sample, liquid mega-cap → **HOLD.** **SE** (1W2L, −$39) single-name small sample, reasonably liquid ADR → **HOLD.**
+- **Semis broadly** (NVDA/AVGO/TSM/QCOM/INTC/AMD/MU) — hit by the two-day chip plunge, but liquid and strategy-fit; a two-day sector dip is a regime move, not a name park trigger (the gate self-throttles). They are today's rebound vehicles if leadership resumes. **HOLD all.**
+- Zero/low-signal liquid names (CRM/MSFT/QCOM-history) reflect the regime, not name-quality — only a *structural* strategy mismatch (WPM, already parked) warrants a curation park. **HOLD.**
+- **No watchlist name reports during market hours today**; no on-list halt/binary catalyst. Pre-market movers (VERA +6% ahead of a 07-07 PDUFA; Samsung prelim) are event/off-list one-offs — **not** clean trending liquid large-caps that fit an intraday breakout strategy → not add candidates.
+- **Adds: none** — first session back from a holiday into **elevated two-day chip volatility** + the **start of Q2 earnings season** (event risk ramping), still-hawkish-but-patient Fed, and a −17% drawdown with an $801 cushion to protect. Today's leadership (tech/semis rebound + Meta cloud news) is **already fully covered on-list** (NVDA/AVGO/AMD/MU/TSM/INTC/QCOM + AAPL/MSFT/AMZN/META/GOOG/GOOGL/TSLA). No high-conviction trending large-cap absent from the list.
+
+### Changes applied to watchlist
+**No changes.** 26 active retained. No park trigger matured (ENPH = regime-wide STOP-bucket leak → strategy-gate work, not a name park; AAPL/SE small-sample; semis are a two-day sector dip, not name-quality; the rest are regime droughts, not structural mismatches; GOOGL park watch already CLOSED 07-01). 0 positions open (nothing locked). No adds into holiday-return chip volatility + the Q2-earnings-season start. Conservative hold is the correct call — no churn.
+
+### Final watchlist
+26 active (unchanged): AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+(Parked: BABA, BIRD, C, JPM, WPM.)
+Service restarted: **no** (no watchlist changes; 0 open positions — nothing locked).
+
+### Notes for pre-market research (next session — Tue 07-07)
+- **Confirm IMP-009 & IMP-010 fired cleanly on their first live session (07-06)** — carry to today's daily-review: on any gap-down open a clean `stale_signal_gap_down` skip (no 422); on any slipped STOP/TP a stored `entry_price` matching the Alpaca buy fill that reconciles. The chip-gap tape makes 07-06 a likely test.
+- **Chip rotation is the tape's swing factor:** semis plunged two days into 07-02 then bounced 07-06 — watch whether the on-list semis (NVDA/MU/TSM/AVGO/AMD/INTC/QCOM) resume leadership or fade again; INTC (2W0L, +$176) and TSLA (3W0L) remain the book's anchors.
+- **Q2 earnings season is starting** — no on-list name reported during hours 07-06, but reports ramp; **check the intraday-earnings calendar each morning** and park any on-list name reporting during market hours on its report day (event risk). Banks (~mid-July) are mostly parked already (C/JPM).
+- **ENPH** stays the biggest 14d loser (−$180, 0W2) but remains the regime-wide false-breakout leak (STOP bucket PF 0.01), addressed by the post-close intraday-regime gate (#1 lever) — re-flag as a name park only if a name-specific pattern separates from the regime.
+- **VERA PDUFA 07-07** (off-list) — no direct watchlist effect. Equity **$8,301.04 (−17.0%)**, **$801 above** the −25% ($7,500) flag — protect the cushion.
+
+---
