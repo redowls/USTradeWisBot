@@ -544,3 +544,44 @@ None — market closed. Nothing to root-cause at the trade level.
 - **GOOGL / META** — both low-conf MA winners riding the tech-led relief bounce (GOOGL TP +$44.62, META +$22.48). Low-conf MA book keeps paying; keep both GOOG/GOOGL and META.
 - **COST** — low-conf MA drift, −$7.81 noise; nothing name-specific.
 - **Regime read for tomorrow:** today was a mixed relief bounce — MA drifters that went WITH the tech bid won, breakouts that needed follow-through false-broke on the chop. The SPY-EMA9 regime measurement (IMP-011) says post-fix **bullish-tape entries are the profitable ones** — if SPY opens/holds below its short intraday EMA, expect more SE/INTC-style false breakouts. Q2 earnings season is ramping — check the intraday-earnings calendar and park any on-list name reporting during hours. Equity **$8,230.53 (−17.7%)**, **$730 above** the −25% flag — protect the cushion.
+
+---
+
+## 2026-07-07 — Daily Review
+
+### Stats
+- Trades: **6 closed (1W / 5L)**, win rate **16.7%**.
+- Net realized P&L: **−$8.22** (day **−0.100%**) — essentially a scratch; one TP (META +$85.74) nearly offset all five losers (−$93.96 combined). Equity close **$8,222.28** (from $8,230.53 open; Alpaca last_equity 8230.53 → equity 8222.28 = **−$8.22 broker truth, matches to the penny**). **−17.8% YTD**, **$722 above** the −25% ($7,500) strategy-review flag.
+- Avg winner **+$85.74** (META, the only win); avg loser **−$18.79** (AMZN −43.97, TSLA −20.23, AAPL −16.56, AMZN −10.98, GOOGL −2.22). Profit factor (day): 85.74 / 93.96 = **0.91**.
+- Exit reasons: **2 STOP (TSLA/AMZN), 1 TAKE_PROFIT (META), 3 EOD_FLATTEN (GOOGL/AAPL/AMZN)**. Circuit breaker NOT tripped (−0.10% nowhere near −8.0%). **Positions: 0 open on the broker — no naked overnight** (broker `open_position_symbols()` → empty). ✅ IMP-002 held again (the 15:56 flatten reported "3 still open" → retried 15:57/15:58 → all confirmed flat).
+- **IMP-008 fired correctly:** COST was **skipped** at 09:30:11 (`live 965.84 = +1.62% vs signal 950.48` → stale-signal gap-up; the bracket TP would have been mispriced). No 422, no missed-fill silent loss. Fill accuracy: entries/exits booked off the real Alpaca fills (IMP-003/005/010) — day gross ties to the broker move to the penny. Service active since the 07-06 21:40 UTC restart; no in-session errors.
+
+### Trade-by-trade review
+*(entry = real bracket fill per IMP-005/010; "plan" = signal-bar close logged at submit; regime = SPY/QQQ EMA9 at entry)*
+| # | Sym | Entry (ET) | Exit (ET) | Conf/type | Exit | P&L | Regime SPY/QQQ | Root cause |
+|---|-----|-----------|-----------|-----------|------|-----|----------------|-----------|
+| 120 | TSLA | 09:30:11 @416.82 (plan 419.79) | 09:51:39 @413.45 | 61.5 MA | **STOP** | **−$20.23** (−0.81%) | bear/bear | MA open-fade; broke to the ~0.8% stop in 21 min. STOP/false-breakout bucket. |
+| 121 | GOOGL | 09:31:17 @367.86 (broke 367.51) | 15:58:06 @367.70 | 75.0 BOTH | EOD_FLATTEN | −$2.22 (−0.04%) | bear/bear | Tight breakout (0.10% ext), never trended, flat scratch to the flatten. Noise. |
+| 122 | META | 09:31:18 @609.73 (broke 601.89) | 14:14:11 @619.26 | 72.5 BOTH | **TAKE_PROFIT** | **+$85.74** (+1.56%) | **bear/bear** | **Day's only win.** BOTH breakout (mom 0.97), ran to TP over ~4.7h — a clean trend **in a BEARISH index regime** (see counterexample below). |
+| 123 | AMZN | 09:52:30 @247.68 (plan 247.42) | 11:08:59 @243.68 | 61.3 MA | **STOP** | **−$43.97** (−1.61%) | **bull/bull** | **Day's worst loss** — MA open-fade in a BULLISH index regime; stopped in ~76 min. STOP bucket. |
+| 124 | AAPL | 11:11:48 @313.28 | 15:57:04 @311.21 | 60.6 MA | EOD_FLATTEN | −$16.56 (−0.66%) | bear/**bull** | Low-conf MA drift, faded to the flatten. The one trade SPY/QQQ regimes DISAGREE on. |
+| 125 | AMZN | 14:22:43 @246.37 (broke 245.87) | 15:58:07 @245.87 | 70.9 BOTH | EOD_FLATTEN | −$10.98 (−0.20%) | bull/bull | **Same-day re-entry** of AMZN after #123 stopped (STOP 11:09 → re-entry 14:22, 3h13m > 30-min cooldown, allowed by design); drifted to a small-loss flatten. |
+
+### What worked / what didn't
+- **Worked — every risk/measurement invariant held on a scratch day.** 0 open on Alpaca (no overnight carry), retry-until-confirmed flatten cleared all three stragglers (15:56→15:58), circuit breaker dormant at −0.10%, day gross tied to the broker equity move to the penny, no 422 (IMP-008 skipped the COST gap-up cleanly), STOP rows reconcile off the real fill (IMP-010). The BOTH breakout winner (META TP) again carried the day.
+- **Didn't — two false-breakout STOPs (TSLA, AMZN #123) were the whole loss** (−$64.20; the other 3 were flatten drift/scratch −$29.76, offset by META +$85.74). Both were MA-signal open-fades → the STOP/false-breakout bucket (all-time PF 0.01), the one persistent leak. `regime_ok=True` on all 6 (the per-symbol ADX/long-EMA gate never filtered a loser — expected: `regime_ok=False` zeroes confidence, so no such trade ever reaches the book; the flag is a per-SYMBOL trend gate, NOT a market gate).
+- **Didn't — the AMZN same-day re-entry (#125) lost again** (−$10.98) after #123's −$43.97 STOP. Combined AMZN −$54.95. The 30-min re-entry cooldown had long expired (3h13m gap), so this was allowed by design; small enough not to be today's story, but re-entering a name that already stopped the same day is worth watching if it recurs at size.
+- **No NEW per-trade discriminator.** Confidence (IMP-004), volume (06-26), extension (IMP-007), below-level-fill (07-06) all remain refuted. The lever is still market-level (backlog ★).
+
+### Lessons & improvement candidates (ranked)
+1. **(ACTED → IMP-012, measurement-only) Today is a COUNTEREXAMPLE to the naive skip-bearish market-regime gate — and cross-proxy analysis shows its edge is proxy-dependent.** The only winner (META +$85.74 TP) was tagged **BEARISH** under both SPY and QQQ, while the worst loser (AMZN −$43.97 STOP) was tagged **BULLISH**. So on today's tape skip-bearish would have **removed +$46.73 of net-positive P&L and kept −$54.95** — actively harmful. Extended `scripts/regime_analysis.py` to measure the regime under **two proxies (SPY + QQQ, EMA9)** side by side + added a `--since YYYY-MM-DD` window and a pure `analytics.regime_proxy_agreement` helper (**no engine/sizing/risk change**). **Result on the post-06-15 live regime:** under **SPY** bullish PF 1.43 vs bearish PF 0.99 (skip-bearish removes only −$2.57 — barely helps), but under **QQQ** bearish is *profitable* (PF 1.22, +$79.14) so skip-bearish would REMOVE +$79.14 — and the two proxies **disagree on 18% of trades (51/62 agree)**. This **tempers IMP-011's SPY-only optimism** (which read bullish 1.45 vs bearish 0.98): the naive EMA9 gate's edge does NOT survive the proxy swap, so it is **NOT ready to ship**. Measurement-first (IMP-004/006/007 pattern).
+2. **(STANDING #1 lever) Intraday market-regime entry gate.** Next steps refined by today: the raw "skip-bearish under SPY-EMA9" gate is refuted as proxy-fragile — a real gate needs (a) a regime definition robust across proxies (test VWAP and "skip first N min on a red open" next, not just EMA), (b) a bigger post-06-15 bearish sample, (c) replay validation, before any engine tightening (long-only when bullish). Re-run `scripts.regime_analysis --since 2026-06-15` each review and watch whether SPY/QQQ converge.
+3. **(Note, no action) Same-day re-entry after a stop** (AMZN today): 30-min cooldown allowed it after 3h. Single small instance (−$10.98); park the idea of a longer/loss-aware re-entry cooldown until a real recurring cost appears — do not overfit one AMZN.
+
+### Notes for pre-market research
+- **META** — day's only winner (+$85.74 TP), a clean BOTH breakout that trended all afternoon; franchise-quality behavior. Keep top-of-list.
+- **AMZN** — worst name today: MA open-fade STOP (−$43.97) then a same-day re-entry that also bled (−$10.98), −$54.95 combined. Both were open/early entries that faded; behaves with the tape, no name defect — **no park**, but note it was the day's drag.
+- **TSLA** — MA open-fade STOP (−$20.23) in 21 min; a fast false start, small controlled loss. No park.
+- **COST** — **skipped** by the IMP-008 stale-signal guard (gapped +1.62% between signal and fill); not a watchlist issue, the guard did its job. Watch whether COST keeps gapping past the open (recurring gap-and-go that the bot correctly declines).
+- **GOOGL/AAPL** — low-conf drifters, scratch/small losses; nothing name-specific.
+- **Regime read for tomorrow:** near-scratch mixed tape; the winner trended in a *bearish* index regime while the biggest loser stopped in a *bullish* one → the naive index-EMA regime gate would NOT have helped today (IMP-012). Don't expect a market filter to save false-breakout STOPs yet. Equity **$8,222.28 (−17.8%)**, **$722 above** the −25% flag — cushion intact.
