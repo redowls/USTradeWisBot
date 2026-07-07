@@ -159,6 +159,30 @@ def by_market_regime(rows: list[dict], regime_by_trade_id: dict) -> dict:
     }
 
 
+def regime_proxy_agreement(regime_a: dict, regime_b: dict) -> dict:
+    """Compare two index-regime proxy tags (e.g. SPY-EMA9 vs QQQ-EMA9).
+
+    Each arg maps trade_id -> a REGIME_* label. Over the trade_ids present in
+    BOTH maps, report how often the two proxies agree — a robustness check on the
+    regime definition before any engine gate relies on it (IMP-011's queued
+    "compare EMA9 vs QQQ/VWAP" step). If flipping the proxy can flip a trade's
+    regime, the gate's edge is proxy-dependent and not yet trustworthy. Pure —
+    no network, no DB.
+    """
+    tids = sorted(set(regime_a) & set(regime_b))
+    disagreements = [(t, regime_a[t], regime_b[t]) for t in tids
+                     if regime_a[t] != regime_b[t]]
+    n = len(tids)
+    agree = n - len(disagreements)
+    return {
+        "trades": n,
+        "agree": agree,
+        "disagree": len(disagreements),
+        "agree_pct": round(100 * agree / n, 1) if n else 0.0,
+        "disagreements": disagreements,
+    }
+
+
 def load_closed_trades(since: date | None = None) -> list[dict]:
     """Closed trades joined to their signal (signal_type/confidence/broke_level)."""
     sql = (

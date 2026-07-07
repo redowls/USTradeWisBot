@@ -272,3 +272,69 @@ def test_by_market_regime_empty_and_all_unknown_safe():
     allu = analytics.by_market_regime(TODAY_20260706, {})
     assert allu["skip_bearish"]["skipped_trades"] == 0
     assert allu["skip_bearish"]["kept_trades"] == 5
+
+
+# --- IMP-012: proxy cross-check + the 2026-07-07 counterexample ---------------
+#
+# 2026-07-07 (6 trades, 1W/5L, -$8.22) is a clean counterexample to the naive
+# "skip bearish" market-regime gate: the only winner (META +85.74 TAKE_PROFIT)
+# was tagged BEARISH under BOTH SPY and QQQ, while the worst loser (AMZN -43.97
+# STOP) was tagged BULLISH. SPY and QQQ agree on 5 of 6 trades (they differ only
+# on AAPL). These fixtures keep that evidence visible so a naive skip-bearish
+# gate can't be shipped as a "win".
+TODAY_20260707 = [
+    {"trade_id": 120, "symbol": "TSLA", "realized_pl": -20.23, "exit_reason": "STOP"},
+    {"trade_id": 121, "symbol": "GOOGL", "realized_pl": -2.22, "exit_reason": "EOD_FLATTEN"},
+    {"trade_id": 122, "symbol": "META", "realized_pl": 85.74, "exit_reason": "TAKE_PROFIT"},
+    {"trade_id": 123, "symbol": "AMZN", "realized_pl": -43.97, "exit_reason": "STOP"},
+    {"trade_id": 124, "symbol": "AAPL", "realized_pl": -16.56, "exit_reason": "EOD_FLATTEN"},
+    {"trade_id": 125, "symbol": "AMZN", "realized_pl": -10.98, "exit_reason": "EOD_FLATTEN"},
+]
+# Real intraday regime at each entry, measured off SPY and QQQ EMA9 (5-min bars).
+REGIME_SPY_20260707 = {
+    120: analytics.REGIME_BEARISH, 121: analytics.REGIME_BEARISH,
+    122: analytics.REGIME_BEARISH, 123: analytics.REGIME_BULLISH,
+    124: analytics.REGIME_BEARISH, 125: analytics.REGIME_BULLISH,
+}
+REGIME_QQQ_20260707 = {
+    120: analytics.REGIME_BEARISH, 121: analytics.REGIME_BEARISH,
+    122: analytics.REGIME_BEARISH, 123: analytics.REGIME_BULLISH,
+    124: analytics.REGIME_BULLISH, 125: analytics.REGIME_BULLISH,  # AAPL flips
+}
+
+
+def test_regime_proxy_agreement_today():
+    agr = analytics.regime_proxy_agreement(REGIME_SPY_20260707, REGIME_QQQ_20260707)
+    assert agr["trades"] == 6
+    assert agr["agree"] == 5
+    assert agr["disagree"] == 1
+    assert agr["agree_pct"] == 83.3
+    # The single disagreement is AAPL (124): SPY bearish, QQQ bullish.
+    assert agr["disagreements"] == [
+        (124, analytics.REGIME_BEARISH, analytics.REGIME_BULLISH)
+    ]
+
+
+def test_regime_proxy_agreement_empty_and_partial_overlap():
+    assert analytics.regime_proxy_agreement({}, {})["trades"] == 0
+    assert analytics.regime_proxy_agreement({}, {})["agree_pct"] == 0.0
+    # Only trade_ids present in BOTH maps are compared.
+    a = {1: analytics.REGIME_BULLISH, 2: analytics.REGIME_BEARISH}
+    b = {2: analytics.REGIME_BEARISH, 3: analytics.REGIME_BULLISH}
+    agr = analytics.regime_proxy_agreement(a, b)
+    assert agr["trades"] == 1 and agr["agree"] == 1
+
+
+def test_skip_bearish_gate_is_harmful_on_2026_07_07():
+    """The counterexample: skip-bearish removes NET-POSITIVE P&L today (bad gate)."""
+    res = analytics.by_market_regime(TODAY_20260707, REGIME_SPY_20260707)
+    b = res["buckets"]
+    # The winner (META +85.74) sits in the BEARISH bucket, so bearish is net POSITIVE.
+    assert b[analytics.REGIME_BEARISH]["total_pl"] == 46.73  # -20.23 -2.22 +85.74 -16.56
+    assert b[analytics.REGIME_BULLISH]["total_pl"] == -54.95  # -43.97 -10.98
+    sk = res["skip_bearish"]
+    # Skipping bearish would REMOVE +$46.73 of net-positive P&L and KEEP -$54.95
+    # -> the naive gate is harmful on today's tape. Guard against shipping it as a win.
+    assert sk["skipped_total_pl"] == 46.73
+    assert sk["skipped_total_pl"] > 0
+    assert sk["kept_total_pl"] == -54.95
