@@ -594,3 +594,37 @@ Service restarted: **no** (no watchlist changes; 0 open positions — nothing lo
 - **VERA PDUFA 07-07** (off-list) — no direct watchlist effect. Equity **$8,301.04 (−17.0%)**, **$801 above** the −25% ($7,500) flag — protect the cushion.
 
 ---
+
+## 2026-07-07 — Pre-market Research
+
+### Market context
+**Risk-off open on renewed memory-chip weakness; broad market pulls back from records.** Monday 07-06 closed at fresh records — **S&P 500 +0.72% (7,537.43), Nasdaq Composite +1.12% (26,121.16), Dow +0.29% to a first-ever close above 53,000 (53,055.91)**. Tue futures turn **lower**: **S&P 500 −0.2%, Nasdaq-100 −1.0%**, the pressure concentrated in semis/memory: **Samsung fell 8.8% in Seoul** (Q2 profit surged 19× but the report underwhelmed), dragging **MU and SanDisk down >5% in US pre-market** in sympathy — the third chip-down move in a week (SMH −4.5% on 07-02, bounce 07-06, back down today). **SpaceX joins the Nasdaq-100 today** (index-mechanics one-off). Fed: CME FedWatch now ~**56% odds of a Sept hike** (down from 61% a week ago) after last week's soft June NFP (+57k). Macro today is light. **Earnings: a light day — no noteworthy pre-bell reports; today's names (PENG after close, ~5 total) are all off-list; PEP reports Thu 07-09 pre-open (off-list).** Q2 earnings season ramps mid-week/Thursday; banks begin ~mid-July. **No watchlist name reports during market hours today → no intraday earnings risk on the list.** Treat the open as a risk-off chip-led pullback from records, not a trend break.
+
+### Carried from daily review (2026-07-06)
+- **IMP-010 CONFIRMED live 07-06** (INTC/SE STOP rows stored the real Alpaca buy fill and reconcile); **IMP-009 still PENDING** (no down-gap past the 1.0% cap fired yet). Both are daily-review/code items — no watchlist action.
+- **Q2 earnings season starting → check the intraday-earnings calendar each morning and park any on-list name reporting during market hours.** Acted on: verified today's calendar — **no on-list name reports during hours 07-07** → no earnings park.
+- **Chip rotation is the tape's swing factor** — semis are today's down-driver again (Samsung). Standing judgment: a multi-day sector dip is a **regime** move, not a name-park trigger; the gate self-throttles. Honored (hold all semis).
+- **ENPH** remains the biggest 14d loser but is the **regime-wide false-breakout STOP-bucket leak** (all-time PF 0.01), addressed by the post-close intraday-regime gate (#1 lever), **not** a name park. Held per consistent standing judgment (06-15/06-26/07-01/07-02/07-06).
+
+### Watchlist review
+- **Positions: 0 open — nothing locked.** Account ACTIVE, equity **$8,230.53** (flat vs 07-06 close $8,230.53; last_equity $8,301.04), cash $8,230.53, buying power $32,922, daytrade_count 0. **−17.7% from $10K**, **$730 above** the −25% ($7,500) strategy-review flag. Clock `is_open=false`, next open 07-07 09:30 ET (pre-open run).
+- **MU / semis (NVDA/AVGO/TSM/QCOM/INTC/AMD)** — MU down >5% pre-market on Samsung memory weakness (sector sympathy, not a name catalyst); all are liquid large-cap semis that fit the strategy. A Samsung-driven memory dip is a regime move → **HOLD all** (the ATR-based sizing + no-overnight flatten bound the risk; the entry gate self-throttles). If chip leadership resumes they are the rebound vehicles.
+- **ENPH** (biggest 14d loser, regime STOP-bucket leak) → **HOLD** (strategy-gate work, not a name park). **AAPL / SE** (small-sample regime open-fades, liquid) → **HOLD**. Zero/low-signal liquid names (CRM/MSFT/QCOM-history) reflect the regime drought, not name-quality — only a structural mismatch (WPM, already parked) warrants a curation park → **HOLD**.
+- **No on-list name reports during market hours today**; no halt/binary catalyst on any name. Pre-market movers (Samsung prelim, SpaceX index add, VERA 07-07 PDUFA) are event/off-list one-offs — **not** clean trending liquid large-caps that fit an intraday breakout strategy → not add candidates.
+- **Adds: none** — lower futures into renewed chip volatility (Samsung), a pullback from record highs, the start of Q2 earnings season (event risk ramping), still-hawkish-but-patient Fed (~56% Sept hike), and a −17.7% drawdown with a $730 cushion to protect. Today's leadership is already fully covered on-list (semis + megacaps). No high-conviction trending large-cap absent from the list.
+
+### Changes applied to watchlist
+**No changes.** 26 active retained. No park trigger matured (no on-list intraday earnings today; MU/semis = a Samsung-driven sector dip, not name-quality; ENPH = regime STOP-bucket leak → strategy-gate work; AAPL/SE small-sample; the rest are regime droughts, not structural mismatches; GOOGL park watch already CLOSED 07-01). 0 positions open (nothing locked). No adds into a risk-off, chip-led pullback at the start of earnings season. Conservative hold is the correct call — no churn.
+
+### Final watchlist
+26 active (unchanged): AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+(Parked: BABA, BIRD, C, JPM, WPM.)
+Service restarted: **no** (no watchlist changes; 0 open positions — nothing locked).
+
+### Notes for pre-market research (next session — Wed 07-08)
+- **Chip weakness is the live watch item:** memory (MU/SanDisk/Samsung) led a 3rd down-move today — watch whether the on-list semis (NVDA/MU/TSM/AVGO/AMD/INTC/QCOM) stabilize or keep fading; INTC (2W0L→first loss 07-06) and TSLA remain the book's earners. A multi-day chip dip stays a regime move (no name park) unless a single name separates structurally.
+- **Q2 earnings season ramps Wed/Thu** (7 reports Wed 07-08, 13 Thu 07-09; **PEP pre-open Thu 07-09**, off-list) — **check the intraday-earnings calendar each morning and park any on-list name reporting during market hours on its report day.** Banks (~mid-July) are mostly parked already (C/JPM).
+- **ENPH** stays the biggest 14d loser but remains the regime-wide false-breakout STOP-bucket leak (PF 0.01) — post-close intraday-regime gate (#1 lever), not a pre-market name park.
+- **Verify IMP-009 (down-gap skip) if a gap-down open occurs** — still pending its first live trigger; today's chip-gap tape is a likely test. Equity **$8,230.53 (−17.7%)**, **$730 above** the −25% ($7,500) flag — protect the cushion.
+
+---
