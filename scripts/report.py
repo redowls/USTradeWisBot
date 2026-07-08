@@ -67,6 +67,17 @@ def _print_report(since=None) -> int:
         print(f"  {er:12} {s['trades']:6d} {s['win_rate']:6.1f} "
               f"{s['total_pl']:10.2f} {s['expectancy']:8.2f} {_pf(s):>6}")
 
+    sp = m.get("by_stop_protection", {})
+    if sp:
+        print("\nBy stop protection (STOP exits, fraction of original 1R retained):")
+        print("  full-1R = full loss · break-even/trailed = IMP-013 rescued")
+        print(f"  {'band':10} {'trades':>6} {'win%':>6} {'total$':>10} {'exp$':>8} {'PF':>6}")
+        for band, s in sp.items():
+            if s["trades"] == 0:
+                continue
+            print(f"  {band:10} {s['trades']:6d} {s['win_rate']:6.1f} "
+                  f"{s['total_pl']:10.2f} {s['expectancy']:8.2f} {_pf(s):>6}")
+
     ext = m.get("by_entry_extension", {})
     if ext:
         print("\nBy entry extension (breakout fills, % above broken level):")

@@ -338,3 +338,72 @@ def test_skip_bearish_gate_is_harmful_on_2026_07_07():
     assert sk["skipped_total_pl"] == 46.73
     assert sk["skipped_total_pl"] > 0
     assert sk["kept_total_pl"] == -54.95
+
+
+# --- IMP-014 (2026-07-08): stop-protection split of the STOP bucket ------------
+#
+# First live session under IMP-013 (break-even@+0.5R / trail@+1R). All four STOP
+# exits that day (entry/orig_stop/exit are the real Alpaca fills; trades.stop_price
+# keeps the ORIGINAL 1R anchor by IMP-013 design):
+#   NVDA #127  e197.3592 s194.51  x197.42    pl +0.79  -> rf 1.021 break-even
+#   QCOM #129  e185.19   s182.12  x182.10    pl -37.08 -> rf 0.00  full-1R
+#   XOM  #126  e141.68   s139.88  x141.67    pl -0.19  -> rf 0.994 break-even
+#   AVGO #130  e390.04   s383.68  x390.0314  pl -0.12  -> rf 0.999 break-even
+# Three IMP-013 break-even rescues (~scratch, +0.48 combined) vs one real full-1R
+# false-breakout loss (QCOM -37.08). Without the split the by_exit_reason STOP
+# bucket blends the two and misreads both IMP-013's benefit and the residual leak.
+STOP_EXITS_20260708 = [
+    {"trade_id": 127, "realized_pl": 0.79, "exit_reason": "STOP",
+     "entry_price": 197.3592, "stop_price": 194.51, "exit_price": 197.42},
+    {"trade_id": 129, "realized_pl": -37.08, "exit_reason": "STOP",
+     "entry_price": 185.19, "stop_price": 182.12, "exit_price": 182.10},
+    {"trade_id": 126, "realized_pl": -0.19, "exit_reason": "STOP",
+     "entry_price": 141.68, "stop_price": 139.88, "exit_price": 141.67},
+    {"trade_id": 130, "realized_pl": -0.12, "exit_reason": "STOP",
+     "entry_price": 390.04, "stop_price": 383.68, "exit_price": 390.0314},
+]
+
+
+def test_stop_protection_ratio_classifies_today_stops():
+    r = {row["trade_id"]: analytics.stop_protection_ratio(row) for row in STOP_EXITS_20260708}
+    assert round(r[129], 3) == -0.007      # QCOM stopped at the original 1R
+    assert 0.9 <= r[126] <= 1.05           # XOM stopped ~at break-even
+    assert 0.9 <= r[130] <= 1.05           # AVGO stopped ~at break-even
+    assert 1.0 <= r[127] <= 1.05           # NVDA eked just past break-even
+
+
+def test_stop_protection_ratio_none_on_missing_or_non_long():
+    assert analytics.stop_protection_ratio({"entry_price": None, "stop_price": 1, "exit_price": 1}) is None
+    # stop not below entry (bad/non-long row) -> excluded, never a divide-by-zero.
+    assert analytics.stop_protection_ratio({"entry_price": 100.0, "stop_price": 100.0, "exit_price": 99.0}) is None
+
+
+def test_by_stop_protection_splits_full_loss_from_imp013_rescues():
+    sp = analytics.by_stop_protection(STOP_EXITS_20260708)
+    # The one full-1R stop carries the whole real loss...
+    assert sp["full-1R"]["trades"] == 1
+    assert sp["full-1R"]["total_pl"] == -37.08
+    # ...while the three IMP-013 break-even rescues are ~scratch (+0.48 combined).
+    assert sp["break-even"]["trades"] == 3
+    assert sp["break-even"]["total_pl"] == 0.48
+    assert sp["trailed"]["trades"] == 0
+
+
+def test_by_stop_protection_only_counts_stop_exits_and_is_empty_safe():
+    # A non-STOP exit (EOD_FLATTEN) with prices present must NOT be bucketed here.
+    rows = STOP_EXITS_20260708 + [
+        {"trade_id": 128, "realized_pl": 14.4, "exit_reason": "EOD_FLATTEN",
+         "entry_price": 112.46, "stop_price": 110.68, "exit_price": 113.06},
+    ]
+    sp = analytics.by_stop_protection(rows)
+    assert sum(b["trades"] for b in sp.values()) == 4  # only the 4 STOP exits
+    assert analytics.by_stop_protection([]) == {}
+    # STOP exits without usable prices contribute nothing (no crash).
+    assert analytics.by_stop_protection(
+        [{"trade_id": 1, "realized_pl": -5.0, "exit_reason": "STOP"}]) == {}
+
+
+def test_compute_metrics_exposes_by_stop_protection():
+    m = analytics.compute_metrics(STOP_EXITS_20260708)
+    assert "by_stop_protection" in m
+    assert m["by_stop_protection"]["full-1R"]["total_pl"] == -37.08

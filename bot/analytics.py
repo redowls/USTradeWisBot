@@ -56,6 +56,22 @@ EXTENSION_BANDS: tuple[tuple[float, float, str], ...] = (
     (1.0, float("inf"), ">1.0%"),
 )
 
+# Stop-protection bands — split STOP exits by the fraction of the ORIGINAL 1R
+# risk retained at the stop (see stop_protection_ratio). Since IMP-013
+# (2026-07-08) raises the broker stop to break-even at +0.5R and trails it at
+# +1R, the "STOP" exit_reason no longer means one thing: a full-1R stop is a real
+# false-breakout loss (the PF~0.01 leak), while a break-even/trailed stop is a
+# trade IMP-013 rescued. These bands de-blend the two so the residual real-STOP
+# leak and IMP-013's effect can be judged separately. full-1R = stopped at/below
+# the original 1R; break-even ~= stop raised to entry (small slippage/ratchet
+# drift allowed up to +0.05R); trailed = stopped materially above entry (in
+# profit).
+STOP_PROTECTION_BANDS: tuple[tuple[float, float, str], ...] = (
+    (float("-inf"), 0.5, "full-1R"),
+    (0.5, 1.05, "break-even"),
+    (1.05, float("inf"), "trailed"),
+)
+
 
 def _bucket(pls: list[float]) -> dict:
     """Win-rate / total / expectancy / profit-factor over one slice of P&Ls."""
@@ -90,6 +106,48 @@ def _extension_pct(row: dict) -> float | None:
     if bl_f <= 0:
         return None
     return (ep_f - bl_f) / bl_f * 100.0
+
+
+def stop_protection_ratio(row: dict) -> float | None:
+    """Fraction of the ORIGINAL 1R risk retained at a STOP exit (long).
+
+    (exit_price - orig_stop) / (entry_price - orig_stop): 0.0 = stopped at the
+    original 1R stop (a full false-breakout loss), 1.0 = stopped at break-even
+    (IMP-013 raised the stop to entry), >1.0 = trailed into profit before
+    stopping. Anchored to the ORIGINAL plan stop, which trades.stop_price keeps
+    by IMP-013 design (the raised stop lives only at the broker). Returns None
+    when entry/stop/exit are missing or the stop is not below entry (non-long or
+    a bad row), so such rows are simply excluded. Pure — no DB, no network.
+    """
+    entry = row.get("entry_price")
+    stop = row.get("stop_price")
+    exit_price = row.get("exit_price")
+    if entry is None or stop is None or exit_price is None:
+        return None
+    risk = _f(entry) - _f(stop)
+    if risk <= 0:
+        return None
+    return (_f(exit_price) - _f(stop)) / risk
+
+
+def by_stop_protection(rows: list[dict]) -> dict:
+    """Bucket STOP-exit P&L by how much of the original 1R was retained.
+
+    Only rows whose exit_reason is STOP and that have a usable
+    stop_protection_ratio are counted; returns {band: _bucket(...)} for every
+    STOP_PROTECTION_BANDS label (empty dict when no STOP exit has a usable
+    ratio). Pure.
+    """
+    pairs = [(r, stop_protection_ratio(r)) for r in rows
+             if r.get("realized_pl") is not None and r.get("exit_reason") == "STOP"]
+    pairs = [(r, rf) for r, rf in pairs if rf is not None]
+    if not pairs:
+        return {}
+    out: dict[str, dict] = {}
+    for lo, hi, label in STOP_PROTECTION_BANDS:
+        sub = [_f(r["realized_pl"]) for r, rf in pairs if lo <= rf < hi]
+        out[label] = _bucket(sub)
+    return out
 
 
 # --- Market-regime tagging (todo.md backlog ★ — the top strategy lever) --------
@@ -188,6 +246,7 @@ def load_closed_trades(since: date | None = None) -> list[dict]:
     sql = (
         "SELECT t.trade_id, t.symbol, t.realized_pl, t.realized_pl_pct, "
         "t.exit_reason, t.entry_time, t.exit_time, t.entry_price, "
+        "t.stop_price, t.exit_price, "
         "s.signal_type, s.confidence, s.broke_level "
         "FROM trades t LEFT JOIN signals s ON s.trade_id = t.trade_id "
         "WHERE t.status = 'CLOSED' AND t.realized_pl IS NOT NULL"
@@ -259,6 +318,14 @@ def compute_metrics(rows: list[dict]) -> dict:
             sub = [_f(r["realized_pl"]) for r, e in ext_pairs if lo <= e < hi]
             by_extension[label] = _bucket(sub)
 
+    # By stop protection — de-blend the STOP exit_reason now that IMP-013
+    # (2026-07-08) raises stops to break-even (+0.5R) and trails them (+1R). A
+    # STOP exit is either a full original-1R loss (the real false-breakout leak,
+    # all-time PF ~0.01) or a trade IMP-013 rescued to ~break-even / trailed
+    # profit. Splitting by the retained fraction of the original 1R keeps the
+    # by_exit_reason STOP bucket honest and measures IMP-013's effect over time.
+    by_stop_prot = by_stop_protection(closed)
+
     # False-breakout rate: of breakout-driven trades, the share that stopped out.
     bo = [r for r in closed if (r.get("signal_type") in ("BREAKOUT", "BOTH"))]
     fb_rate = (round(100 * sum(1 for r in bo if r.get("exit_reason") == "STOP") / len(bo), 1)
@@ -278,6 +345,7 @@ def compute_metrics(rows: list[dict]) -> dict:
         "by_signal_type": by_type,
         "by_confidence_band": by_band,
         "by_exit_reason": by_exit,
+        "by_stop_protection": by_stop_prot,
         "by_entry_extension": by_extension,
         "false_breakout_rate": fb_rate,
         "exit_reasons": dict(Counter(r.get("exit_reason") for r in closed)),
