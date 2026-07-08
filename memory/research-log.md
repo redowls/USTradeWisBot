@@ -628,3 +628,39 @@ Service restarted: **no** (no watchlist changes; 0 open positions — nothing lo
 - **Verify IMP-009 (down-gap skip) if a gap-down open occurs** — still pending its first live trigger; today's chip-gap tape is a likely test. Equity **$8,230.53 (−17.7%)**, **$730 above** the −25% ($7,500) flag — protect the cushion.
 
 ---
+
+## 2026-07-08 — Pre-market Research
+
+### Market context
+**Risk-on, chip-led rebound after strong Micron results.** Dow futures ~53,627 (Strong-Buy technicals, up from 53,380 open); APAC ripped overnight — **KOSPI +5.9%, Nasdaq (NQ) +1.9% after Micron (MU) reported its best quarter ever (+18%)** on surging AI-memory demand, rising memory prices and long-term supply agreements (though recent intraday chip volatility wiped ~$137B across memory names, and Michael Burry disclosed a MU short on 07-02). The AI trade is the swing factor — Nasdaq-100 hunting its next catalyst with **Magnificent-Seven Q2 earnings about to begin (late July)**. Other flow: AMZN seeking a ≥$25B USD bond sale (Bloomberg); GOOGL joined a €411M Proxima Fusion round; US–Iran Doha talks reported "positive progress" on the Strait-of-Hormuz 60-day MoU (oil contained). **Earnings today are light — 7 reports, all off-list (LEVI, IMMR, HELE + 4 small-caps); no watchlist name reports during market hours → no intraday earnings risk on the list.** Note: code side, **IMP-013 (break-even@+0.5R / 1R-trail@+1R via broker-side bracket-leg replace) went LIVE today** (post-close routine) — first live session under the new exit management.
+
+### Carried from daily review (2026-07-07)
+- **Near-scratch day (−$8.22, 1W/5L):** META TP +$85.74 nearly offset five small losers; two false-breakout STOPs (TSLA −$20.23, AMZN #123 −$43.97) were the whole loss — the standing STOP/false-breakout bucket (all-time PF 0.01), a strategy-gate item, **not** a name defect. **No park triggers matured.**
+- **META** — day's only winner, clean BOTH breakout that trended all afternoon → keep top-of-list. ✅
+- **AMZN** — worst name (MA open-fade STOP + same-day re-entry that also bled, −$54.95 combined) but behaves with the tape → **no park**; noted as the day's drag. Honored (hold).
+- **TSLA** MA open-fade STOP (−$20.23, 21 min), small controlled loss → **no park**. **COST** correctly **skipped** by the IMP-008 stale-signal guard (+1.62% gap) — not a watchlist issue. GOOGL/AAPL low-conf drifters → nothing name-specific.
+- **Regime read:** the naive index-EMA gate would NOT have helped 07-07 (winner tagged bearish, biggest loser tagged bullish — IMP-012 proxy-fragility). Don't expect a market filter to save false-breakout STOPs yet → strategy-gate work (post-close #1 lever), **not** a pre-market name action.
+- **Q2 earnings season instruction:** "check the intraday-earnings calendar each morning and park any on-list name reporting during hours." Acted on — verified today's 7 reports are all off-list → no earnings park.
+
+### Watchlist review
+- **Positions: 0 open — nothing locked.** Account ACTIVE, equity **$8,222.25** (flat vs 07-07 close $8,222.28; last_equity carried), cash $8,222.25, buying power $32,889, daytrade_count 0. **−17.8% from $10K**, **$722 above** the −25% ($7,500) strategy-review flag. Clock pre-open (next open 07-08 09:30 ET).
+- Per-symbol P&L (14d closed, 42 trades, net **+$118.19**): positive **TSLA +$151.39 (3W4)**, **META +$102.53 (2W3)**, **INTC +$101.96 (2W3)**, TSM +$63.66, MSFT +$58.52, GOOGL +$49.23 (2W4), GOOG +$40.90, MU +$20.27, AMD +$19.61, QCOM +$9.62, SPY +$9.48. Worst: **ENPH −$180.28 (0W2)**, SE −$95.06 (1W3), AAPL −$65.62 (2W4), CRM −$54.42 (0W2), AMZN −$50.36 (1W3), WMT −$27.41, BAC −$18.19, COST −$15.31, AVGO −$2.33. All liquid large-caps/ETFs that fit the strategy; book strongly net-green over 14d, carried by TSLA/META/INTC. **No chronic-loser park trigger matured** — ENPH is the recurring regime-wide false-breakout STOP-bucket leak (PF 0.01, post-close #1-lever target, not a name defect — consistent standing judgment 06-15/06-26/07-01/07-02/07-06/07-07); SE (1W3, open-fade) is watched for ~1W4L with the same signature but not there yet; AAPL/CRM/AMZN are regime open-fades / small-sample.
+- **Semis (MU/NVDA/AVGO/TSM/QCOM/INTC/AMD)** — today's leadership on the strong Micron print; all liquid large-cap and strategy-fit → **HOLD all** (the rebound vehicles). MU beat + guided up → the 06-24 earnings park stays correctly resolved (re-enabled 06-25). No halt/binary catalyst on any on-list name.
+- **Adds: none** — today's relative strength (chips/AI + megacaps) is **already fully covered on-list** (NVDA/AVGO/AMD/MU/TSM/INTC/QCOM + AAPL/MSFT/AMZN/META/GOOG/GOOGL/TSLA). Pre-market movers (Plug Power +1.5% on a 50MW deal, Eos Energy +6.7%, IBM) are event/off-list one-offs — not clean trending liquid large-caps for an intraday breakout strategy. Backdrop still a −17.8% drawdown with a $722 cushion to protect and Mag-7 Q2 earnings about to begin (event risk ramping); no chasing.
+
+### Changes applied to watchlist
+**No changes.** 26 active retained. No park trigger matured (no on-list intraday earnings today; ENPH = regime STOP-bucket leak → strategy-gate work; SE/AAPL/CRM/AMZN = regime open-fades / small-sample; semis are today's leaders not park candidates; the rest are regime droughts, not structural mismatches; GOOGL park watch already CLOSED 07-01). 0 positions open (nothing locked). No adds into a chip-led rebound with everything already covered. Conservative hold is the correct call — no churn.
+
+### Final watchlist
+26 active (unchanged): AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+(Parked: BABA, BIRD, C, JPM, WPM.)
+Service restarted: **no** (no watchlist changes; 0 open positions — nothing locked).
+
+### Notes for pre-market research (next session — Thu 07-09)
+- **IMP-013 went live today (07-08)** — first live session under broker-side break-even@+0.5R + 1R-trail@+1R. Carry to the daily-review: confirm any position that reaches +0.5R has its stop moved to break-even (fewer round-trip STOP losses) and that the bracket-leg replace fires cleanly (no 422/"order already replaced" loops). This directly targets the STOP-bucket leak — watch whether it trims the false-breakout give-back.
+- **Chip/AI is the tape's swing factor** — Micron's blockbuster print lifted the whole memory/semi complex; watch whether on-list semis (MU/NVDA/TSM/AVGO/AMD/INTC/QCOM) sustain leadership or fade intraday (the 07-02→07-07 pattern was plunge→bounce→fade). TSLA (3W4, +$151) / META (+$102) / INTC (+$102) remain the book anchors.
+- **Q2 / Mag-7 earnings begin late July** — 13 reports Thu 07-09 (PEP pre-open, off-list); banks ~mid-July (JPM ~07-14, C/JPM already parked). **Check the intraday-earnings calendar each morning and park any on-list name reporting during market hours on its report day.**
+- **SE** (1W3 incubation, recurring open-fade) — the most persistent single-name drag; re-flag as a park candidate if it reaches ~1W4L with the same false-breakout signature. **ENPH** stays the biggest 14d loser (−$180, 0W2) but remains the regime-wide STOP-bucket leak (post-close gate, not a name park).
+- Equity **$8,222.25 (−17.8%)**, **$722 above** the −25% ($7,500) flag — protect the cushion into the start of earnings season.
+
+---
