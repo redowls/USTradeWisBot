@@ -56,6 +56,59 @@ class Engine:
                           f"pl=${rec['realized_pl']} ({rec['realized_pl_pct']}%)")
         return records
 
+    # --- break-even / trailing stop (IMP-013) ---
+    def manage_stops(self, now: datetime | None = None) -> list[dict]:
+        """Ratchet bracket stop legs up on trades that are in profit.
+
+        +0.5R -> stop to entry (break-even); +1R -> trail 1R below the live
+        price. State lives at the broker: the current stop is read off the leg
+        (following the replace chain) every tick, so nothing is lost across the
+        nightly restart, and the DB stop_price stays the ORIGINAL plan stop —
+        it is the risk anchor that defines 1R.
+        """
+        if not config.TRAILING_STOP_ENABLED:
+            return []
+        actions: list[dict] = []
+        for t in logbook.get_open_trades():
+            oid = t.get("alpaca_order_id")
+            if not oid:
+                continue
+            try:
+                parent = execution.get_order(oid)
+                entry_fill = parent.filled_avg_price
+                if entry_fill is None:
+                    continue  # entry not filled yet — nothing at risk
+                entry = float(entry_fill)
+                stop_leg = exits.resolve_stop_leg(parent, execution.get_order)
+                if stop_leg is None:
+                    continue  # stop filled/canceled or unresolved — leave alone
+                current_stop = float(stop_leg.stop_price)
+                live = data.latest_trade_price(t["symbol"])
+                new_stop = exits.compute_trailed_stop(
+                    entry, float(t["stop_price"]), current_stop, live,
+                )
+                if new_stop is None:
+                    continue
+                if self.dry_run:
+                    self._log(f"[dry] would raise stop {t['symbol']} "
+                              f"{current_stop:.2f} -> {new_stop:.2f}")
+                    continue
+                res = execution.replace_stop_order(str(stop_leg.id), new_stop)
+                if res["ok"]:
+                    actions.append({"symbol": t["symbol"], "action": "stop_raised",
+                                    "from": current_stop, "to": new_stop,
+                                    "order_id": res["order_id"]})
+                    self._log(f"STOP RAISED {t['symbol']} {current_stop:.2f} -> "
+                              f"{new_stop:.2f} (live {live:.2f}, entry {entry:.2f})")
+                else:
+                    # Old stop still working — position stays protected; retry
+                    # next tick off the freshly-resolved leg.
+                    self._log(f"STOP RAISE FAILED {t['symbol']}: {res['error']}")
+            except Exception as exc:  # noqa: BLE001 - one symbol must not stop the rest
+                self._log(f"manage_stops error {t.get('symbol')}: "
+                          f"{type(exc).__name__}: {exc}")
+        return actions
+
     # --- entries ---
     def consider_entries(self, now: datetime | None = None) -> list[dict]:
         """Evaluate the watchlist and open new bracket positions (before cutoff)."""
@@ -276,6 +329,7 @@ class Engine:
                     if self.eod_flatten():
                         self.flattened_on = now.date()
             else:
+                self.manage_stops(now)
                 self.consider_entries(now)
         except Exception as exc:  # noqa: BLE001 - one bad tick must not kill the loop
             msg = f"tick error: {type(exc).__name__}: {exc}"

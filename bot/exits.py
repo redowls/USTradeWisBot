@@ -131,6 +131,77 @@ def detect_exits(entry_order_ids: list[str]) -> list[dict]:
     return records
 
 
+# --- Break-even + trailing stop (IMP-013) -----------------------------------
+
+_STOP_LEG_TYPES = {"STOP", "STOP_LIMIT", "TRAILING_STOP"}
+# Statuses in which Alpaca will accept a PATCH on the leg. A bracket's stop leg
+# sits HELD while the take-profit limit is the working OCO order.
+_REPLACEABLE = {"NEW", "ACCEPTED", "HELD", "PENDING_NEW"}
+
+
+def compute_trailed_stop(
+    entry_price: float,
+    initial_stop: float,
+    current_stop: float,
+    live_price: float | None,
+) -> float | None:
+    """New (higher) stop price for a long, or None when the stop should not move.
+
+    R is anchored to the ORIGINAL plan stop (entry - initial_stop), never the
+    already-moved stop — anchoring to the moved stop would shrink 1R on every
+    ratchet and chase the price straight into noise.
+      * >= BREAKEVEN_TRIGGER_R unrealized -> stop to entry.
+      * >= TRAIL_TRIGGER_R -> stop trails TRAIL_DISTANCE_R below the live price.
+    Monotonic: only returns a stop ABOVE the current one, and only when the
+    improvement clears STOP_RATCHET_MIN_PCT of entry (no 60s replace churn).
+    """
+    if not config.TRAILING_STOP_ENABLED or live_price is None:
+        return None
+    risk = entry_price - initial_stop
+    if risk <= 0 or entry_price <= 0:
+        return None
+    gain_r = (live_price - entry_price) / risk
+    if gain_r >= config.TRAIL_TRIGGER_R:
+        candidate = live_price - config.TRAIL_DISTANCE_R * risk
+    elif gain_r >= config.BREAKEVEN_TRIGGER_R:
+        candidate = entry_price
+    else:
+        return None
+    min_step = entry_price * config.STOP_RATCHET_MIN_PCT / 100.0
+    if candidate <= current_stop + min_step:
+        return None
+    return round(candidate, 2)
+
+
+def resolve_stop_leg(entry_order, fetch, max_hops: int = 5):
+    """The CURRENT stop leg of a bracket, following Alpaca's replace chain.
+
+    Every replace rotates the order id: the old leg goes status=replaced with
+    ``replaced_by`` pointing at its successor (losing track of the rotation is
+    USTradeBot's 422 "order already replaced" loop). ``fetch`` is an order
+    lookup (execution.get_order in production, a dict in tests). Returns the
+    active leg object, or None when the stop is filled/canceled/missing.
+    """
+    legs = getattr(entry_order, "legs", None) or []
+    leg = next(
+        (l for l in legs
+         if _enum_tail(getattr(l, "type", None)) in _STOP_LEG_TYPES),
+        None,
+    )
+    for _ in range(max_hops):
+        if leg is None:
+            return None
+        status = _enum_tail(getattr(leg, "status", ""))
+        if status == "REPLACED":
+            replaced_by = getattr(leg, "replaced_by", None)
+            if not replaced_by or str(replaced_by) == str(getattr(leg, "id", "")):
+                return None
+            leg = fetch(str(replaced_by))
+            continue
+        return leg if status in _REPLACEABLE else None
+    return None
+
+
 # --- End-of-day flatten -----------------------------------------------------
 
 def _position_snapshot(reason: str) -> list[dict]:

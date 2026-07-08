@@ -19,6 +19,7 @@ from alpaca.common.exceptions import APIError
 from alpaca.trading.enums import OrderClass, OrderSide, TimeInForce
 from alpaca.trading.requests import (
     MarketOrderRequest,
+    ReplaceOrderRequest,
     StopLossRequest,
     TakeProfitRequest,
 )
@@ -129,3 +130,25 @@ def get_order(order_id: str):
 def cancel_order(order_id: str) -> None:
     """Cancel an order by id (used to clean up test orders)."""
     broker.trading_client().cancel_order_by_id(order_id)
+
+
+def replace_stop_order(order_id: str, new_stop: float) -> dict:
+    """Raise a bracket stop leg to `new_stop`. Never raises — returns a result dict.
+
+    Result keys: ok, order_id (the NEW leg id — Alpaca rotates the id on every
+    replace, and the next resolve must follow it or loop on 422 "order already
+    replaced"), error. A failed replace leaves the old stop working, so the
+    position is never unprotected; the next tick simply retries. IMP-013.
+    """
+    request = ReplaceOrderRequest(stop_price=new_stop)
+    try:
+        order = _with_retry(
+            broker.trading_client().replace_order_by_id, order_id, order_data=request,
+        )
+    except APIError as exc:
+        return {"ok": False, "order_id": order_id,
+                "error": f"APIError {_api_status(exc)}: {exc}"}
+    except Exception as exc:  # noqa: BLE001 - surface any other failure to the caller
+        return {"ok": False, "order_id": order_id,
+                "error": f"{type(exc).__name__}: {exc}"}
+    return {"ok": True, "order_id": str(order.id), "error": None}

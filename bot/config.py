@@ -72,6 +72,28 @@ MAX_ENTRY_SLIPPAGE_PCT = 1.0    # skip an entry if the LIVE price has moved more
                                 # nothing (IMP-008 up-side; IMP-009 down-side symmetry).
                                 # IMP-008.
 
+# --- Break-even + trailing stop (IMP-013) ---
+# 06-08..07-07 audit (123 closed trades): STOP exits -$3,266 (56 trades, 1 win)
+# vs TAKE_PROFIT +$1,577 — but only 20/123 trades ever reached the 1.5R target
+# intraday, and 23 of 47 EOD_FLATTEN trades were green at the close after giving
+# back most of their open profit. Realized payoff ratio 1.08 vs the ~1.8 a 36%
+# win rate needs. Holding overnight is NOT the fix (5-day hold simulation on the
+# 47 EOD trades: 21 TP vs 21 stop, ~+$12/trade before gap risk); banking intraday
+# progress is. The moved stop lives BROKER-SIDE (bracket-leg replace), so it
+# survives the nightly service restart; trades.stop_price in the DB keeps the
+# ORIGINAL plan stop because that distance defines 1R.
+TRAILING_STOP_ENABLED = True
+BREAKEVEN_TRIGGER_R = 0.5       # at +0.5R unrealized, raise the stop to entry —
+                                # a trade that showed profit can no longer close red.
+TRAIL_TRIGGER_R = 1.0           # at +1R start trailing instead of sitting at entry.
+TRAIL_DISTANCE_R = 1.0          # trail this many R below the live price (ratchet:
+                                # the stop only ever moves UP).
+STOP_RATCHET_MIN_PCT = 0.10     # skip replaces that improve the stop by less than
+                                # this % of entry — the loop ticks every 60s and
+                                # Alpaca rotates the order id on every replace
+                                # (USTradeBot's 422 "already replaced" saga); don't
+                                # churn the leg for pennies.
+
 # --- Daily-loss circuit breaker (#1) ---
 DAILY_LOSS_HALT_PCT = 8.0       # was 3.0; raised 2026-06-10 to un-halt after the
                                 # morning's tight-stop losses, then confirmed by the
