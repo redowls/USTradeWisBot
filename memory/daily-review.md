@@ -585,3 +585,45 @@ None — market closed. Nothing to root-cause at the trade level.
 - **COST** — **skipped** by the IMP-008 stale-signal guard (gapped +1.62% between signal and fill); not a watchlist issue, the guard did its job. Watch whether COST keeps gapping past the open (recurring gap-and-go that the bot correctly declines).
 - **GOOGL/AAPL** — low-conf drifters, scratch/small losses; nothing name-specific.
 - **Regime read for tomorrow:** near-scratch mixed tape; the winner trended in a *bearish* index regime while the biggest loser stopped in a *bullish* one → the naive index-EMA regime gate would NOT have helped today (IMP-012). Don't expect a market filter to save false-breakout STOPs yet. Equity **$8,222.28 (−17.8%)**, **$722 above** the −25% flag — cushion intact.
+
+---
+
+## 2026-07-08 — Daily Review
+
+### Stats
+- Trades: **8 closed (4W / 4L)**, win rate **50.0%**. Green day — and the **first live session under IMP-013** (break-even@+0.5R / 1R-trail@+1R, shipped last night).
+- Net realized P&L: **+$93.02** (day **+1.13%**). Equity close **$8,315.27** (from $8,222.25 open; **+$93.02 broker truth — matches to the penny**, last_equity confirms). **−16.8% YTD**, **$815 above** the −25% ($7,500) strategy-review flag (cushion widened).
+- Avg winner **+$34.45** (ENPH +61.76, NVDA +60.84, WMT +14.40, NVDA +0.79); avg loser **−$11.19** (QCOM −37.08, QCOM −7.38, XOM −0.19, AVGO −0.12). **Three of the four "losers" are IMP-013 break-even scratches (−$0.19 / −$0.12 / and NVDA +$0.79)** — the only real loss is QCOM −$37.08.
+- Profit factor (day): 137.79 / 44.77 = **3.08**. Exit reasons: **4 STOP** (1 full-1R + 3 IMP-013 break-even), **1 TAKE_PROFIT**, **3 EOD_FLATTEN**.
+- Circuit breaker NOT tripped (+1.13% nowhere near −8.0%). **Positions: 0 open on the broker — no naked overnight** (IMP-002, 10th straight clean session). ✅ Service active all session (since 06:59:15 UTC pre-market restart); journal clean, **0 rejected orders** (no 422 loop), **10 stop-replace orders** (the IMP-013 STOP RAISED chain), 16 filled / 11 canceled.
+
+### Trade-by-trade review
+*(entry/exit = real Alpaca fills; orig_stop = plan 1R anchor, kept in trades.stop_price by IMP-013 design; rf = fraction of original 1R retained at a STOP exit)*
+| # | Sym | Entry (ET) | Exit (ET) | Conf | Type | Exit | P&L | Root cause / IMP-013 behaviour |
+|---|-----|-----------|-----------|------|------|------|-----|-----------|
+| 127 | NVDA | 09:37 @197.36 | 09:50 @197.42 | 61.7 | MA | STOP (rf 1.02) | **+$0.79** | Popped to +0.5R → stop raised to break-even (194.51→197.36); faded back and stopped ~flat. **IMP-013 break-even rescue.** |
+| 126 | XOM | 09:36 @141.68 | 12:23 @141.67 | 60.5 | MA | STOP (rf 0.99) | **−$0.19** | Reached +0.5R → stop→entry (139.88→141.68); round-tripped, stopped at break-even. **IMP-013 rescue** (a full 1R would have been ≈−$34). |
+| 130 | AVGO | 12:22 @390.04 | 13:46 @390.03 | 79.7 | BOTH | STOP (rf 1.00) | **−$0.12** | BOTH breakout (broke 389.12) that popped +0.5R then fully round-tripped → stop→entry (383.68→390.04). **IMP-013 rescue** — a full 1R here was ≈−$89; the exact false-breakout give-back IMP-013 targets. |
+| 129 | QCOM | 10:01 @185.19 | 11:25 @182.10 | 61.0 | MA | STOP (rf 0.00) | **−$37.08** | Faded straight from entry, never reached +0.5R → full original 1R stop (−1.67%). **The one real loss** — classic open-fade false breakout (PF-0.01 bucket); IMP-013 can't help a trade that never gets green (that's the regime gate's job). |
+| 131 | NVDA | 12:37 @199.22 | 14:59 @203.90 | 60.6 | MA | TAKE_PROFIT | **+$60.84** | Ran to +1R → trailed 6× (200.01→200.82) then hit TP (+2.35%). **IMP-013 trail rode a clean winner to target.** Day's engine. |
+| 128 | WMT | 09:41 @112.46 | 15:57 @113.06 | 64.2 | MA | EOD_FLATTEN | **+$14.40** | Stop raised to break-even (110.68→112.46) but never hit; drifted +0.53% to flatten. Small win. |
+| 133 | ENPH | 15:22 @42.55 | 15:57 @42.87 | 83.9 | BOTH | EOD_FLATTEN | **+$61.76** | Late (15:22) high-conf BOTH; small favourable drift (+0.75%), large $ on 193 sh. Flattened green. |
+| 132 | QCOM | 14:03 @186.59 | 15:57 @186.34 | 73.6 | BOTH | EOD_FLATTEN | **−$7.38** | Afternoon BOTH breakout (broke 185.88), never reached +0.5R, small drift-down to flatten (−0.14%). |
+
+### What worked / what didn't
+- **Worked — IMP-013 VALIDATED cleanly on its first live session.** Broker-confirmed: 10 stop-replace orders fired, **0 rejected** — no 422 "order already replaced" loop (the `resolve_stop_leg` replaced-by chain-following held). Three trades that reached +0.5R and then round-tripped (XOM, NVDA #127, AVGO) were **scratched at break-even** instead of riding to a full 1R stop or the EOD flatten; without IMP-013 those three alone were ≈−$160 of give-back (AVGO's BOTH round-trip ≈−$89 the standout). NVDA #131 trailed +1R→TP for the day's biggest win (+$60.84). The mechanism did exactly what it was built to do; state lived at the broker and survived the pre-market restart.
+- **Worked — capital protection + fill accuracy held.** 0 open positions (IMP-002, 10th session); day DB gross (+$93.02) == broker equity move to the penny (IMP-003/005/010); no circuit-breaker, no naked overnight.
+- **Didn't — the one real loss (QCOM #129, −$37.08) is the residual leak IMP-013 can't touch.** It faded straight from entry (never green), so break-even never armed → full original 1R stop. This is the PF-0.01 open-fade false-breakout bucket that the **intraday market-regime / breakout-quality entry gate** (standing #1 lever) targets — IMP-013 protects trades that first get to +0.5R; it does nothing for a trade that's red from the first tick.
+- **Measurement gap surfaced:** with IMP-013 live, the by_exit_reason "STOP" bucket now blends full-1R losses with break-even rescues — hiding both IMP-013's benefit and the residual real-STOP leak. Fixed as today's IMP-014 (below).
+
+### Lessons & improvement candidates (ranked)
+1. **[SHIPPED IMP-014]** De-blend the STOP bucket by stop-protection (fraction of the original 1R retained at exit): **full-1R** (real false-breakout loss) vs **break-even** / **trailed** (IMP-013 rescues). Today: STOP = 1 full-1R (QCOM −$37.08) + 3 break-even (+$0.48). All-time the split is decisive — of 60 STOP exits, **57 are full-1R (−$3,303, PF 0.01)** = the entire leak, and the break-even bucket is the IMP-013 era just beginning. Pure measurement/tooling (the IMP-004/006/007 pattern), no entry/exit/risk logic touched — lets every future review judge IMP-013's real effect and keeps the STOP-PF from being misread as "improving" when it's just blending.
+2. **Intraday market-regime / breakout-quality entry gate (standing #1 lever)** — the residual leak (QCOM open-fade) is exactly this. NOT acted on today: it needs the deliberate `scripts/replay.py` multi-run build over post-06-15 history (IMP-011/012 showed the naive EMA9 gate is proxy-fragile SPY-vs-QQQ), not a post-close hack, and today's evidence is IMP-013's validation + measurement, not the gate.
+3. **Watch break-even give-back over more sessions:** did any of the 3 break-even scratches (XOM/NVDA/AVGO) recover after the stop? Grow the by_stop_protection sample; if break-even trips too eagerly on names that then run, revisit BREAKEVEN_TRIGGER_R. Single-session — defer, do not tune on n=3.
+
+### Notes for pre-market research
+- **IMP-013 works live** — expect fewer full-loss STOPs on trades that get green; watch the daily by_stop_protection split (full-1R vs break-even) as the running scorecard.
+- **QCOM** — signaled twice today (MA #129 full-stop −$37; BOTH #132 flatten −$7), both faded from/near entry — the day's weak name; a semi that didn't participate in the Micron-led bid. Not a park (liquid, strategy-fit, open-fade = regime), but note the double open-fade.
+- **NVDA** — the day's quality on both sides: a break-even scratch AM (#127) and a clean +1R-trail→TP PM (#131, +$60.84). Semis led (Micron print); NVDA and AVGO both produced tradable breakouts. Keep top-of-list.
+- **ENPH** — late (15:22) high-conf BOTH that flattened green (+$61.76); its recurring 0W2 STOP-bucket signature did NOT repeat today. Watch whether it keeps behaving.
+- Equity **$8,315.27 (−16.8%)**, **$815 above** the −25% ($7,500) flag — cushion widened, best of incubation. No watchlist change warranted by today.
