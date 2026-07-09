@@ -664,3 +664,35 @@ Service restarted: **no** (no watchlist changes; 0 open positions — nothing lo
 - Equity **$8,222.25 (−17.8%)**, **$722 above** the −25% ($7,500) flag — protect the cushion into the start of earnings season.
 
 ---
+
+## 2026-07-09 — Pre-market Research
+
+### Market context
+**AI-trade rebound day 2 vs a fresh US–Iran flare-up — mixed/higher tape.** Nasdaq-100 futures **+0.5%**, S&P 500 **+0.1%**, Dow ~flat-to-slightly-lower; VIX ~17. The bid is the AI/memory complex ahead of **SK Hynix's US ADR debut** (offering ~7× oversubscribed, prices Thu, lists Fri) — chips rallied across Asia/Europe/US for a 2nd day. Offsetting it: the US launched **new airstrikes on Iran overnight** and Tehran targeted Gulf states; Trump warned of "much worse," revoked the Iran oil-sanction waiver → crude popped Wed then eased (Brent −0.5% to ~$77.60; gold +0.8% to ~$4,115). **Earnings today are all off-list** — PEP (reported a Q2 beat, backed guide), PGR + ~25 small/mid names; **no watchlist name reports during market hours → no intraday earnings risk on the list.** On-list catalyst: **CRM downgraded to Sector Weight from Overweight at KeyBanc** (Agentforce upside doubt) — a rating change, not a binary event.
+
+### Carried from daily review (2026-07-08)
+- **Green day (+$93.02, 4W/4L, PF 3.08)** and **IMP-013's first live session — VALIDATED**: 10 broker stop-replaces, 0 rejected (no 422 loop); 3 trades reached +0.5R, round-tripped, and were scratched at break-even (XOM/NVDA #127/AVGO — AVGO's full-1R was ≈−$89), NVDA #131 trailed +1R→TP (+$60.84). The one real loss (QCOM #129 −$37.08) faded from entry so break-even never armed — the residual open-fade leak is the regime-gate's job, not IMP-013's. → watch the daily by_stop_protection split (full-1R vs break-even) as the running scorecard. No watchlist change warranted by 07-08.
+- **QCOM** — signaled twice, both faded from/near entry (MA full-stop −$37, BOTH flatten −$7); the day's weak name but liquid + strategy-fit open-fade → **no park**, note the double open-fade. Honored (hold).
+- **NVDA** — quality on both sides (AM break-even scratch + PM +1R-trail→TP); semis led on the Micron print → keep top-of-list. **ENPH** — late high-conf BOTH flattened green (+$61.76), its 0W2 STOP signature did NOT repeat → watch, no park. Honored.
+- **Instruction acted on:** "check the intraday-earnings calendar each morning and park any on-list name reporting during hours." Verified today's ~13–27 reports (PEP/PGR + small caps) are **all off-list → no earnings park.**
+
+### Watchlist review
+- **Positions: 0 open — nothing locked.** Account ACTIVE, equity **$8,315.20** (flat vs 07-08 close $8,315.27; last_equity carried — market closed), cash $8,315.20, buying power $33,260. **−16.8% from $10K**, **$815 above** the −25% ($7,500) strategy-review flag (best-of-incubation cushion). Clock pre-open (next open 07-09 09:30 ET).
+- Per-symbol P&L (14d closed, 44 trades): positive **TSLA +$151.39 (3W4)**, **META +$102.53 (2W3)**, **INTC +$101.96 (2W3)**, TSM +$63.66, NVDA +$61.63, MSFT +$58.52, GOOGL +$49.23, GOOG +$40.90, MU +$20.27, AMD +$19.61, WMT +$14.40, SPY +$9.48. Worst: **ENPH −$118.52 (1W3)**, **SE −$95.06 (1W3)**, AAPL −$65.62 (2W4), AMZN −$50.36 (1W3), QCOM −$34.84 (1W3), COST −$15.31, CRM −$12.94. All liquid large-caps/ETFs that fit the strategy; book net-green over 14d, carried by TSLA/META/INTC/TSM/NVDA. **No chronic-loser park trigger matured** — ENPH is the recurring regime-wide false-breakout STOP-bucket leak (PF 0.01, post-close #1-lever target, not a name defect — standing judgment 06-15→07-08); SE (1W3, open-fade) is watched for ~1W4L with the same signature but not there yet; AAPL/AMZN/QCOM are regime open-fades / small-sample.
+- **Semis / AI (NVDA/AVGO/AMD/MU/TSM/INTC/QCOM)** — today's leadership on the SK-Hynix-led memory bid; all liquid large-cap and strategy-fit → **HOLD all**. **CRM** — KeyBanc downgrade is a rating change (not a halt/binary event); CRM stays a liquid large-cap that fits the strategy → **HOLD**, just note it may open heavy/not break out cleanly (the bot simply won't signal if it's weak). No halt/binary catalyst on any on-list name. **UNH/XOM** — oil whipsaw on the Iran headlines is a macro move, not a name defect → HOLD.
+- **Adds: none** — today's relative strength (chips/AI + megacaps) is **already fully covered on-list** (NVDA/AVGO/AMD/MU/TSM/INTC/QCOM + AAPL/MSFT/AMZN/META/GOOG/GOOGL/TSLA). **SK Hynix** (the day's headline) is an illiquid IPO/ADR debut, not a clean trending liquid US large-cap for an intraday breakout strategy. Pre-market one-offs (SpaceX +0.8%, MNST 2-for-1 split) are event/off-list. Backdrop is a geopolitically charged (US–Iran) mixed tape at a −16.8% drawdown with an $815 cushion to protect — no chasing.
+
+### Changes applied to watchlist
+**No changes.** 26 active retained. No park trigger matured (no on-list intraday earnings today; CRM downgrade = rating change not binary event; ENPH = regime STOP-bucket leak → strategy-gate work; SE/AAPL/AMZN/QCOM = regime open-fades / small-sample; semis are today's leaders not park candidates; the rest are regime droughts, not structural mismatches). 0 positions open (nothing locked). No adds into a geopolitically charged mixed tape with leadership already fully covered. Conservative hold is the correct call — no churn.
+
+### Final watchlist
+26 active (unchanged): AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+(Parked: BABA, BIRD, C, JPM, WPM.)
+Service restarted: **no** (no watchlist changes; 0 open positions — nothing locked).
+
+### Notes for pre-market research (next session — Fri 07-10)
+- **AI/memory is the tape's swing factor** — SK Hynix lists Fri 07-10 (its ADR debut day); watch whether the on-list semis (NVDA/MU/TSM/AVGO/AMD/INTC/QCOM) sustain the SK-Hynix/Micron-led leadership or fade intraday (the plunge→bounce→fade pattern has recurred). TSLA (3W4, +$151) / META (+$102) / INTC (+$102) / NVDA (+$62) remain the book anchors.
+- **US–Iran is a live macro risk** — overnight airstrikes + Gulf retaliation + revoked oil-sanction waiver → oil/energy (XOM) and defensive rotation can whipsaw the tape intraday; a geopolitical gap open is a live test of IMP-009 (down-gap skip) / IMP-008 (up-gap skip). Not a name action.
+- **Earnings ramp:** DAL pre-open Fri 07-10 (off-list); banks ~mid-July (JPM ~07-14, C/JPM already parked); Mag-7 Q2 late July. **Check the intraday-earnings calendar each morning and park any on-list name reporting during market hours on its report day.**
+- **CRM** carries a fresh KeyBanc downgrade (07-09) — watch whether it turns into a persistent laggard vs a one-day fade. **SE** (1W3, recurring open-fade) — re-flag as a park candidate at ~1W4L with the same false-breakout signature. **ENPH** stays the biggest 14d loser (−$118, 1W3) but remains the regime-wide STOP-bucket leak (post-close gate, not a name park).
+- Equity **$8,315.20 (−16.8%)**, **$815 above** the −25% ($7,500) flag — protect the cushion. Track the daily by_stop_protection split (IMP-014) to keep scoring IMP-013.
