@@ -407,3 +407,69 @@ def test_compute_metrics_exposes_by_stop_protection():
     m = analytics.compute_metrics(STOP_EXITS_20260708)
     assert "by_stop_protection" in m
     assert m["by_stop_protection"]["full-1R"]["total_pl"] == -37.08
+
+
+# --- IMP-015 (2026-07-09): machine verdict on the skip-bearish regime gate -----
+#
+# The ★ market-regime gate (IMP-011/012) was queued "pending a bigger post-06-15
+# bearish sample." By 2026-07-09 that sample has GROWN (SPY n=23 / QQQ n=30) and
+# turned NET-POSITIVE under BOTH proxies (SPY bearish PF 1.11 +$37.11; QQQ bearish
+# PF 1.11 +$42.66), so skipping bearish would REMOVE profit. The verdict encodes
+# the analysis's "Read:" rule so this refutation can't be silently reopened.
+def _regime_result(bull_pf, bear_n, bear_pf, skipped_pl):
+    """Build a by_market_regime()-shaped result with only the fields the verdict reads."""
+    return {
+        "buckets": {
+            analytics.REGIME_BULLISH: {"trades": 50, "profit_factor": bull_pf},
+            analytics.REGIME_BEARISH: {"trades": bear_n, "profit_factor": bear_pf},
+        },
+        "skip_bearish": {"skipped_total_pl": skipped_pl, "skipped_trades": bear_n,
+                         "kept_trades": 50, "kept_total_pl": 600.0},
+    }
+
+
+def test_skip_bearish_gate_verdict_refuted_2026_07_09_grown_sample():
+    # Real post-06-15 numbers on 2026-07-09: bearish net-positive under both proxies.
+    v = analytics.skip_bearish_gate_verdict({
+        "SPY": _regime_result(1.74, 23, 1.11, 37.11),
+        "QQQ": _regime_result(1.78, 30, 1.11, 42.66),
+    })
+    assert v["supported"] is False
+    assert "net-positive" in v["reason"]
+    assert v["per_proxy"]["SPY"]["ok"] is False
+    assert v["per_proxy"]["QQQ"]["ok"] is False
+
+
+def test_skip_bearish_gate_verdict_supported_only_when_bearish_is_a_net_loss():
+    # A hypothetical regime where bearish is a large net loss under BOTH proxies
+    # with an adequate sample and worse PF -> the gate would be SUPPORTED.
+    v = analytics.skip_bearish_gate_verdict({
+        "SPY": _regime_result(1.60, 25, 0.55, -180.0),
+        "QQQ": _regime_result(1.55, 26, 0.60, -150.0),
+    })
+    assert v["supported"] is True
+    assert v["reason"] == "all proxies support skip-bearish"
+
+
+def test_skip_bearish_gate_verdict_refused_on_thin_sample_or_no_data():
+    # Adequate + negative under SPY, but the QQQ bearish sample is too thin -> refused.
+    v = analytics.skip_bearish_gate_verdict({
+        "SPY": _regime_result(1.5, 25, 0.5, -100.0),
+        "QQQ": _regime_result(1.5, 8, 0.5, -50.0),
+    })
+    assert v["supported"] is False
+    assert "insufficient bearish sample under QQQ" in v["reason"]
+    # Empty input -> refused, safe (capital-protective default).
+    empty = analytics.skip_bearish_gate_verdict({})
+    assert empty["supported"] is False
+    assert empty["reason"] == "no proxy data"
+
+
+def test_skip_bearish_gate_verdict_refused_when_bearish_pf_not_worse():
+    # Skipping removes a (tiny) net loss AND sample is adequate, but bearish PF is
+    # NOT below bullish -> bearish isn't the worse regime, so the gate is refused.
+    v = analytics.skip_bearish_gate_verdict({
+        "SPY": _regime_result(1.10, 25, 1.20, -5.0),
+    })
+    assert v["supported"] is False
+    assert "bearish not worse than bullish under SPY" in v["reason"]

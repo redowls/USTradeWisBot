@@ -241,6 +241,68 @@ def regime_proxy_agreement(regime_a: dict, regime_b: dict) -> dict:
     }
 
 
+# Per-proxy bearish trades needed before the skip-bearish gate can be ruled IN.
+# A thin bearish sample (IMP-011 shipped at n=13) can flip sign as it grows, so a
+# gate must not earn SUPPORTED on a handful of trades.
+MIN_BEARISH_SAMPLE_FOR_GATE = 20
+
+
+def skip_bearish_gate_verdict(results_by_proxy: dict) -> dict:
+    """Machine verdict on the skip-bearish market-regime gate across proxies.
+
+    `results_by_proxy` maps a proxy label (e.g. "SPY", "QQQ") to a
+    `by_market_regime()` result. Encodes the analysis's prose "Read:" rule as a
+    checkable verdict: skipping every BEARISH-regime entry is SUPPORTED only
+    when, under EVERY proxy, all three hold —
+      (1) the bearish bucket has >= MIN_BEARISH_SAMPLE_FOR_GATE trades (a thin
+          sample can't rule the gate in),
+      (2) skipping bearish removes net-NEGATIVE P&L (`skipped_total_pl` < 0, so
+          the removed trades were a net loss and the book improves), AND
+      (3) the bearish profit factor is below the bullish one (bearish is the
+          worse regime).
+    If any proxy fails any test the gate is REFUTED with the reason — its edge is
+    proxy-fragile, the bearish sample is thin, or (the 2026-07-09 case) the
+    bearish bucket is actually profitable so skipping would remove profit. The
+    default is REFUTED (empty input, missing buckets): a gate must earn SUPPORTED
+    under every proxy, a capital-protective bias so a harmful entry filter can't
+    ship on a cherry-picked window. Pure — no network, no DB.
+    """
+    per_proxy: dict[str, dict] = {}
+    reasons: list[str] = []
+    for proxy, res in results_by_proxy.items():
+        buckets = (res or {}).get("buckets", {})
+        sk = (res or {}).get("skip_bearish", {})
+        bear = buckets.get(REGIME_BEARISH) or {}
+        bull = buckets.get(REGIME_BULLISH) or {}
+        n_bear = bear.get("trades", 0)
+        skipped_pl = sk.get("skipped_total_pl", 0.0)
+        bear_pf = bear.get("profit_factor")
+        bull_pf = bull.get("profit_factor")
+        p = {"bearish_trades": n_bear, "skipped_total_pl": skipped_pl,
+             "bearish_pf": bear_pf, "bullish_pf": bull_pf, "ok": True}
+        if n_bear < MIN_BEARISH_SAMPLE_FOR_GATE:
+            p["ok"] = False
+            reasons.append(f"insufficient bearish sample under {proxy} "
+                           f"(n={n_bear}<{MIN_BEARISH_SAMPLE_FOR_GATE})")
+        elif skipped_pl >= 0:
+            p["ok"] = False
+            reasons.append(f"skipping bearish removes net-positive P&L under "
+                           f"{proxy} (${skipped_pl:+.2f})")
+        elif bear_pf is not None and bull_pf is not None and bear_pf >= bull_pf:
+            p["ok"] = False
+            reasons.append(f"bearish not worse than bullish under {proxy} "
+                           f"(PF {bear_pf:.2f} >= {bull_pf:.2f})")
+        per_proxy[proxy] = p
+    supported = bool(results_by_proxy) and all(p["ok"] for p in per_proxy.values())
+    if supported:
+        reason = "all proxies support skip-bearish"
+    elif reasons:
+        reason = "; ".join(reasons)
+    else:
+        reason = "no proxy data"
+    return {"supported": supported, "reason": reason, "per_proxy": per_proxy}
+
+
 def load_closed_trades(since: date | None = None) -> list[dict]:
     """Closed trades joined to their signal (signal_type/confidence/broke_level)."""
     sql = (

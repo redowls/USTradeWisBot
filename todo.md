@@ -312,6 +312,19 @@ Ordered by expected impact; each item needs replay validation before code.
    (a) grow the post-06-15 bearish sample; (b) compare EMA9 vs VWAP vs QQQ vs
    "skip first N min on a red open" as the proxy in regime_analysis/replay;
    (c) only then gate the engine (long-only when bullish) as a tightening.
+   **→ UPDATE (IMP-015, 2026-07-09): the NAIVE SPY/QQQ-EMA9 skip-bearish gate is
+   REFUTED by the grown sample (step (a) done, gate failed).** The post-06-15
+   bearish bucket has grown to **SPY n=23 (+$37.11, PF 1.11) / QQQ n=30 (+$42.66,
+   PF 1.11) — NET-POSITIVE under BOTH proxies**, so skip-bearish now REMOVES profit
+   (07-09's own loser, TSM, was bullish-tagged under both — an in-sample
+   counterexample). All-time it also fails (bearish PF ≥ bullish under both).
+   `scripts/regime_analysis.py` now prints a machine `GATE VERDICT` (via
+   `analytics.skip_bearish_gate_verdict`, SUPPORTED only if under EVERY proxy
+   bearish n≥20 AND skipping removes a net loss AND bearish PF < bullish) so this
+   can't be silently reopened. **The remaining path is a DIFFERENT regime
+   definition, not a bigger EMA9 sample** — test VWAP and "skip first N min on a
+   red open" as proxies (step (b), still open); only a definition that earns
+   SUPPORTED under the verdict graduates to a replay-validated engine gate.
 
 0a. ~~**EOD-flatten P&L accuracy**~~ **[SHIPPED IMP-003, 2026-06-22]** — on 06-22
    SPY/QQQ/TSM were each booked at exit==entry ($0.00) at the flatten while the

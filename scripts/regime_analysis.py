@@ -99,9 +99,8 @@ def _index_regime_by_trade(rows: list[dict], symbol: str) -> dict[int, str]:
     return regime
 
 
-def _print_proxy(rows: list[dict], regime: dict[int, str], symbol: str) -> None:
+def _print_proxy(res: dict, symbol: str) -> None:
     """Print one proxy's regime buckets + the skip-bearish what-if."""
-    res = analytics.by_market_regime(rows, regime)
     buckets = res["buckets"]
 
     print(f"\n[{symbol} close vs EMA{analytics.INDEX_REGIME_EMA_SPAN}]")
@@ -135,9 +134,11 @@ def _print(since=None) -> int:
         return 0
 
     regimes: dict[str, dict[int, str]] = {}
+    results: dict[str, dict] = {}
     for sym in PROXY_SYMBOLS:
         regimes[sym] = _index_regime_by_trade(rows, sym)
-        _print_proxy(rows, regimes[sym], sym)
+        results[sym] = analytics.by_market_regime(rows, regimes[sym])
+        _print_proxy(results[sym], sym)
 
     # Proxy-robustness cross-check: how often SPY and QQQ agree on a trade's
     # regime. A gate whose signal survives only one proxy is not trustworthy.
@@ -146,6 +147,15 @@ def _print(since=None) -> int:
         agr = analytics.regime_proxy_agreement(regimes[a], regimes[b])
         print(f"\nProxy agreement ({a} vs {b}): {agr['agree']}/{agr['trades']} "
               f"({agr['agree_pct']:.1f}%); {agr['disagree']} disagree")
+
+    # Machine verdict on the skip-bearish gate — encodes the "Read:" rule below
+    # so a refuted gate can't be silently reopened on a cherry-picked window
+    # (the IMP-004/007 pattern). SUPPORTED only if, under EVERY proxy, the
+    # bearish sample is large enough, skipping it removes a net loss, and bearish
+    # is the worse regime.
+    verdict = analytics.skip_bearish_gate_verdict(results)
+    status = "SUPPORTED" if verdict["supported"] else "REFUTED"
+    print(f"\nGATE VERDICT (skip-bearish): {status} — {verdict['reason']}")
 
     print("\nRead: the gate has signal only if BEARISH is materially worse than")
     print("BULLISH under BOTH proxies and 'skipped' P&L is net-negative. This is")
