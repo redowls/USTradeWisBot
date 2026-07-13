@@ -150,6 +150,72 @@ def by_stop_protection(rows: list[dict]) -> dict:
     return out
 
 
+# Time-of-day bands — minutes AFTER the 09:30 ET open at which the entry filled.
+# Motivated by the recurring high-confidence "open-drive fade": on 2026-07-10
+# (TSLA conf-82 BOTH, entered 09:31) and 2026-07-13 (NVDA conf-94 BOTH, entered
+# 09:30) the day's whole loss was a breakout that filled in the first minutes and
+# faded straight to its full 1R stop. That pattern invites a "skip the first N
+# minutes after the open" entry gate (a backlog ★ regime proxy). These bands make
+# the hypothesis checkable BEFORE any engine change: bucketing the book by entry
+# minute shows the false-breakout STOP bleed is spread across the WHOLE session
+# (all-time STOP $ by band 0-5m/5-15m/15-30m/30-60m/60m+ ≈ -1211/-611/-409/-395/
+# -964 — no early band is distinctly worse), and the earliest band also holds the
+# day's BIGGEST winners (2026-07-13 MSFT +$78.39 entered 09:34; 2026-07-09 SE
+# +$228.54 TP entered 09:31), so an open-skip gate would forgo winners without
+# isolating the leak. Measurement-only — the refuted-candidate-made-visible
+# pattern of IMP-004/007/015. Entries only land in 0-360 min (ENTRY_CUTOFF_ET).
+MARKET_OPEN_ET_MINUTES = 9 * 60 + 30      # 09:30 ET regular-session open
+TIME_OF_DAY_BANDS: tuple[tuple[float, float, str], ...] = (
+    (float("-inf"), 5.0, "0-5m"),
+    (5.0, 15.0, "5-15m"),
+    (15.0, 30.0, "15-30m"),
+    (30.0, 60.0, "30-60m"),
+    (60.0, float("inf"), "60m+"),
+)
+
+
+def _minutes_after_open(row: dict) -> float | None:
+    """Minutes from the 09:30 ET open to this trade's entry fill.
+
+    Reads entry_time (a datetime, or an ISO string from the DB driver); returns
+    None when it is missing/unparseable so such rows are simply excluded. The ET
+    wall-clock of entry_time is used directly (trades are logged in market time),
+    so no timezone conversion is needed. Pure — no DB, no network.
+    """
+    et = row.get("entry_time")
+    if et is None:
+        return None
+    if isinstance(et, str):
+        try:
+            et = datetime.fromisoformat(et)
+        except ValueError:
+            return None
+    try:
+        return (et.hour * 60 + et.minute + et.second / 60.0) - MARKET_OPEN_ET_MINUTES
+    except AttributeError:
+        return None
+
+
+def by_time_of_day(rows: list[dict]) -> dict:
+    """Bucket closed-trade P&L by minutes-after-open at entry (TIME_OF_DAY_BANDS).
+
+    Returns {band: _bucket(...)} for every band, over all closed trades with a
+    usable entry_time (empty dict when none have one). Surfaces whether the loss /
+    false-breakout bleed is concentrated near the open — the evidence a "skip the
+    first N minutes" entry gate would need before any engine change. Pure.
+    """
+    pairs = [(r, _minutes_after_open(r)) for r in rows
+             if r.get("realized_pl") is not None]
+    pairs = [(r, mao) for r, mao in pairs if mao is not None]
+    if not pairs:
+        return {}
+    out: dict[str, dict] = {}
+    for lo, hi, label in TIME_OF_DAY_BANDS:
+        sub = [_f(r["realized_pl"]) for r, mao in pairs if lo <= mao < hi]
+        out[label] = _bucket(sub)
+    return out
+
+
 # --- Market-regime tagging (todo.md backlog ★ — the top strategy lever) --------
 #
 # Every per-trade discriminator is refuted (confidence IMP-004, volume 2026-06-26,
@@ -388,6 +454,12 @@ def compute_metrics(rows: list[dict]) -> dict:
     # by_exit_reason STOP bucket honest and measures IMP-013's effect over time.
     by_stop_prot = by_stop_protection(closed)
 
+    # By time of day — minutes-after-open at entry. Tests the "skip the first N
+    # minutes" open-fade gate candidate (see TIME_OF_DAY_BANDS): the STOP/loss
+    # bleed is spread across the whole session and the earliest band also holds
+    # the biggest winners, so an open-skip gate is not the lever.
+    by_tod = by_time_of_day(closed)
+
     # False-breakout rate: of breakout-driven trades, the share that stopped out.
     bo = [r for r in closed if (r.get("signal_type") in ("BREAKOUT", "BOTH"))]
     fb_rate = (round(100 * sum(1 for r in bo if r.get("exit_reason") == "STOP") / len(bo), 1)
@@ -408,6 +480,7 @@ def compute_metrics(rows: list[dict]) -> dict:
         "by_confidence_band": by_band,
         "by_exit_reason": by_exit,
         "by_stop_protection": by_stop_prot,
+        "by_time_of_day": by_tod,
         "by_entry_extension": by_extension,
         "false_breakout_rate": fb_rate,
         "exit_reasons": dict(Counter(r.get("exit_reason") for r in closed)),

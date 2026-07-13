@@ -473,3 +473,71 @@ def test_skip_bearish_gate_verdict_refused_when_bearish_pf_not_worse():
     })
     assert v["supported"] is False
     assert "bearish not worse than bullish under SPY" in v["reason"]
+
+
+# --- IMP-016 (2026-07-13): by-time-of-day breakdown, refutes an open-skip gate --
+#
+# 2026-07-13 closed 2W/4L (-$85.27): the whole loss was NVDA (conf-94 BOTH, entered
+# 09:30:11) fading to its full 1R stop — the SAME open-drive fade as 07-10's TSLA
+# (09:31). That invites a "skip the first N minutes" entry gate. But the 0-5m band
+# also holds the day's BIGGEST winner (MSFT +$78.39, entered 09:34), so skipping
+# the open would forgo winners, and the all-time STOP bleed is spread across every
+# band — the leak is not open-concentrated. These anchor that refutation.
+from datetime import datetime
+
+TODAY_20260713 = [
+    {"trade_id": 143, "symbol": "NVDA",  "realized_pl": -129.93, "exit_reason": "STOP",
+     "entry_time": datetime(2026, 7, 13, 9, 30, 11)},   # 0-5m, the day's whole loss
+    {"trade_id": 144, "symbol": "GOOGL", "realized_pl": -0.78,   "exit_reason": "STOP",
+     "entry_time": datetime(2026, 7, 13, 9, 30, 12)},   # 0-5m, IMP-013 break-even rescue
+    {"trade_id": 145, "symbol": "MSFT",  "realized_pl": 78.39,   "exit_reason": "EOD_FLATTEN",
+     "entry_time": datetime(2026, 7, 13, 9, 34, 34)},   # 0-5m, the day's BIGGEST winner
+    {"trade_id": 146, "symbol": "AMZN",  "realized_pl": -0.36,   "exit_reason": "STOP",
+     "entry_time": datetime(2026, 7, 13, 9, 47, 41)},   # 15-30m, break-even rescue
+    {"trade_id": 147, "symbol": "SE",    "realized_pl": -41.65,  "exit_reason": "STOP",
+     "entry_time": datetime(2026, 7, 13, 10, 40, 35)},  # 60m+, full-1R MA open-fade
+    {"trade_id": 148, "symbol": "COST",  "realized_pl": 9.06,    "exit_reason": "EOD_FLATTEN",
+     "entry_time": datetime(2026, 7, 13, 11, 47, 40)},  # 60m+, small green drift
+]
+
+
+def test_minutes_after_open_today():
+    m = {r["symbol"]: analytics._minutes_after_open(r) for r in TODAY_20260713}
+    assert round(m["NVDA"], 2) == 0.18    # 09:30:11
+    assert round(m["MSFT"], 2) == 4.57    # 09:34:34 — still inside the 0-5m band
+    assert round(m["AMZN"], 2) == 17.68   # 09:47:41
+    assert round(m["SE"], 2) == 70.58     # 10:40:35
+
+
+def test_minutes_after_open_parses_string_and_none_on_missing():
+    # DB drivers may hand back an ISO string; it must parse the same way.
+    assert round(analytics._minutes_after_open(
+        {"entry_time": "2026-07-13 09:34:34"}), 2) == 4.57
+    assert analytics._minutes_after_open({"entry_time": None}) is None
+    assert analytics._minutes_after_open({"entry_time": "not-a-date"}) is None
+    assert analytics._minutes_after_open({}) is None
+
+
+def test_by_time_of_day_open_band_holds_both_worst_loser_and_best_winner():
+    tod = analytics.by_time_of_day(TODAY_20260713)
+    # NVDA (-129.93), GOOGL (-0.78) and MSFT (+78.39) all fill in the first 5 min:
+    # the biggest loser AND the biggest winner share the band, so an open-skip
+    # gate cannot isolate the leak without forgoing the winner.
+    assert tod["0-5m"]["trades"] == 3
+    assert tod["0-5m"]["total_pl"] == -52.32
+    assert tod["0-5m"]["win_rate"] == 33.3
+    assert tod["15-30m"]["trades"] == 1       # AMZN
+    assert tod["60m+"]["trades"] == 2         # SE + COST
+    assert tod["60m+"]["total_pl"] == -32.59
+    # The two empty bands are still present (band coverage is complete).
+    assert tod["5-15m"]["trades"] == 0
+    assert tod["30-60m"]["trades"] == 0
+
+
+def test_by_time_of_day_empty_safe_and_exposed_by_compute_metrics():
+    assert analytics.by_time_of_day([]) == {}
+    # Rows without a usable entry_time contribute nothing (no crash).
+    assert analytics.by_time_of_day([{"realized_pl": -5.0}]) == {}
+    m = analytics.compute_metrics(TODAY_20260713)
+    assert "by_time_of_day" in m
+    assert m["by_time_of_day"]["0-5m"]["total_pl"] == -52.32
