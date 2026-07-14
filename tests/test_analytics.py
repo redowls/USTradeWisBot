@@ -541,3 +541,54 @@ def test_by_time_of_day_empty_safe_and_exposed_by_compute_metrics():
     m = analytics.compute_metrics(TODAY_20260713)
     assert "by_time_of_day" in m
     assert m["by_time_of_day"]["0-5m"]["total_pl"] == -52.32
+
+
+# --- IMP-017 (2026-07-14): by-flatten-outcome, surfaces the fade-to-flatten leak -
+#
+# 2026-07-14 closed 2W/4L (-$41.14). The day's biggest loss was XOM (#150): a
+# conf-78 BOTH breakout that filled 0.65% above its broken level, then faded all
+# day to a -$49.78 EOD_FLATTEN — its wide 3xATR stop never hit, so it never armed
+# IMP-013 and never counted as a STOP. by_stop_protection (IMP-014) is STOP-only,
+# so this open-fade leak is invisible there; and the by_exit_reason EOD_FLATTEN
+# bucket is net-positive overall (the up-drift cohort masks it). Splitting the
+# flatten bucket by the sign of realized P&L surfaces that faded slice. Today's
+# three EOD_FLATTEN exits: XOM -49.78 (faded), META -21.28 (faded), GOOG +18.18
+# (drifted-up).
+FLATTEN_EXITS_20260714 = [
+    {"trade_id": 150, "symbol": "XOM",  "realized_pl": -49.78, "exit_reason": "EOD_FLATTEN"},
+    {"trade_id": 153, "symbol": "GOOG", "realized_pl": 18.18,  "exit_reason": "EOD_FLATTEN"},
+    {"trade_id": 154, "symbol": "META", "realized_pl": -21.28, "exit_reason": "EOD_FLATTEN"},
+]
+
+
+def test_by_flatten_outcome_splits_faded_from_drifted_up():
+    fo = analytics.by_flatten_outcome(FLATTEN_EXITS_20260714)
+    # The two faders (XOM, META) carry the masked leak...
+    assert fo["faded"]["trades"] == 2
+    assert fo["faded"]["total_pl"] == -71.06
+    # ...while the single up-drift (GOOG) is the profitable cohort that hides it.
+    assert fo["drifted-up"]["trades"] == 1
+    assert fo["drifted-up"]["total_pl"] == 18.18
+    assert fo["drifted-up"]["win_rate"] == 100.0
+
+
+def test_by_flatten_outcome_only_counts_flatten_exits_and_is_empty_safe():
+    # STOP / TAKE_PROFIT exits (even with a loss/gain) must NOT be bucketed here.
+    rows = FLATTEN_EXITS_20260714 + [
+        {"trade_id": 151, "symbol": "UNH", "realized_pl": -39.33, "exit_reason": "STOP"},
+        {"trade_id": 149, "symbol": "BAC", "realized_pl": 51.47,  "exit_reason": "TAKE_PROFIT"},
+    ]
+    fo = analytics.by_flatten_outcome(rows)
+    assert fo["faded"]["trades"] == 2          # UNH's STOP loss excluded
+    assert fo["drifted-up"]["trades"] == 1     # BAC's TP win excluded
+    # No EOD_FLATTEN exits at all -> empty dict, no crash.
+    assert analytics.by_flatten_outcome([]) == {}
+    assert analytics.by_flatten_outcome(
+        [{"trade_id": 1, "realized_pl": -5.0, "exit_reason": "STOP"}]) == {}
+
+
+def test_compute_metrics_exposes_by_flatten_outcome():
+    m = analytics.compute_metrics(FLATTEN_EXITS_20260714)
+    assert "by_flatten_outcome" in m
+    assert m["by_flatten_outcome"]["faded"]["total_pl"] == -71.06
+    assert m["by_flatten_outcome"]["drifted-up"]["total_pl"] == 18.18

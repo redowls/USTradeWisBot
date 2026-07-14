@@ -78,6 +78,17 @@ def _print_report(since=None) -> int:
             print(f"  {band:10} {s['trades']:6d} {s['win_rate']:6.1f} "
                   f"{s['total_pl']:10.2f} {s['expectancy']:8.2f} {_pf(s):>6}")
 
+    fo = m.get("by_flatten_outcome", {})
+    if fo:
+        print("\nBy flatten outcome (EOD_FLATTEN exits, sign of realized P&L):")
+        print("  faded = open-fade leak escaping into flatten (no stop hit) · drifted-up = captured green")
+        print(f"  {'outcome':10} {'trades':>6} {'win%':>6} {'total$':>10} {'exp$':>8} {'PF':>6}")
+        for outcome, s in fo.items():
+            if s["trades"] == 0:
+                continue
+            print(f"  {outcome:10} {s['trades']:6d} {s['win_rate']:6.1f} "
+                  f"{s['total_pl']:10.2f} {s['expectancy']:8.2f} {_pf(s):>6}")
+
     tod = m.get("by_time_of_day", {})
     if tod:
         print("\nBy time of day (minutes after 09:30 ET open, at entry):")

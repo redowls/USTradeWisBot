@@ -150,6 +150,33 @@ def by_stop_protection(rows: list[dict]) -> dict:
     return out
 
 
+def by_flatten_outcome(rows: list[dict]) -> dict:
+    """Split EOD_FLATTEN-exit P&L into faded (net loss) vs drifted-up (net gain).
+
+    The EOD_FLATTEN twin of by_stop_protection. IMP-013's break-even/trail only
+    arms once a trade first reaches +0.5R green, so a breakout/MA entry that fades
+    from the open but whose wide 3xATR stop is never hit escapes into an
+    EOD_FLATTEN exit, NOT a STOP — invisible to by_stop_protection (STOP-only).
+    Because the up-drift cohort makes the EOD_FLATTEN bucket net-positive overall
+    (all-time PF ~1.6), that faded sub-population is masked in the by_exit_reason
+    headline. Splitting by the sign of realized P&L surfaces the residual
+    open-fade leak that leaks into the flatten bucket — first clearly seen
+    2026-07-14 (XOM: conf-78 BOTH breakout, filled 0.65% above its level, faded
+    straight to a -$49.78 flatten with its stop never hit). Measurement-only, the
+    refuted-candidate-made-visible pattern of IMP-004/007/014/015/016. Returns
+    {"faded": _bucket, "drifted-up": _bucket} over EOD_FLATTEN exits (empty dict
+    when there are none). Pure — no DB, no network.
+    """
+    flat = [_f(r["realized_pl"]) for r in rows
+            if r.get("realized_pl") is not None and r.get("exit_reason") == "EOD_FLATTEN"]
+    if not flat:
+        return {}
+    return {
+        "faded": _bucket([p for p in flat if p < 0]),
+        "drifted-up": _bucket([p for p in flat if p >= 0]),
+    }
+
+
 # Time-of-day bands — minutes AFTER the 09:30 ET open at which the entry filled.
 # Motivated by the recurring high-confidence "open-drive fade": on 2026-07-10
 # (TSLA conf-82 BOTH, entered 09:31) and 2026-07-13 (NVDA conf-94 BOTH, entered
@@ -454,6 +481,14 @@ def compute_metrics(rows: list[dict]) -> dict:
     # by_exit_reason STOP bucket honest and measures IMP-013's effect over time.
     by_stop_prot = by_stop_protection(closed)
 
+    # By flatten outcome — the EOD_FLATTEN twin of by_stop_protection. An
+    # open-fade whose wide stop is never hit exits via EOD_FLATTEN (not STOP), so
+    # the by_stop_protection scorecard misses it; and the profitable up-drift
+    # cohort makes the EOD_FLATTEN bucket net-positive overall, masking the faded
+    # losers. Splitting by the sign of realized P&L surfaces that faded slice
+    # (2026-07-14 XOM: BOTH breakout faded to a -$49.78 flatten, no stop hit).
+    by_flatten = by_flatten_outcome(closed)
+
     # By time of day — minutes-after-open at entry. Tests the "skip the first N
     # minutes" open-fade gate candidate (see TIME_OF_DAY_BANDS): the STOP/loss
     # bleed is spread across the whole session and the earliest band also holds
@@ -480,6 +515,7 @@ def compute_metrics(rows: list[dict]) -> dict:
         "by_confidence_band": by_band,
         "by_exit_reason": by_exit,
         "by_stop_protection": by_stop_prot,
+        "by_flatten_outcome": by_flatten,
         "by_time_of_day": by_tod,
         "by_entry_extension": by_extension,
         "false_breakout_rate": fb_rate,
