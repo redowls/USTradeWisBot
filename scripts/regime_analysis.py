@@ -19,11 +19,14 @@ bar), so on the first bar of the session it reads a not-yet-complete bar — a s
 lookahead acceptable for a directional regime read, not a live gate. A live gate
 (a future IMP) must use only completed bars.
 
-The regime is measured under TWO proxies — SPY and QQQ (both EMA9 on 5-min
-bars) — so the review can see whether the gate's signal is robust to the proxy
-choice or an artefact of one index (IMP-011's queued "compare EMA9 vs QQQ/VWAP
-before any engine gate" step). If a single proxy swap flips a trade's regime,
-the gate is not yet trustworthy.
+The regime is measured under THREE proxies — SPY-EMA9, QQQ-EMA9, and SPY-VWAP
+(IMP-018) — so the review can see whether the gate's signal is robust to the
+proxy choice or an artefact of one definition (IMP-011's queued "compare EMA9 vs
+QQQ/VWAP before any engine gate" step). QQQ-EMA9 varies the index; SPY-VWAP is a
+genuinely DIFFERENT regime definition (the session volume-weighted fair-value
+line, not a trend EMA) now that index-EMA9 (IMP-015) and time-of-day (IMP-016)
+are both refuted. If a proxy swap flips a trade's regime, the gate is not yet
+trustworthy; the skip-bearish verdict must hold under all three.
 
 Usage:
   python -m scripts.regime_analysis                    # all-time
@@ -39,15 +42,35 @@ from datetime import date
 import pandas as pd
 
 from bot import analytics, config
-from bot.indicators import ema
+from bot.indicators import ema, session_vwap
 
-# Index proxies compared side by side (both EMA9 on 5-min bars). SPY is the
-# primary (analytics.INDEX_REGIME_SYMBOL); QQQ cross-checks proxy-robustness.
-PROXY_SYMBOLS = (analytics.INDEX_REGIME_SYMBOL, "QQQ")
+# Index proxies compared side by side. Each is (label, symbol, mode); the regime
+# is `index close vs a reference line` under classify_index_regime. SPY-EMA9 is
+# the primary (analytics.INDEX_REGIME_SYMBOL); QQQ-EMA9 cross-checks index choice;
+# SPY-VWAP (IMP-018) is a genuinely DIFFERENT regime definition — the session
+# volume-weighted fair-value line, not a trend EMA — since both EMA9 (IMP-015)
+# and time-of-day (IMP-016) were refuted as the ★ market-regime lever. The
+# skip-bearish verdict now requires support under ALL THREE proxies (stricter).
+PROXIES = (
+    ("SPY-EMA9", analytics.INDEX_REGIME_SYMBOL, "ema"),
+    ("QQQ-EMA9", "QQQ", "ema"),
+    ("SPY-VWAP", analytics.INDEX_REGIME_SYMBOL, "vwap"),
+)
 
 
-def _index_regime_by_trade(rows: list[dict], symbol: str) -> dict[int, str]:
-    """Tag each closed trade with `symbol`'s intraday regime at its entry minute."""
+def _reference_line(bars, mode: str):
+    """The regime reference series for `bars`: the short EMA (trend) or the
+    session-anchored VWAP (intraday fair value). classify_index_regime tags a
+    trade bullish when the index close is at/above this line."""
+    if mode == "vwap":
+        return session_vwap(bars)
+    return ema(bars["close"], analytics.INDEX_REGIME_EMA_SPAN)
+
+
+def _index_regime_by_trade(rows: list[dict], symbol: str,
+                           mode: str = "ema") -> dict[int, str]:
+    """Tag each closed trade with `symbol`'s intraday regime at its entry minute,
+    using either the EMA (`mode="ema"`) or session-VWAP (`mode="vwap"`) proxy."""
     if not rows:
         return {}
 
@@ -73,7 +96,7 @@ def _index_regime_by_trade(rows: list[dict], symbol: str) -> dict[int, str]:
         return {}
 
     spy = spy.sort_index()
-    spy_ema = ema(spy["close"], analytics.INDEX_REGIME_EMA_SPAN)
+    ref = _reference_line(spy, mode)
     idx = spy.index
 
     regime: dict[int, str] = {}
@@ -91,19 +114,19 @@ def _index_regime_by_trade(rows: list[dict], symbol: str) -> dict[int, str]:
             regime[tid] = analytics.REGIME_UNKNOWN
             continue
         price = spy["close"].iloc[pos]
-        ema_val = spy_ema.iloc[pos]
+        ref_val = ref.iloc[pos]
         regime[tid] = analytics.classify_index_regime(
             None if pd.isna(price) else float(price),
-            None if pd.isna(ema_val) else float(ema_val),
+            None if pd.isna(ref_val) else float(ref_val),
         )
     return regime
 
 
-def _print_proxy(res: dict, symbol: str) -> None:
+def _print_proxy(res: dict, label: str) -> None:
     """Print one proxy's regime buckets + the skip-bearish what-if."""
     buckets = res["buckets"]
 
-    print(f"\n[{symbol} close vs EMA{analytics.INDEX_REGIME_EMA_SPAN}]")
+    print(f"\n[{label}]")
     print(f"{'regime':9} {'trades':>6} {'win%':>6} {'total$':>10} {'exp$':>8} {'PF':>6}")
     for lbl in (analytics.REGIME_BULLISH, analytics.REGIME_BEARISH,
                 analytics.REGIME_UNKNOWN):
@@ -124,9 +147,8 @@ def _print(since=None) -> int:
     rows = analytics.load_closed_trades(since=since)
     print("=" * 72)
     print(f"USTradeWisBot — market-regime entry analysis ({label})")
-    print(f"(index close vs EMA{analytics.INDEX_REGIME_EMA_SPAN} on "
-          f"{config.BAR_TIMEFRAME} bars, at each entry; proxies: "
-          f"{', '.join(PROXY_SYMBOLS)})")
+    print(f"(index close vs its reference line on {config.BAR_TIMEFRAME} bars, at "
+          f"each entry; proxies: {', '.join(lbl for lbl, _, _ in PROXIES)})")
     print("=" * 72)
     if not rows:
         print("\nNo closed trades logged yet.")
@@ -135,15 +157,16 @@ def _print(since=None) -> int:
 
     regimes: dict[str, dict[int, str]] = {}
     results: dict[str, dict] = {}
-    for sym in PROXY_SYMBOLS:
-        regimes[sym] = _index_regime_by_trade(rows, sym)
-        results[sym] = analytics.by_market_regime(rows, regimes[sym])
-        _print_proxy(results[sym], sym)
+    for lbl, sym, mode in PROXIES:
+        regimes[lbl] = _index_regime_by_trade(rows, sym, mode)
+        results[lbl] = analytics.by_market_regime(rows, regimes[lbl])
+        _print_proxy(results[lbl], lbl)
 
-    # Proxy-robustness cross-check: how often SPY and QQQ agree on a trade's
-    # regime. A gate whose signal survives only one proxy is not trustworthy.
-    if len(PROXY_SYMBOLS) == 2:
-        a, b = PROXY_SYMBOLS
+    # Proxy-robustness cross-checks: how often the proxies agree on a trade's
+    # regime. A gate whose signal survives only one proxy is not trustworthy —
+    # the index-choice check (SPY vs QQQ, IMP-012) and the definition check
+    # (EMA9 vs VWAP on SPY, IMP-018).
+    for a, b in (("SPY-EMA9", "QQQ-EMA9"), ("SPY-EMA9", "SPY-VWAP")):
         agr = analytics.regime_proxy_agreement(regimes[a], regimes[b])
         print(f"\nProxy agreement ({a} vs {b}): {agr['agree']}/{agr['trades']} "
               f"({agr['agree_pct']:.1f}%); {agr['disagree']} disagree")

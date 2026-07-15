@@ -592,3 +592,81 @@ def test_compute_metrics_exposes_by_flatten_outcome():
     assert "by_flatten_outcome" in m
     assert m["by_flatten_outcome"]["faded"]["total_pl"] == -71.06
     assert m["by_flatten_outcome"]["drifted-up"]["total_pl"] == 18.18
+
+
+# --- IMP-018 (2026-07-15): SPY-VWAP as a third market-regime proxy -------------
+#
+# 2026-07-15 closed 2W/6L (-$252.01) — the worst day since June. The entire loss
+# was three high-confidence BOTH breakouts that faded from entry: NVDA (conf 84,
+# -$66.87 STOP), QQQ (conf 81, -$93.08 STOP) and ABNB (conf 86, -$91.26
+# EOD_FLATTEN-faded) = -$251.21, ~100% of the day. index-EMA9 (IMP-015) and
+# time-of-day (IMP-016) are refuted as the ★ market-regime lever; VWAP was the
+# named-but-untested proxy. session_vwap is the session-anchored VWAP line and
+# SPY-VWAP is now the third proxy the skip-bearish verdict must hold under.
+import pandas as pd
+
+from bot.indicators import session_vwap
+
+
+def _bar(ts, price, vol):
+    return {"open": price, "high": price, "low": price, "close": price, "volume": vol}
+
+
+def test_session_vwap_is_volume_weighted_and_running():
+    # Two bars in one session: bar1 @100 (typ 100) vol 100, bar2 @110 vol 300.
+    # VWAP1 = 100; VWAP2 = (100*100 + 110*300)/(100+300) = 43000/400 = 107.5.
+    idx = pd.to_datetime(["2026-07-15 09:30", "2026-07-15 09:35"])
+    df = pd.DataFrame([_bar(None, 100.0, 100), _bar(None, 110.0, 300)], index=idx)
+    v = session_vwap(df)
+    assert round(v.iloc[0], 4) == 100.0
+    assert round(v.iloc[1], 4) == 107.5
+
+
+def test_session_vwap_resets_each_session():
+    # A new calendar date restarts the cumulative sums (intraday, not cross-day).
+    idx = pd.to_datetime(["2026-07-14 15:50", "2026-07-15 09:30", "2026-07-15 09:35"])
+    df = pd.DataFrame([_bar(None, 200.0, 500),   # prior session, huge volume
+                       _bar(None, 100.0, 100),   # new session, first bar
+                       _bar(None, 120.0, 100)], index=idx)
+    v = session_vwap(df)
+    # 07-15's first bar must NOT be dragged toward 07-14's 200 -> it equals 100.
+    assert round(v.iloc[1], 4) == 100.0
+    assert round(v.iloc[2], 4) == 110.0   # (100+120)/2, both equal vol
+
+
+def test_session_vwap_no_divide_by_zero_on_zero_volume():
+    # A leading zero-volume bar yields NaN (never inf), so classify_index_regime
+    # tags it 'unknown' rather than fabricating a regime.
+    idx = pd.to_datetime(["2026-07-15 09:30", "2026-07-15 09:35"])
+    df = pd.DataFrame([_bar(None, 100.0, 0), _bar(None, 110.0, 200)], index=idx)
+    v = session_vwap(df)
+    assert pd.isna(v.iloc[0])
+    assert round(v.iloc[1], 4) == 110.0
+
+
+def test_skip_bearish_verdict_refuted_when_only_vwap_proxy_disagrees():
+    # SPY-EMA9 and QQQ-EMA9 would rule the gate IN (bearish a net loss, worse PF,
+    # adequate sample) but the new SPY-VWAP proxy shows bearish net-POSITIVE ->
+    # the gate is REFUTED because it must hold under ALL THREE proxies. This is
+    # the capital-protective value of adding VWAP: it can only make the gate
+    # harder to ship, never easier.
+    v = analytics.skip_bearish_gate_verdict({
+        "SPY-EMA9": _regime_result(1.60, 25, 0.55, -180.0),
+        "QQQ-EMA9": _regime_result(1.55, 26, 0.60, -150.0),
+        "SPY-VWAP": _regime_result(1.40, 24, 1.20, 62.0),   # bearish profitable
+    })
+    assert v["supported"] is False
+    assert "SPY-VWAP" in v["reason"]
+    assert v["per_proxy"]["SPY-VWAP"]["ok"] is False
+
+
+def test_skip_bearish_verdict_supported_needs_all_three_proxies():
+    # The gate ships only if SPY-EMA9, QQQ-EMA9 AND SPY-VWAP all agree bearish is
+    # a net-loss, worse-PF, adequate-sample regime.
+    v = analytics.skip_bearish_gate_verdict({
+        "SPY-EMA9": _regime_result(1.60, 25, 0.55, -180.0),
+        "QQQ-EMA9": _regime_result(1.55, 26, 0.60, -150.0),
+        "SPY-VWAP": _regime_result(1.50, 24, 0.58, -140.0),
+    })
+    assert v["supported"] is True
+    assert v["reason"] == "all proxies support skip-bearish"

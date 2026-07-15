@@ -785,3 +785,43 @@ None — market closed. Nothing to root-cause at the trade level.
 - **UNH** (−$39.33 full-1R STOP) and **META** (−$21.28 late fade-to-flatten) — low-conf MA open/midday faders; nothing name-specific, keep on the list.
 - **AMD** — BOTH breakout that IMP-013 rescued to a −$0.40 break-even scratch; behaved well. **GOOG** small green drift (+$18.18).
 - **Regime read for Wed 07-15:** a shallow −0.49% chop; some names drifted up (BAC/GOOG/AMD), some faded (XOM/UNH/META) — no clean directional tape. Semis mixed. Equity **$8,305.46 (−16.9%)**, **$805.46 above** the −25% ($7,500) flag — **protect it.** Track by_flatten_outcome (IMP-017), by_stop_protection (IMP-014), by_time_of_day (IMP-016) going forward.
+
+## 2026-07-15 — Daily Review
+
+### Stats
+- Trades: **8 closed (2W / 6L), win rate 25%.** **Worst day since 06-10.**
+- Net P&L: **−$252.01** (day −3.03%). Equity close **$8,053.42** (from $8,305.46; last_equity −$252.04, DB gross −$252.01 ties to the broker move to the ~penny). −19.5% YTD.
+- Avg winner **+$40.26** (META +60.68, NVDA#2 +19.83); avg loser **−$55.42** (QQQ/ABNB/NVDA/NFLX/AVGO/AMZN). Day profit factor 80.51 / 332.52 = **0.24**.
+- Exit reasons: **4 STOP** (NVDA, QQQ, AVGO, NFLX), **3 EOD_FLATTEN** (AMZN −1.99, ABNB −91.26, NVDA#2 +19.83), **1 TAKE_PROFIT** (META).
+- Circuit breaker NOT tripped (−3.03% << −8.0% halt). Service active all session. **Book flat by close (8 in / 8 out) — no overnight carry.** No 422s, no rejected stop-replaces (IMP-013 clean).
+
+### Trade-by-trade review
+| # | Sym | Type/Conf | Entry (ET) | Exit | P&L | Root cause |
+|---|-----|-----------|-----------|------|-----|-----------|
+| NVDA | BOTH 84.1 | 09:41 @211.89 | 10:24 STOP @210.13 | **−$66.87** | High-conf breakout, filled ~0.7% above signal → tight 0.82% eff. stop, **faded from entry, never green** (IMP-013 can't arm). |
+| QQQ | BOTH 80.8 | 09:41 @721.37 | 12:05 STOP @712.91 | **−$93.08** | High-conf index breakout, **faded slowly to full-1R stop over 2.5h**, never reached +0.5R. Day's biggest loss. |
+| AVGO | MA 61.4 | 09:49 @396.52 | 10:25 STOP @390.30 | −$37.32 | Low-conf MA breakout, full-1R stop in 36 min. |
+| META | MA 60.9 | 10:25 @668.36 | 11:10 **TAKE_PROFIT** @683.53 | **+$60.68** | The one clean winner — MA signal ran to TP in 45 min. |
+| NFLX | MA 60.1 | 10:36 @74.73 | 15:05 STOP @73.56 | −$42.00 | Low-conf MA, drifted then stopped late-session (full-1R). |
+| AMZN | MA 60.1 | 11:17 @255.23 | 15:56 EOD_FLATTEN @255.03 | −$1.99 | Near-flat drift to flatten. Immaterial. |
+| ABNB | BOTH 85.7 | 12:06 @150.15 | 15:56 EOD_FLATTEN @148.46 | **−$91.26** | **High-conf BOTH breakout that faded from entry, wide 1.4% stop never hit → escaped into flatten (IMP-017 faded bucket).** 2nd biggest loss. |
+| NVDA | BOTH 77.5 | 15:07 @211.70 | 15:56 EOD_FLATTEN @212.49 | +$19.83 | Late (15:07) re-entry, small green drift, flattened. |
+
+### What worked / what didn't
+- **Worked:** Risk controls held perfectly — no halt (−3.03% vs −8% cap), book flat by close (8/8, no naked overnight), 0 rejected stop-replaces, all fills ≤~0.7% off signal (no false stale-signal skips). META's TP (+$60.68) and IMP-013's machinery were clean; NVDA#2 flattened green.
+- **Didn't — the headline:** the day's **entire** loss is the recurring **high-confidence BOTH open-fade** leak — **NVDA (84) −$66.87 + QQQ (81) −$93.08 + ABNB (86) −$91.26 = −$251.21 ≈ 100% of the −$252.01**. All three broke out, filled at/near their level, then **faded straight from entry, never reaching +0.5R** so IMP-013 could not arm (by design). This is the SAME pattern as 07-10 TSLA, 07-13 NVDA, 07-14 XOM — the residual full-1R STOP + EOD_FLATTEN-faded leak (all-time STOP full-1R −$3,873 / PF 0.01; EOD_FLATTEN-faded −$621 / PF 0.00). No per-trade discriminator (confidence, volume, extension, time-of-day) separates them — all refuted.
+- The two MA losers (AVGO −37.32, NFLX −42.00) are the ordinary least-bad MA bucket (all-time PF 0.88); not the concentration.
+
+### Lessons & improvement candidates (ranked)
+1. **[SHIPPED IMP-018]** The ★ market-regime lever's last-named-but-untested proxy — **SPY session-VWAP** — built as a third regime proxy in `scripts/regime_analysis.py` and fed through IMP-015's machine verdict. **Critically capital-protective:** on today's window the two EMA proxies (SPY-EMA9 & QQQ-EMA9) both flipped bearish-net-negative (today's NVDA/QQQ faders tagged EMA-bearish), so the **EMA-only verdict would have flipped to SUPPORTED** — i.e. a naive read would have green-lit shipping the skip-bearish gate. Adding VWAP keeps it **REFUTED**: under SPY-VWAP the bearish bucket is *profitable* (+$101.86, PF 1.14 > bullish 1.05), and SPY-EMA9 vs SPY-VWAP disagree on **33% of trades** (vs only 18% for SPY-vs-QQQ) — the regime *definition* matters more than the index, so the gate is definition-fragile and must not ship. See below.
+2. The residual open-fade leak (full-1R + flatten-faded) remains the core drawdown driver, and **no regime proxy tried (EMA9 index, time-of-day, now VWAP) cleanly isolates it** — today NVDA/QQQ were EMA-*bullish* (an EMA gate wouldn't even skip them) yet VWAP-bearish, and VWAP-bearish is net-profitable. The lever now needs a *fundamentally different* signal (per-symbol breakout-quality / opening-range hold), tested via replay — **not** a post-close hack. Defer; keep measuring.
+3. IMP-013 continues to correctly NOT rescue never-green faders (by design). No action; its scope is trades that reach +0.5R.
+
+### Notes for pre-market research
+- **NVDA** — TWO trades today: a conf-84 BOTH that open-faded to a full-1R STOP (−$66.87) AND a conf-77 late (15:07) re-entry that flattened green (+$19.83). Net −$47.04. **One open-fade, not a name defect** (liquid mega-cap, strategy-fit) — **no park.** The open-fade is the regime leak, not NVDA-specific.
+- **QQQ** — conf-81 index-ETF BOTH breakout that **faded slowly to its stop over 2.5h (−$93.08, day's biggest loss)**. The index itself faded intraday — a broad-tape chop signal, note it.
+- **ABNB** — conf-86 BOTH breakout that **faded from entry into the flatten (−$91.26, wide stop never hit)** — the 2nd clean IMP-017 fade-to-flatten instance in two days (XOM 07-14, ABNB 07-15). High confidence did NOT protect. No park (liquid large-cap); it is the regime open-fade leak.
+- **META** — the day's only winner (MA conf-61 → TP +$60.68); behaved well, keep.
+- **AVGO / NFLX** — low-conf MA full-1R STOPs (−37.32 / −42.00); ordinary MA-bucket losers, no name action. **AMZN** near-flat flatten drift (−1.99), now 0W over recent window — softest small-sample name, watch for a chronic-loser pattern (still a liquid large-cap, no trigger).
+- **⚠️ TSM & UNH REPORT TOMORROW (Thu 07-16), both pre-open (BMO)** — verify exact timing and apply the earnings-park rule (park only if a report shifts to *during* market hours; BMO reporters stay tradable but gap/volatile). Re-scan the full intraday-earnings calendar (NFLX Q2 = 07-16 AMC).
+- **Regime read for Thu 07-16:** today the SPY intraday tape faded (EMA proxies turned bearish-negative) but **VWAP-bearish stayed profitable** — the index-regime gate is REFUTED under the new 3-proxy test; **do NOT expect any index-regime filter to catch the high-conf open-fades** (NVDA/QQQ were even EMA-*bullish*). The lever is a *different* signal (per-symbol opening-range / breakout-quality via replay), not a watchlist action. Equity **$8,053.42 (−19.5%)**, **$553.42 above** the −25% ($7,500) flag — **cushion cut hard by today's −$252; protect it aggressively into the 07-16 earnings.**

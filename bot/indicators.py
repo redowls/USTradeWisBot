@@ -27,6 +27,27 @@ def _wilder(series: pd.Series, period: int) -> pd.Series:
     return series.ewm(alpha=1.0 / period, adjust=False).mean()
 
 
+def session_vwap(df: pd.DataFrame) -> pd.Series:
+    """Session-anchored VWAP: cumulative (typical price × volume) / cumulative
+    volume, RESET each trading day.
+
+    Typical price = (high + low + close) / 3. The cumulative sums restart at the
+    first bar of every calendar date (grouping on the ET DatetimeIndex), so the
+    value is the running volume-weighted average price *within* the session — the
+    classic intraday fair-value line, not a cross-session average. NaN where a
+    session's cumulative volume is still 0 (never divides by zero). Pure — no I/O.
+
+    Used as an index-regime proxy (IMP-018): price above session VWAP = bullish
+    intraday, a genuinely different regime definition from the EMA proxies
+    (index-EMA9 refuted IMP-015, time-of-day refuted IMP-016).
+    """
+    tp = (df["high"] + df["low"] + df["close"]) / 3.0
+    day = df.index.normalize()
+    cum_pv = (tp * df["volume"]).groupby(day).cumsum()
+    cum_vol = df["volume"].groupby(day).cumsum()
+    return cum_pv / cum_vol.where(cum_vol != 0)
+
+
 def true_range(df: pd.DataFrame) -> pd.Series:
     """True Range: max(H-L, |H-prevC|, |L-prevC|)."""
     prev_close = df["close"].shift(1)

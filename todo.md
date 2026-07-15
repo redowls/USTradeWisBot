@@ -325,6 +325,18 @@ Ordered by expected impact; each item needs replay validation before code.
    definition, not a bigger EMA9 sample** — test VWAP and "skip first N min on a
    red open" as proxies (step (b), still open); only a definition that earns
    SUPPORTED under the verdict graduates to a replay-validated engine gate.
+   **→ UPDATE (IMP-018, 2026-07-15): VWAP proxy built (step (b) partly done) —
+   gate STILL REFUTED, and adding it PREVENTED a false SUPPORTED.** Added
+   `bot/indicators.session_vwap` + a 3rd proxy `SPY-VWAP` to regime_analysis;
+   the verdict now runs over SPY-EMA9/QQQ-EMA9/SPY-VWAP. On the 07-15 window the
+   two EMA proxies both turned bearish-net-NEGATIVE (SPY −$139.16/PF 0.79; QQQ
+   −$222.70/PF 0.74) so an **EMA-only verdict computes SUPPORTED** — but
+   **SPY-VWAP bearish is PROFITABLE (+$101.86/PF 1.14 > bullish 1.05)** → 3-proxy
+   verdict REFUTED. SPY-EMA9 vs SPY-VWAP disagree on 33% of trades (vs 18%
+   SPY-vs-QQQ): the regime *definition* is more fragile than the index choice, so
+   no index-regime proxy can ship. **Next: a per-symbol signal (opening-range /
+   breakout-quality hold), replay-validated — index-regime proxies are exhausted
+   (EMA9, time-of-day, VWAP all fail to isolate the high-conf open-fades).**
 
 0a. ~~**EOD-flatten P&L accuracy**~~ **[SHIPPED IMP-003, 2026-06-22]** — on 06-22
    SPY/QQQ/TSM were each booked at exit==entry ($0.00) at the flatten while the
