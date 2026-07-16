@@ -337,6 +337,33 @@ Ordered by expected impact; each item needs replay validation before code.
    no index-regime proxy can ship. **Next: a per-symbol signal (opening-range /
    breakout-quality hold), replay-validated — index-regime proxies are exhausted
    (EMA9, time-of-day, VWAP all fail to isolate the high-conf open-fades).**
+   **→ UPDATE (IMP-019, 2026-07-16): the per-symbol signal is FOUND — entry
+   distance from the symbol's OWN session VWAP at entry is the first non-refuted
+   discriminator.** `bot/replay.py` now computes each fill's % vs its session VWAP
+   (`session_vwap`/`bars_open_to_entry`/`vwap_distance_rows`/`bucket_vwap_distance`)
+   and `scripts/replay.py` prints the band table. On the 63 recent trades with bars
+   it is **cleanly monotonic**: `<-0.25%` 57.1% win +$19.07 · `-0.25..0%` 50.0%
+   +$22.04 · `0..+0.25%` 50.0% −$10.33 · `+0.25..+0.50%` 38.5% −$20.13 · `≥+0.50%`
+   31.6% −$13.72. The sign flips at VWAP: fills at/below the session VWAP are
+   net-positive; fills stretched above it fade. **This directly justifies the gate
+   proposal below — see ★★.** (Distinct from IMP-018's REFUTED SPY-VWAP *index
+   regime*: this is the *symbol's own* VWAP as a per-trade entry-quality filter.)
+
+★★ **(PROPOSED 2026-07-16, IMP-019 — NEEDS HUMAN APPROVAL: entry-logic change)
+   VWAP entry-quality gate.** IMP-019's replay diagnostic shows fills stretched
+   ≥~+0.25% above the symbol's own session VWAP at entry are net-negative
+   (win% 32–38%, exp −$14 to −$20) while fills at/below VWAP are net-positive
+   (win% 50–57%, exp +$19 to +$22), cleanly monotonic across 63 recent trades.
+   Proposed change (a pure *tightening* — skips entries, never widens risk): in
+   `engine.consider_entries`, skip (or deprioritize) a candidate whose fill/last
+   price is more than ~+0.25–0.50% above the current session VWAP. **DO NOT SHIP
+   WITHOUT SIGN-OFF** — this is an entry-gate change (ground-rule: entry-gate
+   changes need explicit human approval). **Pre-ship validation required:** (1) add
+   a `--vwap-skip PCT` what-if to `scripts/replay.py` and confirm the P&L delta
+   clears the simulation noise budget (baseline sum|error|); (2) confirm it removes
+   the above-VWAP open-fade losers WITHOUT killing the at/below-VWAP winners on a
+   held-out window; (3) pick the threshold from the band edges (+0.25% is where the
+   sign flips), not curve-fit. Only then wire the engine gate.
 
 0a. ~~**EOD-flatten P&L accuracy**~~ **[SHIPPED IMP-003, 2026-06-22]** — on 06-22
    SPY/QQQ/TSM were each booked at exit==entry ($0.00) at the flatten while the

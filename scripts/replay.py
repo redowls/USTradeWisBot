@@ -51,8 +51,23 @@ def main(argv: list[str]) -> int:
     for be in [0.5, 1.0, *extra_be]:
         result = replay.replay_trades(trades, all_bars, breakeven_at_r=be)
         _print_run(f"breakeven at +{be}R", result, baseline["abs_error"])
+    print()
+    _print_vwap_bands(trades, all_bars)
     print("=" * 72)
     return 0
+
+
+def _print_vwap_bands(trades: list[dict], all_bars: dict) -> None:
+    """★ open-fade lever: does entry stretch above the session VWAP predict fades?"""
+    rows = replay.vwap_distance_rows(trades, all_bars)
+    bands = replay.bucket_vwap_distance(rows)
+    print(f"By entry distance from session VWAP ({len(rows)} trades with bars):")
+    print("  tests the open-fade hypothesis — fills stretched above the session")
+    print("  volume-weighted price should fade back; near/below VWAP should hold")
+    print(f"  {'band':>16}{'trades':>8}{'win%':>7}{'total$':>11}{'exp$':>9}")
+    for b in bands:
+        print(f"  {b['label']:>16}{b['n']:>8}{b['win_pct']:>7.1f}"
+              f"{b['total']:>11.2f}{b['exp']:>9.2f}")
 
 
 def _is_float(text: str) -> bool:

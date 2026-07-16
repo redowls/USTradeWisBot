@@ -1,9 +1,16 @@
 """Unit tests for bot/replay.py — the pure simulation core, on synthetic bars
 and on today's recorded WMT scenario (trade 54, 2026-06-11)."""
 
+import datetime
+
 import pandas as pd
 
-from bot.replay import simulate_bracket
+from bot.replay import (
+    bucket_vwap_distance,
+    session_vwap,
+    simulate_bracket,
+    vwap_distance_rows,
+)
 
 
 def _bars(rows):
@@ -72,3 +79,50 @@ def test_mfe_mae_tracking():
     assert sim.mfe == 4.0
     assert sim.mae == -1.0
     assert sim.exit_reason == "EOD_FLATTEN"
+
+
+# --- Entry-vs-VWAP diagnostic (IMP-019) --------------------------------------
+
+def _ohlcv(rows):
+    """rows = [(high, low, close, volume), ...] -> full OHLCV DataFrame (ET)."""
+    return pd.DataFrame(
+        [{"high": h, "low": lo, "close": c, "volume": v} for h, lo, c, v in rows],
+        index=pd.date_range("2026-07-16 09:30", periods=len(rows),
+                            freq="5min", tz="America/New_York"),
+    )
+
+
+def test_session_vwap_is_volume_weighted():
+    # bar1 typical=100 (vol 100); bar2 typical=102 (vol 300)
+    # VWAP = (100*100 + 102*300) / 400 = 101.5
+    bars = _ohlcv([(101, 99, 100, 100), (103, 101, 102, 300)])
+    assert session_vwap(bars) == 101.5
+
+
+def test_session_vwap_none_without_volume():
+    assert session_vwap(_ohlcv([(101, 99, 100, 0)])) is None
+    assert session_vwap(None) is None
+
+
+# Today's AMZN (10:26 entry 255.38, full-1R STOP -$37.25) filled above its
+# session VWAP — the open-fade case IMP-019 exists to bucket. AAPL (09:46 entry
+# 329.27, +$32.32) held. A flat-VWAP synthetic reproduces both signs.
+def test_vwap_distance_rows_and_bucketing():
+    flat = _ohlcv([(100, 100, 100, 100)] * 3)  # session VWAP == 100.0
+    all_bars = {"AMZN": flat, "AAPL": flat}
+    trades = [
+        dict(trade_id=1, symbol="AMZN", entry_price=100.5, realized_pl=-37.25,
+             entry_time=datetime.datetime(2026, 7, 16, 9, 45)),   # +0.50% above VWAP
+        dict(trade_id=2, symbol="AAPL", entry_price=99.8, realized_pl=32.32,
+             entry_time=datetime.datetime(2026, 7, 16, 9, 45)),   # -0.20% below VWAP
+    ]
+    rows = vwap_distance_rows(trades, all_bars)
+    by_id = {r["trade_id"]: r for r in rows}
+    assert by_id[1]["dist_pct"] == 0.5 and by_id[1]["win"] is False
+    assert by_id[2]["dist_pct"] == -0.2 and by_id[2]["win"] is True
+
+    bands = bucket_vwap_distance(rows)
+    top = bands[-1]                       # ">= +0.50%" band holds the AMZN fade
+    assert top["n"] == 1 and top["total"] == -37.25 and top["win_pct"] == 0.0
+    near = next(b for b in bands if b["label"] == "-0.25..+0.00%")
+    assert near["n"] == 1 and near["total"] == 32.32

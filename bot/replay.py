@@ -178,3 +178,106 @@ def replay_trades(
 def load_all_bars(trades: list[dict]) -> dict[str, pd.DataFrame]:
     symbols = sorted({t["symbol"] for t in trades})
     return get_bars_for_symbols(symbols, n_bars=REPLAY_N_BARS)
+
+
+# --- Entry-vs-VWAP diagnostic (IMP-019) --------------------------------------
+# The recurring drawdown driver is the "open-fade" leak: fills that never reach
+# +0.5R (so IMP-013's breakeven never arms) and bleed the full 1R. Every
+# per-trade discriminator tried so far — confidence, extension, time-of-day,
+# index-EMA / SPY-VWAP regime proxies (IMP-016/018) — has been REFUTED as a
+# separator. The one lever named repeatedly but never actually measured is the
+# fill's distance from the symbol's OWN session VWAP at entry: the hypothesis is
+# that fills stretched well above VWAP mean-revert (fade), while fills near/below
+# hold. This turns that untested intuition into a recorded-data table so it can
+# be confirmed or refuted like every other proxy — no risk/entry logic changes.
+
+# Entry-price bands relative to session VWAP, in %. Ordered edges; the tool
+# reports (-inf, e0), [e0, e1), ... [eN, +inf).
+VWAP_DIST_EDGES = (-0.25, 0.0, 0.25, 0.5)
+
+
+def session_vwap(bars: pd.DataFrame | None) -> float | None:
+    """Volume-weighted typical price over the given bars.
+
+    Typical price = (high + low + close) / 3, weighted by volume. Returns None
+    when there is no bar or no traded volume. Pure: DataFrame in, number out.
+    """
+    if bars is None or bars.empty:
+        return None
+    typical = (bars["high"] + bars["low"] + bars["close"]) / 3.0
+    vol = bars["volume"].astype(float)
+    denom = float(vol.sum())
+    if denom <= 0:
+        return None
+    return float((typical * vol).sum() / denom)
+
+
+def bars_open_to_entry(
+    all_bars: dict[str, pd.DataFrame], trade: dict
+) -> pd.DataFrame | None:
+    """Entry-day session bars from the open through the entry bar (inclusive)."""
+    df = all_bars.get(trade["symbol"])
+    if df is None or df.empty:
+        return None
+    day = trade["entry_time"].strftime("%Y-%m-%d")
+    entry_hm = trade["entry_time"].strftime("%H:%M")
+    days = df.index.strftime("%Y-%m-%d")
+    hm = df.index.strftime("%H:%M")
+    window = df[(days == day) & (hm <= entry_hm)]
+    return window if not window.empty else None
+
+
+def vwap_distance_rows(
+    trades: list[dict], all_bars: dict[str, pd.DataFrame]
+) -> list[dict]:
+    """Per-trade entry-price distance from the session VWAP at entry (%)."""
+    rows: list[dict] = []
+    for t in trades:
+        vwap = session_vwap(bars_open_to_entry(all_bars, t))
+        if vwap is None or vwap <= 0:
+            continue
+        entry = float(t["entry_price"])
+        pl = float(t["realized_pl"])
+        rows.append({
+            "trade_id": t["trade_id"],
+            "symbol": t["symbol"],
+            "dist_pct": round((entry - vwap) / vwap * 100.0, 3),
+            "pl": pl,
+            "win": pl > 0,
+        })
+    return rows
+
+
+def _fmt_vwap_band(lo: float, hi: float) -> str:
+    if lo == float("-inf"):
+        return f"< {hi:+.2f}%"
+    if hi == float("inf"):
+        return f">= {lo:+.2f}%"
+    return f"{lo:+.2f}..{hi:+.2f}%"
+
+
+def bucket_vwap_distance(
+    rows: list[dict], edges: tuple[float, ...] = VWAP_DIST_EDGES
+) -> list[dict]:
+    """Group vwap_distance_rows into ordered bands with win%/total/expectancy."""
+    bounds: list[tuple[float, float]] = []
+    lo = float("-inf")
+    for e in edges:
+        bounds.append((lo, e))
+        lo = e
+    bounds.append((lo, float("inf")))
+
+    out: list[dict] = []
+    for lo, hi in bounds:
+        band = [r for r in rows if lo <= r["dist_pct"] < hi]
+        n = len(band)
+        total = round(sum(r["pl"] for r in band), 2)
+        wins = sum(1 for r in band if r["win"])
+        out.append({
+            "label": _fmt_vwap_band(lo, hi),
+            "n": n,
+            "win_pct": round(100.0 * wins / n, 1) if n else 0.0,
+            "total": total,
+            "exp": round(total / n, 2) if n else 0.0,
+        })
+    return out

@@ -825,3 +825,41 @@ None — market closed. Nothing to root-cause at the trade level.
 - **AVGO / NFLX** — low-conf MA full-1R STOPs (−37.32 / −42.00); ordinary MA-bucket losers, no name action. **AMZN** near-flat flatten drift (−1.99), now 0W over recent window — softest small-sample name, watch for a chronic-loser pattern (still a liquid large-cap, no trigger).
 - **⚠️ TSM & UNH REPORT TOMORROW (Thu 07-16), both pre-open (BMO)** — verify exact timing and apply the earnings-park rule (park only if a report shifts to *during* market hours; BMO reporters stay tradable but gap/volatile). Re-scan the full intraday-earnings calendar (NFLX Q2 = 07-16 AMC).
 - **Regime read for Thu 07-16:** today the SPY intraday tape faded (EMA proxies turned bearish-negative) but **VWAP-bearish stayed profitable** — the index-regime gate is REFUTED under the new 3-proxy test; **do NOT expect any index-regime filter to catch the high-conf open-fades** (NVDA/QQQ were even EMA-*bullish*). The lever is a *different* signal (per-symbol opening-range / breakout-quality via replay), not a watchlist action. Equity **$8,053.42 (−19.5%)**, **$553.42 above** the −25% ($7,500) flag — **cushion cut hard by today's −$252; protect it aggressively into the 07-16 earnings.**
+
+---
+
+## 2026-07-16 — Daily Review
+
+### Stats
+- Trades: 4 closed (2W / 2L), win rate 50%.
+- Net P&L: **−$2.69** (day −0.033%). Equity close **$8,050.68** (from $8,053.37 open). A flat recovery day after 07-15's −$252.01.
+- Avg winner +$18.92 (AAPL +32.32, WMT +5.52); avg loser −$20.27 (AMZN −37.25, GOOG −3.28).
+- Profit factor (day): 37.84 / 40.53 = **0.93** (near-scratch).
+- Circuit breaker NOT tripped (−0.03% << −8.0% halt). Service active all session, no errors/exceptions. **0 open positions at close — Alpaca fully reconciles (equity $8,050.68, 4 buys GOOG/AAPL/AMZN/WMT all match DB, no overnight leak).**
+- Exit reasons: 2 STOP (GOOG, AMZN), 2 EOD_FLATTEN (AAPL, WMT).
+
+### Trade-by-trade review
+| # | Sym | Entry (ET) | Exit (ET) | Conf | Exit | P&L | Root cause |
+|---|-----|-----------|-----------|------|------|-----|-----------|
+| — | GOOG | 09:39:06 @370.997 | 10:55 @370.88 | 92.0 | STOP | **−$3.28** | Genuine breakout (brk=1.0, +0.10% ext), reached +0.5R → **IMP-013 armed break-even**, faded back and stopped at ~entry. A scratch, **not** a full-1R loss (would have been ~−$146). IMP-013 working exactly as designed. |
+| — | AAPL | 09:46:39 @329.27 | 15:56 @333.31 | 61.6 | EOD_FLATTEN | **+$32.32** | Non-breakout MA/value entry (brk=0.0, broke_level=None), drifted up steadily, captured green into flatten. Day's best. |
+| — | AMZN | 10:26:36 @255.38 | 15:17 @251.66 | 61.5 | STOP | **−$37.25** | Non-breakout MA/value entry (brk=0.0), faded from entry, never reached +0.5R (IMP-013 could not arm), took the full 1R stop (dist 1.45% ≈ ATR floor). Day's only real loss. **AMZN now 0W5** over the recent window. |
+| — | WMT | 10:55:58 @114.56 | 15:56 @114.80 | 61.1 | EOD_FLATTEN | +$5.52 | Non-breakout MA/value entry, minor drift-up into flatten. |
+
+### What worked / what didn't
+- **Worked:** IMP-013 rescued GOOG — a high-conf (92) breakout that faded reached +0.5R first, armed the break-even stop, and exited at a −$3.28 scratch instead of a ~−$146 full-1R loss. This is the mechanism doing its job. Risk controls all held; 0 overnight; broker/DB reconcile cleanly.
+- **Didn't:** AMZN was the whole day's loss — a non-breakout momentum/value entry that faded straight from entry and took the full 1R stop without ever reaching +0.5R (so IMP-013 by design cannot help). Same open-fade signature as the recurring leak, just on a low-conf MA entry rather than a high-conf BOTH.
+- 3 of 4 fills were non-breakout (brk=0.0) MA/value entries — 2 small winners + 1 loser; the least-bad bucket (all-time MA PF 0.88), net roughly scratch. Nothing to change there today.
+
+### Lessons & improvement candidates (ranked)
+1. **[SHIPPED IMP-019]** Finally *measured* the ★ open-fade lever per-trade: the fill's distance from the symbol's **own session VWAP at entry**. Every prior discriminator (confidence, extension, time-of-day, index-EMA/SPY-VWAP *regime*) was REFUTED — this one is **not**. On the 63 recent trades with bars the signal is **cleanly monotonic**: fills at/below session VWAP win 50–57% (exp **+$19 to +$22**), fills stretched ≥+0.25% above VWAP win 31–38% (exp **−$14 to −$20**). The break is right at VWAP (0.00%). Today's AMZN full-1R fade was an above-VWAP fill; the winners AAPL/WMT held near/below. Shipped as a `scripts/replay.py` diagnostic table (+ pure `bot/replay.py` functions + unit tests). This is the first per-trade separator of the open-fade leak — but acting on it (a VWAP entry-quality gate) is an **entry-logic change → proposed in `todo.md` for human approval**, not shipped silently.
+2. Residual open-fade leak (full-1R + flatten-faded) remains the core drawdown driver; IMP-019 now gives a candidate gate to test it in replay before touching live entry logic. Defer the gate itself to human sign-off.
+3. IMP-013 continues to correctly rescue only trades that reach +0.5R (GOOG today) and correctly does NOT rescue never-green faders (AMZN today). Working as designed; no action.
+
+### Notes for pre-market research
+- **AMZN — now 0W5** over the recent window (today −$37.25, a full-1R open-fade stop). This is the softest small-sample name and the pre-market chronic-loser watch flagged 07-15/07-16. **Still a liquid large-cap, strategy-fit; no structural defect — the losses are the above-VWAP open-fade regime, not a name flaw.** No park trigger matured yet, but **if AMZN takes another full-1R fade tomorrow consider a park decision.**
+- **GOOG** — conf-92 breakout that faded but was scratched by IMP-013 (+0.5R reached). Behaved fine; the mechanism protected it. Keep.
+- **AAPL / WMT** — quiet non-breakout MA/value drift-up winners; no action, both fine.
+- **★ Open-fade lever update:** IMP-019 found the **first non-refuted per-trade discriminator** — entry distance from the symbol's own session VWAP. Fills ≥+0.25% above VWAP are net-negative; fills at/below VWAP are net-positive. A **VWAP entry-quality gate** (skip/deprioritize fills stretched above session VWAP) is now proposed in `todo.md` for human approval — do NOT treat as shipped; it is an entry-logic change awaiting sign-off. Run `python -m scripts.replay` for the live band table.
+- **NFLX reported AMC today (07-16) → it will gap Fri 07-17** — treat with extra caution (wide post-earnings ranges; no overnight risk for an EOD-flatten bot). Re-scan the intraday-earnings calendar and park any on-list name reporting *during* market hours.
+- **TSM/UNH** both printed pre-open today (BMO, not parked); note whether TSM lifts/fades the semi complex. Equity **$8,050.68 (−19.5%)**, **$550.68 above** the −25% ($7,500) flag — cushion essentially flat on the day; protect it.
