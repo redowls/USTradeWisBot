@@ -281,3 +281,46 @@ def bucket_vwap_distance(
             "exp": round(total / n, 2) if n else 0.0,
         })
     return out
+
+
+def vwap_skip_whatif(rows: list[dict], threshold_pct: float) -> dict:
+    """What-if for the proposed VWAP entry-quality gate (todo.md ★★).
+
+    Given the per-trade rows from ``vwap_distance_rows`` (already restricted to
+    the gate-evaluable universe: closed trades with session bars), simulate
+    *skipping* every entry filled more than ``threshold_pct`` above its session
+    VWAP and keeping the rest. This is a pure entry-SKIP what-if, so ``delta``
+    (= −skipped_pl, the P&L the book improves by not taking those trades) is
+    the EXACT recorded realized P&L of the removed trades — there is no fill
+    simulation and therefore no per-trade error. Compare ``abs(delta)`` to the
+    replay baseline ``sum|error|`` (the noise budget) only as a materiality
+    bar: a delta that clears it comfortably means the effect is a real signal,
+    not a marginal artefact worth chasing.
+
+    Trades with no bars / no VWAP are not in ``rows`` at all (fail-open — the
+    eventual engine gate would likewise never skip on missing VWAP), so this
+    measures only what the gate could actually have acted on.
+    """
+    kept = [r for r in rows if r["dist_pct"] <= threshold_pct]
+    skipped = [r for r in rows if r["dist_pct"] > threshold_pct]
+
+    def _pl(band: list[dict]) -> float:
+        return round(sum(r["pl"] for r in band), 2)
+
+    def _win_pct(band: list[dict]) -> float:
+        return round(100.0 * sum(1 for r in band if r["win"]) / len(band), 1) \
+            if band else 0.0
+
+    skipped_pl = _pl(skipped)
+    return {
+        "threshold_pct": threshold_pct,
+        "n_total": len(rows),
+        "n_kept": len(kept),
+        "n_skipped": len(skipped),
+        "actual_pl": _pl(rows),
+        "kept_pl": _pl(kept),
+        "skipped_pl": skipped_pl,
+        "delta": round(-skipped_pl, 2),
+        "kept_win_pct": _win_pct(kept),
+        "skipped_win_pct": _win_pct(skipped),
+    }

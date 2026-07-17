@@ -364,6 +364,18 @@ Ordered by expected impact; each item needs replay validation before code.
    the above-VWAP open-fade losers WITHOUT killing the at/below-VWAP winners on a
    held-out window; (3) pick the threshold from the band edges (+0.25% is where the
    sign flips), not curve-fit. Only then wire the engine gate.
+   **→ STEP (1) DONE (IMP-020, 2026-07-17): the P&L delta CLEARS the noise budget.**
+   `scripts/replay.py --vwap-skip PCT` (+ pure `bot/replay.vwap_skip_whatif`) now
+   simulates the skip. On the 61 gate-evaluable trades (noise budget $55.81):
+   **skip >+0.25% → keep 27 (+$78.49, 44.4% win) / skip 34 (−$688.26, 29.4% win),
+   delta +$688.26 (~12× the budget) — the kept book flips NET-POSITIVE**; skip
+   >+0.50% delta +$426.59; skip >+1.0% delta +$83.23. +0.25% (the sign-flip band
+   edge) is the only threshold that turns the kept book positive → not curve-fit.
+   Today (07-17, 0W/5L −$211.48) added 5 more above-VWAP faders (all ≥+0.50%),
+   growing the sample. **Gate now ESCALATED for human sign-off.** Remaining before
+   any engine change: step (2) confirm on a held-out window (skipping removes the
+   above-VWAP losers without killing at/below-VWAP winners), step (3) fix the
+   threshold at +0.25%. Do NOT wire `engine.consider_entries` without approval.
 
 0a. ~~**EOD-flatten P&L accuracy**~~ **[SHIPPED IMP-003, 2026-06-22]** — on 06-22
    SPY/QQQ/TSM were each booked at exit==entry ($0.00) at the flatten while the

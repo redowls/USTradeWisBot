@@ -10,6 +10,7 @@ from bot.replay import (
     session_vwap,
     simulate_bracket,
     vwap_distance_rows,
+    vwap_skip_whatif,
 )
 
 
@@ -126,3 +127,45 @@ def test_vwap_distance_rows_and_bucketing():
     assert top["n"] == 1 and top["total"] == -37.25 and top["win_pct"] == 0.0
     near = next(b for b in bands if b["label"] == "-0.25..+0.00%")
     assert near["n"] == 1 and near["total"] == 32.32
+
+
+# Today's (2026-07-17, 0W/5L −$211.48) five real fills, ALL above session VWAP:
+# CRM +0.68% −55.65 · MU +3.66% −0.35 · UNH +0.65% −40.02 · AMD +3.82% −115.32 ·
+# AAPL +0.51% −0.14. The VWAP-skip what-if (pre-ship validation for the proposed
+# ★★ gate, todo.md) must remove exactly the trades above the threshold and report
+# an EXACT delta (recorded P&L of the skipped trades, no fill simulation).
+TODAY_VWAP_ROWS = [
+    dict(trade_id=167, symbol="CRM", dist_pct=0.68, pl=-55.65, win=False),
+    dict(trade_id=168, symbol="MU", dist_pct=3.66, pl=-0.35, win=False),
+    dict(trade_id=169, symbol="UNH", dist_pct=0.65, pl=-40.02, win=False),
+    dict(trade_id=170, symbol="AMD", dist_pct=3.82, pl=-115.32, win=False),
+    dict(trade_id=171, symbol="AAPL", dist_pct=0.51, pl=-0.14, win=False),
+]
+
+
+def test_vwap_skip_whatif_skips_every_above_vwap_fill_today():
+    # At +0.50% every one of today's five fills is above threshold -> all skipped;
+    # the book improves by the whole −$211.48 (exact recorded P&L, not a sim).
+    r = vwap_skip_whatif(TODAY_VWAP_ROWS, 0.50)
+    assert r["n_total"] == 5 and r["n_skipped"] == 5 and r["n_kept"] == 0
+    assert r["skipped_pl"] == -211.48
+    assert r["delta"] == 211.48                     # improvement from skipping
+    assert abs(r["delta"]) > 55.81                  # clears the noise budget
+    assert r["kept_pl"] == 0.0 and r["kept_win_pct"] == 0.0
+
+
+def test_vwap_skip_whatif_partial_threshold_today():
+    # At +1.0% only MU (+3.66%) and AMD (+3.82%) are skipped; CRM/UNH/AAPL kept.
+    r = vwap_skip_whatif(TODAY_VWAP_ROWS, 1.0)
+    assert r["n_kept"] == 3 and r["n_skipped"] == 2
+    assert r["kept_pl"] == -95.81                   # CRM+UNH+AAPL
+    assert r["skipped_pl"] == -115.67               # MU+AMD
+    assert r["delta"] == 115.67
+    assert r["skipped_win_pct"] == 0.0 and r["kept_win_pct"] == 0.0
+
+
+def test_vwap_skip_whatif_empty_is_safe():
+    r = vwap_skip_whatif([], 0.25)
+    assert r["n_total"] == 0 and r["n_kept"] == 0 and r["n_skipped"] == 0
+    assert r["delta"] == 0.0 and r["kept_win_pct"] == 0.0
+    assert r["skipped_pl"] == 0.0 and r["kept_pl"] == 0.0
