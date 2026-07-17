@@ -863,3 +863,41 @@ None — market closed. Nothing to root-cause at the trade level.
 - **★ Open-fade lever update:** IMP-019 found the **first non-refuted per-trade discriminator** — entry distance from the symbol's own session VWAP. Fills ≥+0.25% above VWAP are net-negative; fills at/below VWAP are net-positive. A **VWAP entry-quality gate** (skip/deprioritize fills stretched above session VWAP) is now proposed in `todo.md` for human approval — do NOT treat as shipped; it is an entry-logic change awaiting sign-off. Run `python -m scripts.replay` for the live band table.
 - **NFLX reported AMC today (07-16) → it will gap Fri 07-17** — treat with extra caution (wide post-earnings ranges; no overnight risk for an EOD-flatten bot). Re-scan the intraday-earnings calendar and park any on-list name reporting *during* market hours.
 - **TSM/UNH** both printed pre-open today (BMO, not parked); note whether TSM lifts/fades the semi complex. Equity **$8,050.68 (−19.5%)**, **$550.68 above** the −25% ($7,500) flag — cushion essentially flat on the day; protect it.
+
+---
+
+## 2026-07-17 — Daily Review
+
+### Stats
+- Trades: 5 closed (**0W / 5L**), win rate **0%**.
+- Net P&L: **−$211.48** (day −2.627%). Equity close **$7,839.17** (from $8,050.65 open). Worst day since 07-15 (−$252.01), in a risk-off AI/chip-led selloff tape (Nasdaq-100 futures −1.6%, SOXX −3%, Kospi −7%).
+- Avg winner: none. Avg loser −$42.30; the three real losers averaged −$70.33 (CRM −55.65, UNH −40.02, AMD −115.32); MU −0.35 and AAPL −0.14 were near-flat break-even/scratch exits.
+- Profit factor (day): 0 / 211.48 = **0.00**.
+- Circuit breaker NOT tripped (−2.63% << −8.0% halt). Service active all session, no errors/exceptions. **0 open positions at close — Alpaca fully reconciles** (equity 8050.65→7839.17 = −$211.48 to the penny; all 10 fills CRM/MU/UNH/AMD/AAPL match DB entry & exit exactly; no overnight leak).
+- Exit reasons: 4 STOP (CRM, MU, UNH, AMD), 1 EOD_FLATTEN (AAPL).
+
+### Trade-by-trade review
+| # | Sym | Entry (ET) | Exit (ET) | Conf | Type | Exit | P&L | VWAP dist | Root cause |
+|---|-----|-----------|-----------|------|------|------|-----|-----------|-----------|
+| 167 | CRM | 09:37:04 @174.77 | 10:04 @171.06 | 62.6 | MA | STOP | **−$55.65** | **+0.68%** | Non-breakout MA entry filled **above** session VWAP, faded straight down, took the full 1R stop (dist 2.00%, exit −2.12% w/ stop-through). Never reached +0.5R → IMP-013 couldn't arm. Above-VWAP open-fade. |
+| 168 | MU | 12:06:10 @884.47 | 13:57 @884.12 | 62.8 | MA | STOP | −$0.35 | +3.66% | qty 1 (884/sh caps size). Reached +0.5R → **IMP-013 armed break-even**, stopped at ~entry for −$0.04%. A scratch, not a loss. Mechanism working. |
+| 169 | UNH | 12:21:41 @433.17 | 15:49 @426.50 | 63.8 | MA | STOP | **−$40.02** | **+0.65%** | Non-breakout MA entry above VWAP, ground down all afternoon to the full 1R stop (dist 1.50% = ATR floor). Never green → IMP-013 couldn't arm. Above-VWAP open-fade. |
+| 170 | AMD | 12:49:48 @502.00 | 15:14 @492.39 | 81.2 | BOTH | STOP | **−$115.32** | **+3.82%** | Day's worst. High-conf BOTH breakout (ext only +0.08% above broken level) but filled **+3.82% above session VWAP** into a −3% semi selloff; faded to full 1R stop (dist 1.86%). Never reached +0.5R → IMP-013 couldn't arm. The recurring high-conf above-VWAP fade. |
+| 171 | AAPL | 15:05:17 @333.98 | 15:57 @333.96 | 60.1 | MA | EOD_FLATTEN | −$0.14 | +0.51% | Late low-conf MA entry, flat into the 15:55 flatten. Scratch. |
+
+### What worked / what didn't
+- **Worked:** Every risk control held — no halt, 0 overnight, broker/DB reconcile to the penny. **IMP-013 correctly rescued MU** (reached +0.5R, armed break-even, scratched at −$0.35 instead of a full −1R) and correctly could NOT rescue the three never-green faders (CRM/UNH/AMD) — by design, those are the regime/entry-quality gate's job, not IMP-013's.
+- **Didn't:** The entire −$211 is **above-VWAP open-fades.** All 5 fills were above session VWAP; the 3 real losers (CRM +0.68%, UNH +0.65%, AMD +3.82%) each faded from entry to the full 1R stop. AMD is the textbook recurring case: high-conf BOTH, tight extension over the broken *level*, but stretched +3.82% above its own VWAP into an AI-capex/chip selloff — exactly the IMP-019 open-fade signature. This is not a stop-placement, sizing, slippage, data, or bug problem: books reconcile, stops fired correctly, the day just took five entries stretched above fair value on a red-tape day.
+- Not open-concentrated: only CRM entered near the open (09:37); MU/UNH/AMD/AAPL were all midday (12:06–15:05). Consistent with IMP-016's refutation of a "skip first N min" gate — the leak is above-VWAP fills, not the clock.
+
+### Lessons & improvement candidates (ranked)
+1. **[SHIPPED IMP-020]** Today gave 5 more above-VWAP faders (all ≥+0.50% above VWAP), so I advanced the ★★ VWAP-gate's **pre-ship validation step 1** (required by `todo.md` before human sign-off): added a `--vwap-skip PCT` what-if to `scripts/replay.py` (+ pure `vwap_skip_whatif` in `bot/replay.py`, 3 tests on today's real trades). It simulates skipping fills stretched above session VWAP and reports the exact P&L delta vs the replay noise budget. **Result: the delta clears the noise budget by ~12× and the kept book flips positive at +0.25%** — skip >+0.25% keeps 27 trades (**+$78.49**, 44.4% win) and removes 34 above-VWAP trades (−$688.26, 29.4% win); noise budget is only $55.81. Measurement/tooling only — the engine gate itself is still an entry-logic change **awaiting human approval** (todo.md ★★, now escalated with this evidence).
+2. **Residual open-fade leak is now fully characterized and has a validated candidate fix** — the VWAP entry-quality gate. The next step is human sign-off on the ★★ proposal (threshold at the +0.25% band edge where the sign flips), then wire it as a *tightening* skip in `engine.consider_entries`. Do NOT ship without approval.
+3. IMP-013 continues to do exactly its job (rescued MU, correctly passive on never-green faders). No action.
+
+### Notes for pre-market research
+- **AMD — new chronic-loser watch.** Today −$115.32 (the day's worst), a high-conf BOTH breakout that filled +3.82% above its own session VWAP and faded to a full 1R stop in the AI-capex/chip selloff. Liquid mega-cap, strategy-fit — the loss is the **above-VWAP open-fade regime, not a name defect** (same documented cause as AMZN). No park trigger; watch for a repeat.
+- **AMZN did NOT trade today** (no signal) — its 0W5 watch is unchanged; still the standing chronic-loser flag but no fresh fade to mature a park.
+- **CRM / UNH** — both MA-only entries that faded above VWAP to full stops; regime-driven (risk-off tape), not name defects. Keep. UNH ground down all afternoon — note if it stays heavy.
+- **Semis (AMD/NVDA/MU/TSM/AVGO/INTC/QCOM)** — remained the down-driver (global AI-capex/chip de-rate, SOXX −3%). Watch Monday whether the complex stabilizes or the breather deepens; on-list HOLDs (regime, not name-quality). MU capped at qty 1 (884/sh) — negligible risk contribution.
+- **★★ VWAP entry-quality gate — now backed by pre-ship validation (IMP-020).** Skipping fills >+0.25% above session VWAP would have flipped the 61-trade replay book from −$610 to **+$78.49**, delta clearing the noise budget ~12×. This is a **strategy/entry-logic lever awaiting human sign-off in `todo.md` — NOT a watchlist action.** Run `python -m scripts.replay` for the band table + skip what-if. Equity **$7,839.17 (−21.6%)**, now **$339.17 above** the −25% ($7,500) review flag — cushion thinned by today's −$211; protect aggressively.
