@@ -899,3 +899,35 @@ Service restarted: **no** (no watchlist changes; 0 open positions — nothing lo
 - **Chip bounce durability is Tue's swing factor** — 07-20 opened risk-on with semis leading (MU +3%, AMD +2%) after a −20%-off-peak de-rate. Watch whether the bounce holds or fades back into the AI-capex skepticism; the real test is **GOOGL's Wed 07-22 AMC print (first hyperscaler capex read-through)** — on-list semis are HOLDs (regime, not name defects). Re-scan the intraday-earnings calendar: **GOOGL + TSLA Wed AMC, INTC Thu** — all after-hours so far, but park any on-list name that shifts to *during* market hours.
 - **AMD + AMZN — dual chronic-loser watch.** AMD (07-17 −$115, worst of day) and AMZN (0W5, didn't trade 07-17). Both are the **above-VWAP open-fade regime, not name flaws** — a fresh full-1R open-fade on either matures a park *discussion*, but the real lever is the **VWAP entry-quality gate (IMP-020, todo.md, human sign-off)**, not curation.
 - **Open-fade leak = still the core drawdown driver**; IMP-020 validated that skipping fills >+0.25% above session VWAP flips the replay book −$610 → +$78.49 — an entry-logic lever awaiting human sign-off, **NOT a watchlist action.** Equity **$7,839.15 (−21.6%)**, **$339.15 above** the −25% ($7,500) flag — cushion thin; protect it aggressively into the Mag-7 earnings week.
+
+---
+
+## 2026-07-21 — Pre-market Research
+
+### Market context
+**Risk-on again — semis rebound Day 2; futures higher.** Nasdaq-100 futures **+1.4%**, S&P 500 **+0.6%**, Dow **+166 (+0.3%)**. Chips extend Monday's relief bounce (oversold NDX/SOX mean-reversion) on **US–Iran ceasefire-talk hopes** (mediators floating a 10-day truce); oil steadied ~**$83.90 WTI** (Red Sea shipping still a swing). **Earnings season strong** — 87% of the ~54 S&P names reported have beaten EPS; premarket beats **3M +7%, GM +2%**. Fed pause priced at 88% (CME FedWatch). Today's BMO reporters (**GM, MMM, NOC, NVS, SCHW, DHR, HAL, DHI, MSCI, EFX, SYF, GPC, HAS, KEY, ALLY** …) are **all off-list**; **no on-list name reports during market hours today.** This week's on-list slate: **GOOGL + TSLA Wed 07-22 AMC, INTC Thu — all after-hours** (GOOGL = first hyperscaler AI-capex read-through, the week's real test).
+
+### Carried from daily review (last written 2026-07-17; 07-20 review not yet posted)
+- **Mon 07-20 booked −$87.86** across 4 trades (QCOM −40.32 STOP @09:36, MU −25.18 STOP, INTC −22.12 EOD_FLATTEN, AVGO −0.24 STOP) — equity $7,839.15 → **$7,751.27**. Same **above-VWAP open-fade signature** (QCOM opened straight into a full-1R stop); not name defects.
+- **QCOM now 0W3 (−$84.78 / 14d)**, **AMZN 0W4 (−$50.58)**, **AMD 0W2 (−$115.72)**, **UNH 0W2 (−$79.35)**, **TSLA 1×−$119.38** — the standing chronic-loser watches. Documented cause across every daily review = the **above-VWAP open-fade regime, not name flaws** (all top-liquidity large-caps, strategy-fit). The real lever is the **VWAP entry-quality gate (IMP-020, todo.md, human sign-off)**, not curation → **HOLD all.**
+- **14d winners anchor the book:** SE +186.89, MSFT +78.39, ENPH +61.76, BAC +54.63, META +39.40, AAPL +35.95, WMT +26.16 — the list's quality names are producing; the leak is entry-quality, uniform across names.
+
+### Watchlist review
+- **Positions: 0 open — nothing locked.** Account **ACTIVE**, equity **$7,751.27**, cash $7,751.27, buying power $31,005. **−22.5% from $10K**, **$251.27 above** the −25% ($7,500) strategy-review flag — cushion cut to a hair by Monday's −$88; protect aggressively.
+- **Intraday-earnings check (standing rule):** today's reporters are all off-list; on-list GOOGL/TSLA are Wed AMC, INTC Thu after-hours → **no on-list name reports during market hours today or this week** → **no earnings park.** (WisBot flattens by 15:55 ET → zero overnight risk on any AMC gapper.)
+- **Semis / AI (NVDA/MU/TSM/AVGO/AMD/INTC/QCOM)** — extend the relief bounce (Day 2, oversold mean-reversion); the de-rate was a global AI-capex regime move, not name-quality → all liquid large-cap, strategy-fit → **HOLD all.** Durability resolves at GOOGL's Wed capex print.
+- **Chronic watches (QCOM 0W3 / AMZN 0W4 / AMD / UNH / TSLA)** — every loss is the above-VWAP open-fade regime, no name-specific defect (all top-liquidity large-caps, none sub-$5/illiquid/halt-prone) → **HOLD.** Parking liquid large-caps won't fix a strategy-wide entry-quality leak; that's churn. **NFLX** (07-16 AMC gapper) post-earnings ranges normalizing, EOD-flatten → **HOLD.** **CRM/rest** — regime droughts, no halt/binary during market hours today → **HOLD all.**
+- **Adds: none.** Today's premarket movers are earnings gappers (3M +7%, GM +2%) — off-list and not clean-breakout adds; the semi/megacap leadership is already fully on-list; rotation sectors (financials/energy) covered by BAC/XOM. Chasing a Day-2 relief bounce into an unresolved AI-capex de-rate — with a **−22.5% drawdown and only $251 of cushion** and GOOGL's capex read-through still a day out — is exactly the wrong risk to add.
+
+### Changes applied to watchlist
+**No changes.** 26 active retained. No park trigger matured: no on-list name reports during market hours today or this week (GOOGL/TSLA Wed AMC, INTC Thu after-hours); QCOM 0W3 / AMZN 0W4 / AMD / UNH / TSLA are the above-VWAP open-fade regime — the ★★ VWAP-gate strategy lever (IMP-020, todo.md, human sign-off), **not** name defects; semis are a global AI-capex regime move (bouncing today), not name-quality. 0 positions open (nothing locked). No adds — leaders/rotation already covered, thin $251 cushion argues against chasing a Day-2 bounce before GOOGL's Wed capex print. Conservative hold is the correct call — no churn.
+
+### Final watchlist
+26 active (unchanged): AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+(Parked: BABA, BIRD, C, JPM, WPM.)
+Service restarted: **no** (no watchlist changes; 0 open positions — nothing locked).
+
+### Notes for pre-market research (next session — Wed 07-22)
+- **★★ THE REAL FIX IS BLOCKED ON HUMAN SIGN-OFF, NOT CURATION.** The book has bled to −22.5% ($7,751, only **$251 above** the −25% flag) almost entirely on above-VWAP open-fades. IMP-020 is validated: skipping fills >+0.25% above session VWAP flips the 61-trade replay book −$610 → **+$78.49** (~12× noise budget). This is a `bot/engine.py` entry-logic change awaiting approval in `todo.md` — **re-escalate it; watchlist churn cannot fix a strategy-wide leak.**
+- **GOOGL Wed 07-22 AMC = the week's pivot** (first hyperscaler AI-capex read-through) — decides whether the 2-day semi bounce is a bottom or a bounce inside the de-rate. On-list semis stay HOLDs (regime, not name defects). **TSLA also Wed AMC, INTC Thu** — all after-hours; park any on-list name that shifts to *during* market hours.
+- **QCOM now 0W3 / AMZN 0W4 / AMD 0W2 / UNH 0W2** chronic watches — all the above-VWAP open-fade regime, all top-liquidity large-caps, no name-specific defect. A fresh full-1R fade matures a park *discussion* only; the real lever remains the VWAP gate, not a park. Cushion is at a hair ($251) — protect it aggressively into the Mag-7 print week.
