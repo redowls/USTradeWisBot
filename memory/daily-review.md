@@ -35,6 +35,76 @@ the pre-market routine reads this section the next morning)
 
 ---
 
+## 2026-07-21 — Daily Review
+
+### Stats
+- Trades: **3 closed (3W / 0L)**, win rate **100%**. **First green session after three straight red days** (07-15 −$252, 07-17 −$211, 07-20 −$88).
+- Net P&L: **+$78.41** (day **+1.012%**). Equity close **$7,829.68** (from $7,751.29 open). **Alpaca reconciles to the penny** (PA3ESJUO8RU0 equity $7,829.68 = DB close; last_equity $7,751.27 ≈ DB open; **0 open positions — no naked overnight**; all 6 fills — 3 buys + 3 flatten sells at 15:55:58 ET — match DB entries/exits exactly).
+- Avg winner **+$26.14**; no losers. Profit factor (day) = **∞** (zero gross loss).
+- Exit reasons: **3 EOD_FLATTEN (all drifted-up / captured green)** — no STOP, no TP hit (INTC missed its TP by $0.85). Circuit breaker NOT tripped (+1.01% << −8.0% halt). Service active all session, **0 errors/exceptions** in journal.
+
+### Trade-by-trade review
+| # | Sym | Signal | Entry (ET) | Exit (ET) | Conf | Mom | Exit | P&L | % | Root cause |
+|---|-----|--------|-----------|-----------|------|-----|------|-----|---|-----------|
+| 176 | AVGO | MA | 09:42:29 @384.58 | 15:57 @386.81 | 61.53 | 0.87 | EOD_FLATTEN | **+$13.38** | +0.58% | MA-only conf-61, healthy momentum; drifted up on the recovering chip tape, captured at flatten (never reached TP 393.18). Textbook drifted-up flatten. |
+| 177 | QQQ | MA | 10:03:04 @704.12 | 15:57 @709.45 | 60.19 | 0.68 | EOD_FLATTEN | **+$16.00** | +0.76% | Low-conf MA-only index ETF; rode the broad up-day, drifted up and flattened green. |
+| 178 | INTC | MA | 10:04:23 @101.94 | 15:57 @105.71 | 60.40 | 0.69 | EOD_FLATTEN | **+$49.03** | **+3.70%** | Day's engine — INTC ran +3.7% on the chip recovery; MA-only conf-60 held all day, captured at flatten just $0.85 shy of TP (106.56). |
+
+### What worked / what didn't
+- **Worked — the drifted-up EOD_FLATTEN bucket did exactly its job.** All 3 entries were MA-only conf 60-62 that drifted up on a bullish/recovering tape and were captured green at the 15:57 flatten. This is the **mirror image of the 07-15/-17/-20 red-tape faded-flatten losses**: same signal class, same exit mechanism, opposite tape → all-time drifted-up bucket (+$977 / exp +$23.83 / 95% win) grows, faded bucket untouched. Reinforces IMP-004's finding that **MA-only conf 60-62 is the least-bad band** (all-time PF 0.92) — today it was 100% of the trades and 100% of a green day.
+- **Worked — every capital-protection invariant held.** IMP-002 flatten fired cleanly (0 open positions, no naked overnight — the 20th+ straight clean session); IMP-003/IMP-005 fill accuracy held (all 6 fills tie to the broker to the penny); no circuit breaker, no bug, no slippage defect.
+- **Didn't (minor, by design) — capture efficiency.** INTC ran to +3.70% intraday but was carried to flatten $0.85 under its TP rather than locking the gain; AVGO/QQQ drifted modestly. Not a defect — the EOD_FLATTEN drifted-up bucket is the design outcome on a trending-up day, and it was net-positive. No loser to root-cause today.
+- **Tape context:** S&P ~+0.9% / Nasdaq ~+1.0-1.4% (Perplexity, corroborated) — a recovering chip/AI up-day after three risk-off sessions. **No high-conf BOTH breakout fired today** — the open-fade leak names (high-conf BOTH that fade to a full-1R stop) simply didn't appear on the calmer up-tape, so today adds no new evidence on the ★★ VWAP gate either way.
+
+### Lessons & improvement candidates (ranked)
+1. **No code change warranted — analysis-only run.** Clean 3W/0L green day, zero defect, zero loss to root-cause, books reconcile to the penny, no risk event. Today's data justifies no new lever; forcing a change on a defect-free green day would risk overfitting. The candidate landscape is unchanged: the ★★ VWAP entry-quality gate remains a *partial mitigant only* (IMP-021's held-out finding — kept book stays net-negative out of sample), and every per-trade discriminator (confidence IMP-004, volume, extension IMP-007, time-of-day IMP-016) stays refuted. Today's positive contribution is **confirming evidence**: MA-only 60-62 on a bullish tape is genuinely profitable — do NOT filter that band.
+2. **⚠️ Process/traceability flag (NOT acted on — pre-existing uncommitted changes rule):** the 07-20 review declared **"[SHIPPED IMP-021 today]"** but IMP-021 was **never committed** — `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py` sit uncommitted in the working tree and **IMP-021 is absent from `memory/improvement-log.md`** (last committed IMP is IMP-020, 23c9692). Per the ground rules I left those three files untouched/unstaged this run. Tests pass (116) with them present and they are offline replay tooling (no live-bot impact), so this is a bookkeeping/traceability gap, not a health risk. **Queued in todo.md for the next code-capable run / human to finalize the IMP-021 commit + log entry.**
+
+### Notes for pre-market research
+- **INTC** — best name today (+3.70%, MA-only, nearly tagged TP) on the chip recovery; strong momentum, keep top-of-list.
+- **AVGO** — MA-only drift-up, modest (+0.58%), healthy momentum (0.87); benign, keep.
+- **QQQ** — index ETF drift-up (+0.76%); rode the broad tape, no name-specific read.
+- **Tape flipped green** (S&P ~+0.9%, Nasdaq ~+1%) — recovering chip/AI tape after 3 risk-off sessions. If the bid holds, MA-only drift-ups on liquid names should keep working; watch for the return of high-conf BOTH breakouts (none fired today — the open-fade leak was simply absent).
+- Equity **$7,829.68 (−21.7% YTD)** — recovered $78 off the 07-20 low; the −25% ($7,500) strategy-review flag is $330 below.
+
+---
+
+## 2026-07-20 — Daily Review
+
+### Stats
+- Trades: **4 closed (0W / 4L)**, win rate 0%.
+- Net P&L: **−$87.86** (day −1.121%). Equity close **$7,751.29** (from $7,839.17). Alpaca reconciles to the penny (PA3ESJUO8RU0 equity $7,751.29 = DB close; all 4 fills match DB; **0 overnight positions**, all flat by the close).
+- Avg loser −$21.97; no winners. Profit factor (day) = 0.00.
+- Circuit breaker NOT tripped (−1.12% << −8.0% halt). Service active all session, no errors/exceptions in journal. Exit reasons: 3 STOP (QCOM, MU, AVGO), 1 EOD_FLATTEN (INTC).
+- Third red session in a row (07-15 −$252, 07-17 −$211, 07-20 −$88) — a risk-off chip/AI tape; but note the loss size is shrinking and today had no bug, no risk breach, no slippage defect.
+
+### Trade-by-trade review
+| # | Sym | Signal | Entry (ET) | Exit (ET) | Conf | Exit | P&L | VWAP dist | Root cause |
+|---|-----|--------|-----------|-----------|------|------|-----|-----------|-----------|
+| 172 | QCOM | MA | 09:36 @173.00 | 15:25 @170.12 | 64.0 | STOP | −$40.32 | **−0.16%** | MA-only, momentum 0.94; held ~6h then faded to a late-afternoon stop. Filled BELOW VWAP — not an above-VWAP stretch. |
+| 173 | MU | MA | 09:48 @891.52 | 10:21 @866.34 | 61.6 | STOP | −$25.18 | **+0.04%** | MA-only near the 60–62 floor; stopped in 33 min. Filled essentially AT VWAP. |
+| 174 | INTC | BOTH | 10:24 @98.54 | 15:57 @96.96 | 63.3 | EOD_FLATTEN | −$22.12 | **−0.63%** | Breakout (broke 98.04) but **momentum only 0.17** — weak; drifted down all day, flattened at close (open-fade into flatten). Filled WELL BELOW VWAP. |
+| 175 | AVGO | MA | 10:30 @380.24 | 14:33 @380.20 | 63.4 | STOP | −$0.24 | +0.27% | Reached +0.5R so **IMP-013 armed the break-even stop** → exited a scratch (−$0.24) instead of a full 1R loss. The one fill above the +0.25% gate line; also the only one the protection worked on. |
+
+### What worked / what didn't
+- **Worked:** IMP-013's break-even rescue on AVGO — reached +0.5R, stop trailed to entry, cut a would-be full-1R loss to −$0.24. Risk controls all held (no halt, no overnight, books reconcile to the penny). Losses are shrinking session-over-session.
+- **Didn't:** Every entry lost. But the notable finding is **where** they lost: **3 of the 4 fills (QCOM −0.16%, MU +0.04%, INTC −0.63%) were AT or BELOW their session VWAP** — the *safe* side of the pending ★★ VWAP entry-quality gate. That gate (skip fills >+0.25% above VWAP) would have skipped **only AVGO** (a −$0.24 scratch) and **kept all three real losers (−$87.62)**. So today is a clean out-of-sample counter-example: the leak was NOT an above-VWAP stretch today.
+- Signal-quality thread: 3 of 4 were MA-only entries in the low-conf 61–64 band (all-time that band is the weakest, PF ~0.5–0.7); the one breakout (INTC) had very weak momentum (0.17) and faded to the flatten. Consistent with the residual open-fade leak, just from the below-VWAP side today.
+
+### Lessons & improvement candidates (ranked)
+1. **[SHIPPED IMP-021 today]** Build **step (2) of the ★★ VWAP-gate pre-ship checklist — held-out (out-of-sample) validation.** Today is the first genuinely out-of-sample session after IMP-020's in-sample window, and it materially changes the gate's story: on the held-out window (07-17 + 07-20, 9 trades) the skip side still removes net-losers (delta +$211.72, kept 3 / skipped 6) **but the kept book stays net-negative (−$87.62)** — the "kept book flips positive" claim from IMP-020 does **not** carry out of sample because today's losers were filled at/below VWAP. Pure measurement/tooling; directly informs the human sign-off decision (the gate is a partial mitigant, not a cure).
+2. **MA-only entries in the 60–64 confidence band** (QCOM, MU, AVGO today; NFLX/C historically) keep bleeding — candidate: raise the MA-only confidence floor or require a volume/momentum confirm. Still needs more days of evidence and is an entry-logic change (human sign-off). Left in `todo.md`, not acted on today.
+3. **Weak-momentum breakouts** (INTC momentum 0.17) that fade to the flatten — candidate discriminator once the VWAP question is resolved; do not stack two entry changes at once.
+
+### Notes for pre-market research
+- **QCOM** — MA-only conf-64 long faded all day to a late stop (below VWAP); chippy, no clean trend. Watch, don't chase MA-only.
+- **MU** — priced ~891 in our data (check for a split/data quirk vs the ~$100 street price); stopped in 33 min. Low-conf (61.6) MA entry near the floor — low quality.
+- **INTC** — breakout broke 98.04 but momentum was near-zero (0.17) and it drifted down into the flatten. A breakout without momentum = no-go; flag for a momentum-confirm filter.
+- **AVGO** — behaved best (scratch via break-even); MA-only, no follow-through though.
+- Tape context: three straight risk-off chip/AI sessions. If SPY/QQQ stay heavy pre-open, expect more MA-only fades — favour high-conf BOTH names with real momentum over low-conf MA-only breakouts.
+
+---
+
 ## 2026-06-15 — Daily Review
 
 ### Stats

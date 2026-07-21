@@ -376,6 +376,19 @@ Ordered by expected impact; each item needs replay validation before code.
    any engine change: step (2) confirm on a held-out window (skipping removes the
    above-VWAP losers without killing at/below-VWAP winners), step (3) fix the
    threshold at +0.25%. Do NOT wire `engine.consider_entries` without approval.
+   **→ STEP (2) STARTED (IMP-021, 2026-07-20 — ⚠️ NEVER COMMITTED):** the held-out
+   / out-of-sample validation tooling (held-out window `bot/replay.py` +
+   `scripts/replay.py` + `tests/test_replay.py`) was WRITTEN and the 07-20 daily
+   review declared it "SHIPPED IMP-021", but the changes sit **uncommitted** in the
+   working tree and **IMP-021 is absent from `memory/improvement-log.md`** (last
+   committed IMP is IMP-020 / 23c9692). Held-out finding recorded 07-20: on the
+   07-17+07-20 window the skip side removes net-losers but the **kept book stays
+   net-negative** → the gate is a partial mitigant, NOT the "kept book flips
+   positive" claim from IMP-020's in-sample read. **ACTION for the next
+   code-capable run / human:** finalize the IMP-021 commit (stage the three replay
+   files) + write the IMP-021 improvement-log entry. (Left untouched by the 07-21
+   review per the pre-existing-uncommitted-changes rule; tests pass 116/116 with
+   them present, offline tooling only — no live-bot impact.)
 
 0a. ~~**EOD-flatten P&L accuracy**~~ **[SHIPPED IMP-003, 2026-06-22]** — on 06-22
    SPY/QQQ/TSM were each booked at exit==entry ($0.00) at the flatten while the
