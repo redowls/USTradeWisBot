@@ -389,6 +389,25 @@ Ordered by expected impact; each item needs replay validation before code.
    files) + write the IMP-021 improvement-log entry. (Left untouched by the 07-21
    review per the pre-existing-uncommitted-changes rule; tests pass 116/116 with
    them present, offline tooling only — no live-bot impact.)
+   **→ 07-23 UPDATE (strongest single-day evidence FOR the gate; still uncommitted):**
+   today closed 0W/5L −$70.18 and **4 of the 5 fills were >+0.25% above session VWAP**
+   (XOM +0.60%, MU +1.83%, NFLX +0.92%, BAC +0.59%; only the −$0.33 MU IMP-013 scratch
+   was inside at +0.10%). **The >+0.25% gate would have skipped all four faders and
+   avoided −$69.85 of the −$70.18 day.** The held-out check (split @2026-07-22, last 2
+   sessions) now reads: in-sample keep 25 (+$50.60) / skip 23 (−$420.65); **held-out
+   keep 3 (−$41.69) / skip 7 (−$194.01) → GENERALISES on the skip side but the KEPT
+   book stays net-negative out-of-sample** (07-22's ENPH/UNH filled at/below VWAP slip
+   under the gate). So the gate is a **strong-but-PARTIAL mitigant** — it would have
+   near-eliminated *today's* loss but does not catch the at/below-VWAP faders.
+   ⚠️ **CRITICAL CONTEXT FOR THE HUMAN: equity $7,593.96 = −24.06% YTD, only $93.96
+   above the −25% ($7,500) strategy-review flag.** This is the single highest-value
+   open decision. **Please sign off (or decline) the >+0.25%-above-VWAP entry gate** so
+   step (2)/(3) can complete and it can be wired into `engine.consider_entries` as a
+   pure tightening (skips entries, never widens risk). Also finalize the uncommitted
+   IMP-021/IMP-022 tooling (replay held-out check + `by_breakout_momentum` analytics)
+   so the evidence base is traceable. Also (backlog item 3 / entry-timing): 07-23 BAC
+   entered 15:27, 3 min before the 15:30 cutoff — consider a soft "skip entries within
+   N min of the cutoff" rule; queue behind the VWAP gate.
 
 0a. ~~**EOD-flatten P&L accuracy**~~ **[SHIPPED IMP-003, 2026-06-22]** — on 06-22
    SPY/QQQ/TSM were each booked at exit==entry ($0.00) at the flatten while the

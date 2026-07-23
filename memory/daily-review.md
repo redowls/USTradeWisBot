@@ -35,6 +35,85 @@ the pre-market routine reads this section the next morning)
 
 ---
 
+## 2026-07-23 — Daily Review
+
+### Stats
+- Trades: **5 closed (0W / 5L)**, win rate **0%**. Fourth red day in the last five sessions (07-22 −$165, 07-20 −$88, 07-17 −$211), only 07-21 green (+$78).
+- Net P&L: **−$70.18** (day **−0.916%**). Equity close **$7,593.96** (from $7,664.14 open). **Alpaca reconciles to the penny** (PA3ESJUO8RU0 equity $7,593.96 = DB close; **0 open positions — no naked overnight** (~25th straight clean session); all 5 entries + all 5 exits match DB fills exactly; account ACTIVE, not blocked).
+- Avg loser **−$14.04**; no winners. Profit factor (day) = **0.00**.
+- Exit reasons: **2 STOP** (MU #184 trailed-to-breakeven −$0.33 via IMP-013; MU #186 full-1R −$18.80), **3 EOD_FLATTEN** (XOM −30.24, NFLX −15.48, BAC −5.33 — all faded, wide stops never hit). Circuit breaker NOT tripped (−0.92% << −8.0% halt). Service active all session (up 5 days, no restart), **0 errors/exceptions**.
+- ⚠️ **Equity $7,593.96 = −24.06% YTD, only $93.96 above the −25% ($7,500) strategy-review flag** — the thinnest cushion yet (was $164 on 07-22). One more ~$100 day trips the review threshold. Protect capital aggressively.
+
+### Trade-by-trade review
+| # | Sym | Signal | Entry (ET) | Exit (ET) | Conf | Mom | VWAP dist | Exit | P&L | % | Root cause |
+|---|-----|--------|-----------|-----------|------|-----|-----------|------|-----|---|-----------|
+| 184 | MU | MA | 09:51:25 @986.85 | 10:54:56 @986.52 | 61.99 | 0.80 | **+0.10%** | STOP (trailed) | **−$0.33** | −0.03% | Reached +1R; **IMP-013 ratcheted the stop 969.42→986.85 (breakeven)** — faded back, hit the breakeven stop → −$0.33 scratch instead of a full loss. Trail working as designed (broker order replace verified). |
+| 185 | XOM | **BOTH** | 11:19:13 @158.43 (broke 158.155) | 15:56:32 @156.54 | 68.08 | 0.70 | **+0.60%** | EOD_FLATTEN | **−$30.24** | −1.19% | Breakout **chased +0.60% above session VWAP**; faded straight from entry, wide stop (155.97) never hit, bled to the flatten. **Day's biggest loss.** Note: XOM the *stock* closed +1.8% (oil/Mideast) — but the bot's intraday breakout-spike entry mean-reverted. Open/breakout-fade leak. |
+| 186 | MU | MA | 12:36:56 @1008.12 | 14:09:32 @989.32 | 60.55 | 0.91 | **+1.83%** | STOP (full-1R) | **−$18.80** | −1.86% | **Re-entry** of MU after #184 scratched; filled **+1.83% above VWAP** (most-stretched fill of the day), faded to the full 1R stop. The above-VWAP open-fade-to-full-stop leak. |
+| 187 | NFLX | MA | 14:09:10 @69.29 | 15:56:33 @68.86 | 60.86 | 0.76 | **+0.92%** | EOD_FLATTEN | **−$15.48** | −0.62% | Low-conf MA-only, filled +0.92% above VWAP; faded into the flatten. Residual faded-flatten drag. |
+| 188 | BAC | MA | 15:27:14 @61.42 | 15:56:45 @61.29 | 63.50 | 0.90 | **+0.59%** | EOD_FLATTEN | **−$5.33** | −0.21% | **Late entry — 15:27, only 3 min before the 15:30 cutoff**; 29-min hold, no room to work, small flatten loss. |
+
+### What worked / what didn't
+- **Worked — IMP-013 on MU #184.** Stop ratcheted from the 969.42 anchor up to 986.85 (breakeven) after +1R, converting a potential ~−$17 loss into a −$0.33 scratch (broker order-replace confirmed: 969.42→986.85, filled 986.52). Textbook trail.
+- **Worked — every capital-protection invariant held.** 0 open positions (no naked overnight — ~25th straight clean session under IMP-002); books reconcile to Alpaca to the penny (IMP-003/005); no circuit breaker, no bug, no slippage defect. All five losses were controlled to their planned 1R or better.
+- **Didn't — the open-fade leak, this time mostly MA-only.** 4 of 5 losers faded straight from entry (3 into EOD_FLATTEN with wide stops un-hit, 1 to the full stop). Only XOM was a BOTH breakout; four were MA-only. **Decisive VWAP read: 4 of the 5 fills were >+0.25% above their session VWAP** (XOM +0.60, MU#186 +1.83, NFLX +0.92, BAC +0.59) — only the −$0.33 MU scratch was at/below the +0.25% edge (+0.10%). **The pending ★★ VWAP entry-quality gate (skip >+0.25% above VWAP) would have skipped all four faders and avoided −$69.85 of the −$70.18 day.** Strongest single-day evidence for the gate yet.
+- **Tape context (Perplexity, corroborated):** S&P −0.1% (7,498.96), Nasdaq −0.6% (25,690.90), **choppy / mildly risk-off** — negative breadth (Nasdaq decliners 1.86:1), defensive bid into utilities, growth/communication-services lagging, caution into the mega-cap prints. **GOOGL −~5% AH** (raised 2026 capex, first negative FCF quarter since IPO), **TSLA −~3% AH** (margin/profit miss). **No name-specific catalyst on MU/NFLX/BAC**; XOM's +1.8% was sector-driven (oil/Mideast) but the bot's intraday breakout entry still faded. → today's failures were regime (heavy, two-sided tape) + the strategy's own above-VWAP open-fade leak, not news.
+
+### Lessons & improvement candidates (ranked)
+1. **No code change warranted — analysis-only run.** Today's one data-justified lever is the **★★ VWAP entry-quality gate (IMP-019/020)**, and today is its **strongest single-day evidence yet** (4/5 fills >+0.25% above VWAP; the gate would have turned −$70.18 into −$0.33). But it is an **entry-logic change AWAITING HUMAN SIGN-OFF** (ground-rule: entry gates need explicit human approval) — I cannot ship it. Every other per-trade discriminator stays refuted (confidence IMP-004, volume, extension IMP-007, time-of-day IMP-016) and every index-regime proxy is refuted (IMP-015/018). Inventing a *new* untested gate on a −$70 chop day — with the account $93.96 above its strategy-review floor and pre-existing uncommitted code in the tree — would be reckless/overfit. Re-escalated the gate in `todo.md` with today's decisive numbers. **Disciplined outcome: reviewed, no change.**
+2. **Held-out caveat still stands (the gate is a strong-but-PARTIAL mitigant).** On the 07-22+07-23 held-out window the skip side removes net-losers, but the **kept book stays net-negative (−$41.69)** — 07-22's losers (ENPH/UNH) were filled *at/below* VWAP and slip under the gate. So the gate would have hugely helped *today* but is not a complete fix; the residual at/below-VWAP faders (07-22) need a different, still-unfound discriminator.
+3. **⚠️ Traceability flag (NOT acted on — pre-existing uncommitted rule):** `bot/analytics.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py` sit **uncommitted** in the working tree — the IMP-021 (held-out check) + IMP-022 (breakout-momentum analytics) work the 07-20/07-22 reviews declared "SHIPPED" but never committed (last committed IMP = IMP-020 / 23c9692; IMP-021/022 absent from `improvement-log.md`). Left untouched/unstaged this run per the ground rules. **Queued in `todo.md` for the next code-capable run / human to finalize the IMP-021/022 commits + log entries.** Tests pass with them present; offline tooling only, no live-bot impact.
+
+### Notes for pre-market research
+- **XOM** — day's biggest loss (−$30.24): the *stock* rose +1.8% (oil/Mideast) but the bot **chased the breakout +0.60% above VWAP** and it mean-reverted. Energy strength is real; the breakout-chase into it is the problem. Not a name defect — watch, don't over-weight the breakout.
+- **MU** — traded **twice** (both small losses); #186 re-entered at 12:36 filled +1.83% above VWAP → full stop. ~$1,000/sh so qty=1 (tiny $ position). Re-entries into a fading tape keep losing.
+- **NFLX** — MA-only, faded to flatten (−$15.48); +0.92% above VWAP. Regime, not name.
+- **BAC** — **entered 15:27, only 3 min before the 15:30 cutoff** → 29-min hold, no room, −$5.33 flatten. Late-day entries near the cutoff rarely work; flag for the entry-timing backlog item.
+- **Tape choppy/risk-off into mega-cap earnings:** GOOGL −~5% AH (capex/FCF), TSLA −~3% AH (margins) → **both gap Fri 07-24; expect wide post-earnings ranges** (no overnight risk for an EOD-flatten bot). Favor **at/below-VWAP MA drift-ups on green pockets**; avoid chasing breakouts stretched above VWAP into a heavy tape.
+- Equity **$7,593.96 (−24.06% YTD)** — **only $93.96 above the −25% ($7,500) strategy-review flag.** Thinnest cushion yet; protect aggressively.
+
+---
+
+## 2026-07-22 — Daily Review
+
+### Stats
+- Trades: **5 closed (2W / 3L)**, win rate **40%**. Gives back the 07-21 green day (and more) on a risk-off tape.
+- Net P&L: **−$165.52** (day **−2.114%**). Equity close **$7,664.14** (from $7,829.68 open). **Alpaca reconciles to the penny** (PA3ESJUO8RU0 equity $7,664.14 = DB close; last_equity $7,829.66 ≈ prior close; **0 open positions — no naked overnight**; account ACTIVE, not blocked).
+- Avg winner **+$19.66** (AMD +20.79, BAC +18.52); avg loser **−$68.28** (ENPH −124.80, UNH −59.88, QCOM −20.15). Profit factor (day) = 39.31 / 204.83 = **0.19**.
+- Exit reasons: **1 STOP full-1R (ENPH), 1 STOP trailed (AMD, +profit via IMP-013), 3 EOD_FLATTEN (BAC drifted-up / UNH+QCOM faded)**. Circuit breaker NOT tripped (−2.11% << −8.0% halt). Service active all session, **0 errors/exceptions** in journal.
+- ⚠️ **Equity $7,664.14 = −23.4% YTD, only $164.14 above the −25% ($7,500) strategy-review flag** — thinnest cushion yet. Protect capital aggressively.
+
+### Trade-by-trade review
+| # | Sym | Signal | Entry (ET) | Exit (ET) | Conf | Mom | Exit | P&L | % | Root cause |
+|---|-----|--------|-----------|-----------|------|-----|------|-----|---|-----------|
+| 179 | AMD | BOTH | 09:36:24 @542.99 (broke 542.89) | 10:06:08 @545.30 | 76.98 | 0.36 | STOP (trailed) | **+$20.79** | +0.43% | Breakout, modest momentum; reached +1R so **IMP-013 trailed the stop above entry** → locked +$20.79 (a "STOP" exit *in profit*). The trail working as designed. |
+| 180 | BAC | MA | 09:46:20 @61.37 | 15:56:54 @61.81 | 62.52 | 0.83 | EOD_FLATTEN | **+$18.52** | +0.72% | MA-only, healthy momentum (0.83); drifted up on the one green pocket, captured at flatten. The good drifted-up bucket. |
+| 181 | UNH | BOTH | 09:47:38 @434.99 (broke 433.75) | 15:57:15 @430.00 | 73.00 | **0.00** | EOD_FLATTEN | **−$59.88** | −1.15% | Breakout (bo=1.0) with **momentum_score = 0.00 — dead momentum**; faded down all day into the flatten, wide stop never hit. **Second instance of the weak-momentum-breakout-fades-to-flatten pattern** (07-20 INTC mom 0.17 → −$22.12). |
+| 182 | ENPH | BOTH | 10:07:24 @40.79 (broke 40.75) | 10:15:52 @40.14 | 83.11 | 0.92 | STOP (full-1R) | **−$124.80** | −1.59% | High-conf BOTH, **strong** momentum (0.92) — but a genuine **false breakout**: reversed immediately, hit its full 1R stop in 8 min. **Day's biggest loss (75% of gross loss).** The above-VWAP open-fade-to-full-1R-stop leak — momentum did NOT protect it. |
+| 183 | QCOM | MA | 10:21:04 @177.15 | 15:57:29 @175.60 | 60.19 | 0.68 | EOD_FLATTEN | **−$20.15** | −0.88% | Low-conf MA-only near the 60 floor; faded to a small flatten loss. The residual faded-flatten drag. |
+
+### What worked / what didn't
+- **Worked — IMP-013 on AMD.** AMD reached +1R and the broker-side trail ratcheted the stop above entry, converting what could have faded into a **+$20.79 locked gain** (exit_reason STOP but P&L positive). Textbook trail capture. BAC's MA-only drift-up (+$18.52, mom 0.83) also did its job.
+- **Worked — every capital-protection invariant held.** 0 open positions (no naked overnight — 20+ straight clean sessions under IMP-002); books reconcile to the penny (IMP-003/005); no circuit breaker, no bug, no slippage defect. Losses were controlled to their planned 1R.
+- **Didn't — two breakout (BOTH) failures drove 91% of the gross loss.** ENPH (−$124.80, false breakout to full-1R stop *despite* strong momentum 0.92) and UNH (−$59.88, breakout with momentum 0.00 that faded to the flatten). The MA-only book was net-flat (BAC +18.52 / QCOM −20.15). **The leak today was the BOTH/breakout class, not MA-only.**
+- **Tape context (Perplexity, corroborated):** S&P −0.1%, Nasdaq −0.6%, **choppy-to-risk-off** — rising oil (WTI >$85, Iran day 12) + higher yields + AI/tech weakness, into the first Mag-7 prints (GOOGL/TSLA AMC). **No name-specific catalyst** on any of the 5 traded → today's breakout failures were regime (heavy tape) + the strategy's own open-fade leak, not news. This is the mirror of 07-21's drifted-up green day: same signal classes, opposite tape.
+
+### Lessons & improvement candidates (ranked)
+1. **[SHIPPED IMP-022 — measurement/tooling only]** Today surfaced a **new, discrete, non-confidence discriminator that is NOT in the refuted list**: **breakout (BOTH) signals with near-zero momentum_score.** UNH today (mom 0.00 → −$59.88) is the second clear instance after 07-20 INTC (mom 0.17 → −$22.12). Full-book analysis: **BOTH signals with momentum_score < 0.1 are 0W/4L, −$194.19 (exp −$48.55/trade, PF 0.00) — the single worst discrete bucket in the entire book.** But (a) n=4 is thin, and (b) today's *biggest* loss, ENPH (−$124.80), had momentum 0.92 — so a momentum floor would NOT have caught the day's main damage. At a −23.4% drawdown with $164 of cushion, shipping a **live entry-logic change on n=4 would be reckless/overfit** and contradicts this project's governance (the ★★ VWAP gate is *still* awaiting human sign-off). Disciplined move, per the IMP-004/007/016/020 measurement-first pattern: **institutionalize the momentum discriminator as a standing report/analytics breakdown** (`by_breakout_momentum`) so the finding can't be silently lost and accrues more samples, and **queue the momentum-floor entry gate in `todo.md` for human sign-off.** No risk limit, no entry logic touched.
+2. **★★ The real, strategy-wide fix remains the VWAP entry-quality gate (IMP-020), blocked on human sign-off.** ENPH (−$124.80) is exactly its target: an open-window breakout that fails fast to a full-1R stop. Re-escalated in `todo.md`. Watchlist churn cannot fix it.
+3. **Do NOT act on MA-only via confidence** (refuted IMP-004) — today MA-only was net-flat (BAC +18.52 / QCOM −20.15). The leak was BOTH/breakout, not MA-only.
+
+### Notes for pre-market research
+- **ENPH** — high-conf BOTH (83) that was a fast false breakout (−1.59%, full-1R stop in 8 min) on the risk-off tape. Not a name defect (liquid, fits strategy); the open-fade leak. Watch, don't over-weight breakouts into a heavy tape.
+- **UNH** — BOTH breakout with **zero momentum** that bled to the flatten (−$59.88); 0W-in-series continues. Flag: weak-momentum breakouts keep fading (see also 07-20 INTC).
+- **AMD** — behaved best (IMP-013 trail locked +$20.79); modest-momentum breakout that worked. Keep.
+- **BAC** — clean MA-only drift-up (+$18.52, mom 0.83). Keep.
+- **QCOM** — low-conf MA-only near the floor, small fade (−$20.15). Chronic 0W-ish; regime, not name.
+- **Tape flipped back risk-off** (S&P −0.1%, Nasdaq −0.6%, oil >$85, AI/tech weak) into the Mag-7 prints. **GOOGL + TSLA reported AMC today → both gap Thu 07-23; INTC reports Thu.** Expect wide post-earnings ranges (no overnight risk for an EOD-flatten bot). Favor MA-only drift-ups on green pockets over chasing breakouts into a heavy tape.
+- Equity **$7,664.14 (−23.4% YTD)** — **only $164 above the −25% ($7,500) strategy-review flag.** Cushion is the thinnest yet; protect aggressively.
+
+---
+
 ## 2026-07-21 — Daily Review
 
 ### Stats
