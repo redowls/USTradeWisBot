@@ -35,6 +35,44 @@ the pre-market routine reads this section the next morning)
 
 ---
 
+## 2026-07-24 — Daily Review
+
+### Stats
+- Trades: **3 closed (3W / 0L)**, win rate **100%**. **Green day** breaking a four-red-in-five run; second clean 3W/0L sweep of the month (cf. 07-21 +$78.41), both on a firming/bounce tape.
+- Net P&L: **+$87.13** (day **+1.147%**). Equity close **$7,681.00** (from $7,593.87 open). **Alpaca reconciles to the penny** (PA3ESJUO8RU0 equity $7,681.00 = DB close; last_equity $7,593.87 = prior close; **0 open positions — no naked overnight** (~26th straight clean session); all 3 buys (BAC 61.44878, COST 929.342, NFLX 69.31) + all 3 flatten sells at 15:55 ET (61.98 / 935.932 / 70.21) match DB fills exactly; account ACTIVE, not blocked).
+- Avg winner **+$29.04**; no losers. Profit factor (day) = **∞** (zero gross loss).
+- Exit reasons: **3 EOD_FLATTEN (all drifted-up / captured green)** — no STOP, no TP hit. IMP-013 armed on **BAC** (stop 60.50→61.45 break-even after +0.5R) and **NFLX** (stop trailed 68.19→69.31→69.38→69.52) — both protected, drifted up regardless; COST correctly did NOT arm (+0.71% at exit, just shy of +0.5R). Circuit breaker NOT tripped (+1.15% << −8.0% halt). Service active all session (07:00 UTC nightly restart, clean), **0 errors/exceptions** in journal.
+- **Equity $7,681.00 = −23.19% YTD, now $181.00 above the −25% ($7,500) strategy-review flag** — recovered $87 off the 07-23 low; cushion improved from the thinnest-ever $93.96 but still thin. Protect.
+
+### Trade-by-trade review
+| # | Sym | Signal | Entry (ET) | Exit (ET) | Conf | Mom | VWAP dist | Exit | P&L | % | Root cause |
+|---|-----|--------|-----------|-----------|------|-----|-----------|------|-----|---|-----------|
+| 189 | BAC | MA | 09:36:56 @61.4488 | 15:56:28 @61.98 | 61.59 | 0.77 | **−0.23%** | EOD_FLATTEN | **+$21.78** | +0.86% | MA-only 60-62 band, healthy momentum; drifted up on the bounce, **IMP-013 armed break-even** (stop 60.50→61.45), captured green at flatten. Filled **below VWAP — the safe side** of the ★★ gate. *Lost −$5.33 on 07-23; won today — same name, opposite tape.* |
+| 190 | COST | BOTH | 09:43:36 @929.342 (broke 926.815) | 15:56:29 @935.932 | 73.16 | 0.98 | **+0.34%** | EOD_FLATTEN | **+$32.95** | +0.71% | Breakout, strong momentum (0.98); drifted up all session, captured at flatten. Filled **+0.34% ABOVE VWAP — a winner the ★★ VWAP gate (skip >+0.25%) would have SKIPPED.** |
+| 191 | NFLX | MA | 10:09:25 @69.31 | 15:56:30 @70.21 | 60.53 | 0.70 | **+0.63%** | EOD_FLATTEN | **+$32.40** | **+1.30%** | Low-conf MA-only near the 60 floor; **day's best % mover**. Filled **+0.63% above VWAP (≥+0.50% band) — the second winner the gate would have SKIPPED.** IMP-013 trailed the stop 68.19→69.52. *Lost −$15.48 on 07-23; won today.* |
+
+### What worked / what didn't
+- **Worked — the drifted-up EOD_FLATTEN bucket did exactly its job on a stabilization bounce.** All 3 entries (2 MA-only 60-62 + 1 BOTH conf-73) drifted up on a firming tape and were captured green at the 15:56 flatten — the **mirror image of the 07-23 faded-flatten losses** (same signal classes, same exit mechanism, opposite tape). Notably **BAC and NFLX both LOST on 07-23 and WON today** — the cleanest possible confirmation that the leak is *regime* (heavy vs firming tape), not name quality.
+- **Worked — IMP-013 armed correctly.** BAC ratcheted to break-even (60.50→61.45) and NFLX trailed up (68.19→69.52) after each reached its trigger; broker order-replace confirmed, neither stop hit (both drifted up). COST correctly did NOT arm (never reached +0.5R). Zero rejected stop-replaces, no 422 loop.
+- **Worked — every capital-protection invariant held.** 0 open positions (no naked overnight); books reconcile to Alpaca to the penny (IMP-003/005); no circuit breaker, no bug, no slippage defect.
+- **★ Decisive analytic finding — today is a clean OUT-OF-SAMPLE COUNTEREXAMPLE to the ★★ VWAP gate.** 2 of 3 winners were fills **>+0.25% above session VWAP** (COST +0.34%, NFLX +0.63%) that the gate would have **skipped, removing +$65.35 of genuine profit** (turning +$87.13 into +$21.78). The held-out check (`scripts/replay.py`, split at 07-23) now shows the gate's **out-of-sample delta collapsed to just +$4.50** over the 07-23+07-24 window — 07-23's saved faders (−$69.85) are **nearly cancelled by today's above-VWAP winners (+$65.35)**. **The gate is TAPE-DEPENDENT** — it saves heavy-tape faders but saws off green bounce-day winners — the *same* tape-dependence that refuted the skip-bearish index-regime gate (IMP-011/012/015/018). This materially **tempers the 07-23 "strongest evidence yet" framing**: the gate is a partial, regime-conditional mitigant, NOT an unconditional cure.
+- **Tape context:** Perplexity `sonar` returned **stale/conflicting data** (it quoted 07-23's close, S&P 7,408.30 / −1.21%, not today's) → treated as unreliable and discarded; the morning research had Fri futures +0.11% (stabilization bounce after Thu's AI-capex rout). The bot's own green book + 3 drifted-up captures confirm the intraday tape firmed enough for MA/BOTH drift-ups to work. No name-specific catalyst on BAC/COST/NFLX — a broad firming/bounce, not news.
+
+### Lessons & improvement candidates (ranked)
+1. **No code change warranted — analysis-only run (mirrors 07-21).** Clean 3W/0L green day, zero defect, zero loss to root-cause, books reconcile to the penny, no risk event. Today's single decisive finding — the ★★ VWAP gate is **tape-dependent and would have COST +$65.35 today** — argues for *more* caution on the pending gate, not for shipping anything. Every per-trade discriminator (confidence IMP-004, volume, extension IMP-007, time-of-day IMP-016) and index-regime proxy (IMP-015/018) stays refuted. Inventing a change on a defect-free green day would overfit. **Disciplined outcome: reviewed, no change.**
+2. **★★ VWAP gate — today weakens the unconditional-gate case.** Out-of-sample delta is now only **+$4.50** over the 07-23+07-24 held-out window (vs the +$599 in-sample framing). It reinforces IMP-021's held-out caveat: the gate is a **partial, tape-conditional mitigant**, not a cure. If it ever ships (human sign-off), it should likely be **conditioned on tape/regime**, not applied unconditionally — otherwise it removes green bounce-day profit. Escalate this nuance in `todo.md` alongside the existing gate proposal. Still an entry-logic change AWAITING HUMAN SIGN-OFF — not shippable here.
+3. **⚠️ Traceability flag (NOT acted on — pre-existing uncommitted rule):** `bot/analytics.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py` still sit **uncommitted** in the tree — the IMP-021 (held-out check) + IMP-022 (breakout-momentum analytics) work prior reviews declared "SHIPPED" but never committed (last committed IMP = IMP-020 / 23c9692). Left untouched/unstaged this run per the ground rules (never `git add` files I did not modify this run). Any new tooling change would also land in these files and entangle with the uncommitted work — a further reason today is analysis-only. **Queued in `todo.md` for the next code-capable run / human to finalize the IMP-021/022 commits + log entries.**
+
+### Notes for pre-market research
+- **BAC** — won today (+$21.78, MA drift-up, filled below VWAP) after losing 07-23 (−$5.33); regime not name. Keep, top-of-list on a firming tape.
+- **COST** — clean BOTH breakout drift-up (+$32.95, strong mom 0.98); filled above VWAP but won on the bounce. Keep.
+- **NFLX** — **day's best % (+1.30%)**, low-conf MA-only; won today after losing 07-23 (−$15.48). Same name, opposite tape — the regime read, not a name defect. Keep.
+- **Tape firmed to a stabilization bounce** after Thu's AI-capex rout — if the bid holds, MA/BOTH drift-ups on liquid names keep working. **But this is a bounce, not a confirmed trend:** fresh Trump Section 301 tariffs, 10Y >4.7% (hawkish), and AI-capex ROI scrutiny still overhang. Don't chase stretched above-VWAP breakouts into any re-heavying of the tape.
+- **Mon 07-27: Mag-7 earnings ramp** (MSFT/META/AAPL/AMZN over the coming sessions) — re-scan the intraday-earnings calendar each morning and park any on-list name that shifts to reporting *during* market hours (AMC/BMO gaps carry no overnight risk for an EOD-flatten bot).
+- Equity **$7,681.00 (−23.19% YTD)** — recovered $87 off the low; now **$181.00 above the −25% ($7,500) strategy-review flag** (was $93.96). Cushion improved but still thin; protect.
+
+---
+
 ## 2026-07-23 — Daily Review
 
 ### Stats
