@@ -997,3 +997,38 @@ Service restarted: **no** (no watchlist changes; 0 open positions — nothing lo
 - **Chronic watches (NVDA 1W3 / UNH 0W3 / AMZN 0W3 / AMD 1W3 / QCOM 0W2 / ENPH)** — all above-VWAP open-fade regime, all top-liquidity large-caps, no name-specific defect. A fresh full-1R fade matures a park *discussion* only; the real lever is the ★★ VWAP entry-quality gate (IMP-020, human sign-off), NOT curation.
 - **★★ The real fix is still blocked on human sign-off** — re-escalate IMP-020 (skip fills >+0.25% above session VWAP; validated −$610 → +$78.49 in replay). Watchlist churn cannot fix a strategy-wide entry-quality leak.
 - **⚠️ Cushion is at its thinnest yet: equity $7,664.14 (−23.4%), only ~$164 above the −25% ($7,500) strategy-review flag.** One more −$165 day breaches it. Protect aggressively; do not add names into the ongoing AI-capex-scrutiny / oil-~$90 risk-off tape.
+
+---
+
+## 2026-07-24 — Pre-market Research
+
+### Market context
+**Modest stabilization bounce after Thursday's Big-Tech rout.** Thu 07-23 was an AI-capex bloodbath: **S&P 500 −1.21% (7,408.30), Nasdaq Composite −2.15% (25,137.69), Dow −0.97%** — the Mag-7 shed ~$800B, **GOOGL −7% / TSLA −14%** on their earnings (both posted **negative Q2 free cash flow** amid ballooning AI spend). Fri 07-24 futures point **modestly higher: S&P +0.11%** (Polymarket implied ~66% odds of an up-open) — a stabilization attempt, not a trend. Overhangs: **new Trump Section 301 tariffs (10–12.5%) took effect overnight**; **10Y yield briefly >4.7%** → rising rate-hike odds (hawkish); **Brent eased −2% to <$99** after briefly topping $100 on Red Sea tanker attacks. Today's data: **S&P Global flash PMIs (services/mfg) + new home sales**. Earnings BMO: **AXP, VZ, NEE, CHTR, SLB, HCA, THC** — **all off-list; NO on-list name reports DURING market hours today** → no intraday earnings park. INTC (07-23 AMC) gaps today, already digesting by the open.
+
+### Carried from daily review (2026-07-23)
+- **07-23 booked −$70.18 (0W/5L)** → equity close **$7,593.96** (−24.06% YTD). All 5 faded from entry (2 STOP, 3 EOD_FLATTEN); **4 of 5 fills were >+0.25% above session VWAP** — the ★★ VWAP entry-quality gate (IMP-019/020) would have skipped all four faders and avoided −$69.85 of the −$70.18 day. **Strongest single-day evidence yet, but the gate is an entry-logic change AWAITING HUMAN SIGN-OFF — not shippable here, not fixable by curation.**
+- **Per-name reads all "not a name defect":** XOM (biggest loss, chased breakout +0.60% above VWAP; energy strength real), MU (traded twice, re-entries into a fading tape, ~$1000/sh so tiny qty), NFLX (regime), BAC (late 15:27 entry — entry-timing backlog). All liquid, all HOLD.
+- **⚠️ Cushion at its thinnest yet — $93.96 above the −25% ($7,500) flag.** Protect aggressively; do not add.
+- **Traceability flag (not acted on):** IMP-021/022 offline tooling (analytics.py, replay.py, scripts/replay.py, tests/test_replay.py) sit uncommitted in the tree — left untouched per ground rules (code changes belong to the daily-review routine).
+
+### Watchlist review
+- **Positions: 0 open — nothing locked.** Account **ACTIVE**, equity **$7,593.87** (last_equity $7,593.87 = flat, no trades since 07-23 close), cash $7,593.87, buying power $30,375. **−24.06% from $10K, only $93.87 above the −25% ($7,500) strategy-review flag — thinnest cushion yet.** Clock `is_open=false`, next open 07-24 09:30 ET (pre-open run).
+- **Intraday-earnings check (standing rule):** GOOGL/TSLA earnings ALREADY resolved (dropped Thu 07-23); INTC (07-23 AMC) gaps today. Today's BMO reporters (AXP/VZ/NEE/CHTR/SLB/HCA/THC) are **all off-list**. **No on-list name reports during market hours today → no earnings park.** No halt/binary on any on-list name.
+- Per-symbol P&L (14d closed): red **NVDA −$176.97 (1W3)**, **UNH −$139.23 (0W3)**, **ENPH −$124.80 (0W1)**, **AMD −$94.93 (1W3)**, **ABNB −$91.26 (0W1)**, XOM −$80.02 (0W2), QQQ −$77.08 (1W2), QCOM −$60.47 (0W2), NFLX −$57.48 (0W2), CRM −$55.65 (0W1), **MU −$44.66 (0W4)**, SE −$41.65, **AMZN −$39.60 (0W3)**, AVGO −$24.18, GOOGL −$0.78. Green **MSFT +$78.39**, **BAC +$67.82 (3W4)**, **META +$39.40**, AAPL +$32.18, INTC +$26.91, GOOG +$14.90, WMT +$11.76, COST +$9.06, SPY +$5.59. **The quality names still produce; the red is uniform above-VWAP open-fade regime, not name-specific.** Zero-signal check: **no on-list name has never signaled** (empty) — no structural-mismatch park candidate (WPM already parked for that reason).
+- **No chronic-loser park trigger matured.** Every red name (NVDA/UNH/ENPH/AMD/ABNB/MU/AMZN) is the standing above-VWAP open-fade regime — the ★★ VWAP-gate target (IMP-020, human sign-off), all liquid large-caps that fit the breakout strategy; none sub-$5/illiquid/halt-prone. MU 0W4 (14d) is the same regime + re-entry-into-fade pattern the 07-23 review documented (~$1000/sh → tiny $ risk), not a name defect; held per the deliberate 06-25 re-enable (AI-memory day-driver).
+- **GOOGL/TSLA post-earnings day-2** — wide intraday ranges likely persist; both liquid mega-caps, EOD-flatten (no overnight risk) → **HOLD** (extra intraday caution: favor at/below-VWAP drift-ups, avoid chasing breakouts stretched above VWAP into the heavy tape, per 07-23 review).
+- **Adds: none** — a stabilization bounce (not a confirmed trend) into fresh tariffs + rising yields (10Y >4.7%) + AI-capex ROI scrutiny, at a **−24.06% drawdown with only $93.87 of cushion.** Leaders/rotation already fully on-list (semis, megacaps, financials via BAC, energy via XOM). Chasing into a fragile bounce at the thinnest cushion yet is exactly the wrong risk.
+
+### Changes applied to watchlist
+**No changes.** 26 active retained. No park trigger matured: no on-list name reports during market hours today; every red name is the above-VWAP open-fade regime (the ★★ VWAP-gate strategy lever, IMP-020 / todo.md / human sign-off), **not** a name defect; no structural mismatch (no zero-signal names). 0 positions open (nothing locked). No adds — thinnest-ever cushion argues against chasing a fragile bounce into tariffs/rate-hike overhang. Conservative hold is the correct call — no churn.
+
+### Final watchlist
+26 active (unchanged): AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+(Parked: BABA, BIRD, C, JPM, WPM.)
+Service restarted: **no** (no watchlist changes; 0 open positions — nothing locked; service already active since the 07:00 UTC nightly cycle).
+
+### Notes for pre-market research (next session — Mon 07-27)
+- **Mag-7 earnings ramp late July** — MSFT/META/AAPL/AMZN report over the coming sessions. Re-scan the intraday-earnings calendar each morning and park any on-list name that shifts to reporting *during* market hours (WisBot flattens by 15:55 ET, so AMC/BMO gaps carry no overnight risk — only *during-hours* reports warrant a park).
+- **Chronic watches (NVDA 1W3 / UNH 0W3 / ENPH 0W1 / AMD 1W3 / ABNB 0W1 / MU 0W4 / AMZN 0W3)** — all above-VWAP open-fade regime, all top-liquidity large-caps, no name-specific defect. A fresh full-1R fade matures a park *discussion* only; the real lever is the ★★ VWAP entry-quality gate (IMP-020, human sign-off), NOT curation.
+- **★★ The real fix is still blocked on human sign-off** — re-escalate IMP-020 (skip fills >+0.25% above session VWAP; 07-23 was its strongest single-day evidence yet — would have turned −$70.18 into −$0.33). Watchlist churn cannot fix a strategy-wide entry-quality leak.
+- **⚠️ Cushion at its thinnest ever: equity $7,593.87 (−24.06%), only $93.87 above the −25% ($7,500) strategy-review flag.** One more ~$100 day breaches it → strategy review triggers. Protect aggressively; do NOT add names into the tariff/rate-hike/AI-capex-scrutiny tape.
