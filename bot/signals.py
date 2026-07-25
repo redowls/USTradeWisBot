@@ -200,7 +200,7 @@ def _null_result(symbol: str) -> dict:
         "symbol": symbol, "breakout_score": 0.0, "ma_score": 0.0,
         "value_score": 0.0, "momentum_score": 0.0, "regime_ok": False,
         "regime_multiplier": 0.0, "signal_type": None, "broke_level": None,
-        "close": None, "atr": None, "bars": 0,
+        "close": None, "atr": None, "session_vwap": None, "bars": 0,
     }
 
 
@@ -224,6 +224,12 @@ def evaluate(symbol: str, df: pd.DataFrame | None = None, n_bars: int = 120) -> 
     value = value_score(comp, df)
     mom = momentum_score(comp)
     regime_ok, regime_mult = regime(comp)
+    # Current session VWAP (IMP-022): last value of the day-reset VWAP series;
+    # the entry-quality gate in engine.consider_entries skips fills stretched too
+    # far above it. NaN (thin/zero-volume session) -> None so the gate fails open.
+    vwap_series = indicators.session_vwap(df)
+    vwap_last = _safe(vwap_series.iloc[-1]) if len(vwap_series) else 0.0
+    session_vwap = round(vwap_last, 4) if vwap_last and vwap_last > 0 else None
 
     return {
         "symbol": symbol,
@@ -237,6 +243,7 @@ def evaluate(symbol: str, df: pd.DataFrame | None = None, n_bars: int = 120) -> 
         "broke_level": round(broke_level, 4) if broke_level is not None else None,
         "close": round(_safe(df["close"].iloc[-1]), 4),
         "atr": round(_safe(comp["atr"].iloc[-1]), 4),
+        "session_vwap": session_vwap,
         "bars": len(df),
     }
 

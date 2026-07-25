@@ -74,6 +74,21 @@ def entry_slippage_pct(live_price: float | None, entry_price: float | None) -> f
     return (live_price - entry_price) / entry_price * 100.0
 
 
+def vwap_distance_pct(entry_price: float | None, session_vwap: float | None) -> float | None:
+    """Percent the entry sits ABOVE the symbol's session VWAP, or None if unknown.
+
+    Positive = filled above the volume-weighted fair-value line (a stretched
+    chase that tends to fade); negative = filled at/below it. The engine's VWAP
+    entry-quality gate (IMP-022) skips an entry when this exceeds
+    VWAP_MAX_DIST_PCT. Returns None when either price is missing/invalid so the
+    gate fails open (no skip) — matching the live behavior on a thin/zero-volume
+    session where session_vwap is undefined.
+    """
+    if entry_price is None or session_vwap is None or session_vwap <= 0:
+        return None
+    return (entry_price - session_vwap) / session_vwap * 100.0
+
+
 def _skip(symbol: str, confidence: float, entry: float, reason: str) -> PositionPlan:
     return PositionPlan(
         symbol=symbol, confidence=confidence, tradable=False, skip_reason=reason,

@@ -39,8 +39,9 @@ def _equity() -> float:
 
 
 def format_report(s: dict) -> str:
+    gate = "IMP-021 + IMP-022 VWAP gate" if s.get("vwap_gate") else "IMP-021 only (no VWAP gate)"
     lines = [
-        "📊 USTradeWisBot — 30-day backtest (whole strategy, incl. IMP-021)",
+        f"📊 USTradeWisBot — 30-day backtest (whole strategy, {gate})",
         f"Window: {s['window']}  ({s['sessions']} sessions)",
         f"Symbols ({len(s['symbols'])}): {', '.join(s['symbols'])}",
         "",
@@ -79,6 +80,14 @@ def main(argv: list[str] | None = None) -> int:
         print("No active watchlist symbols — aborting.", file=sys.stderr)
         return 1
 
+    # By default apply the live IMP-022 VWAP entry gate so the report reflects the
+    # REAL bot; --no-vwap-gate shows the pre-IMP-022 baseline for comparison.
+    def _vwap_gate(features: dict) -> bool:
+        d = features.get("vwap_dist_pct")
+        return d is None or d <= config.VWAP_MAX_DIST_PCT
+
+    entry_filter = None if "--no-vwap-gate" in argv else _vwap_gate
+
     equity = _equity()
     # Fetch history: window sessions + warmup, with RTH-filter slack.
     n_bars = ceil(days / 30 * SESSIONS_PER_MONTH) * BARS_PER_SESSION + backtest.EVAL_BARS + 200
@@ -86,7 +95,8 @@ def main(argv: list[str] | None = None) -> int:
           flush=True)
     all_bars = data.get_bars_for_symbols(symbols, n_bars=n_bars, timeframe=config.BAR_TIMEFRAME)
 
-    summary = backtest.run_backtest(all_bars, symbols, days, equity)
+    summary = backtest.run_backtest(all_bars, symbols, days, equity, entry_filter=entry_filter)
+    summary["vwap_gate"] = entry_filter is not None
     report = format_report(summary)
     print("\n" + report)
 

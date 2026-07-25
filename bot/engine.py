@@ -156,6 +156,22 @@ class Engine:
                 break
             if conf < config.MIN_CONFIDENCE or not ev.get("signal_type"):
                 continue
+            # --- VWAP entry-quality gate (IMP-022) ---
+            # Skip fills stretched more than VWAP_MAX_DIST_PCT above the symbol's
+            # session VWAP: entry-vs-session-VWAP is the one clean separator of the
+            # open-fade leak (recorded-trade holdout IMP-019/020 + a from-scratch
+            # 30-day backtest both agree). Fills at/below VWAP hold; stretched-above
+            # fills fade to the stop. Fail-open when VWAP is undefined.
+            vwap_dist = sizing.vwap_distance_pct(ev.get("close"), ev.get("session_vwap"))
+            if vwap_dist is not None and vwap_dist > config.VWAP_MAX_DIST_PCT:
+                actions.append({"symbol": ev["symbol"], "confidence": conf,
+                                "action": "skip",
+                                "detail": f"above_vwap_+{vwap_dist:.2f}%"})
+                self._log(f"ENTRY SKIPPED {ev['symbol']}: entry {ev['close']:.2f} is "
+                          f"+{vwap_dist:.2f}% above session VWAP "
+                          f"{ev['session_vwap']:.2f} (>{config.VWAP_MAX_DIST_PCT}% — "
+                          f"stretched fill, fades)")
+                continue
             # Underlying-equivalence guard (#3): share classes count as one
             # stock for the held-skip, the daily cap and the cooldown.
             equiv = config.equivalent_symbols(ev["symbol"])

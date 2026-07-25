@@ -58,6 +58,12 @@ class BtTrade:
     confidence: float
     exit_reason: str
     pl: float
+    # Entry-quality features (for filter what-ifs); default so tests need not set them.
+    vwap_dist_pct: float | None = None   # entry price vs session VWAP at entry, %
+    momentum: float = 0.0
+    regime_mult: float = 0.0
+    ma_score: float = 0.0
+    value_score: float = 0.0
 
     @property
     def win(self) -> bool:
@@ -103,11 +109,29 @@ def _session_dates(bars: pd.DataFrame, days: int) -> list[date]:
     return [d for d in all_days if d > cutoff]
 
 
+def _session_vwap_upto(day_bars: pd.DataFrame, upto: int) -> float | None:
+    """Volume-weighted typical price from the session open through bar ``upto``.
+
+    Returns None when there is no ``volume`` column or no traded volume, so a
+    VWAP filter can fail open (like the live engine would on missing data).
+    """
+    if "volume" not in day_bars.columns:
+        return None
+    seg = day_bars.iloc[: upto + 1]
+    typical = (seg["high"] + seg["low"] + seg["close"]) / 3.0
+    vol = seg["volume"].astype(float)
+    denom = float(vol.sum())
+    if denom <= 0:
+        return None
+    return float((typical * vol).sum() / denom)
+
+
 def symbol_trades_for_day(
     symbol: str,
     bars: pd.DataFrame,
     day: date,
     equity: float,
+    entry_filter=None,
 ) -> list[BtTrade]:
     """Every entry the strategy would have taken on ``symbol`` on ``day``.
 
@@ -115,6 +139,12 @@ def symbol_trades_for_day(
     enters at that bar's close and simulates the bracket to the EOD flatten,
     then resumes scanning after the exit + re-entry cooldown, up to the daily
     per-symbol cap.
+
+    ``entry_filter`` (optional) is a candidate gate ``fn(features: dict) -> bool``
+    evaluated at each qualifying signal BEFORE entering; when it returns False the
+    bar is skipped and scanning continues (the entry never happens, so it also
+    frees a MAX_CONCURRENT slot downstream). ``features`` carries vwap_dist_pct,
+    momentum, regime_mult, ma_score, value_score, confidence.
     """
     day_mask = [ts.date() == day for ts in bars.index]
     day_bars = bars[day_mask]
@@ -158,6 +188,22 @@ def symbol_trades_for_day(
             i += 1
             continue
 
+        # Entry-quality features + optional candidate gate (skip = keep scanning).
+        vwap = _session_vwap_upto(day_bars, i)
+        vwap_dist = (round((plan.entry_price - vwap) / vwap * 100.0, 3)
+                     if vwap and vwap > 0 else None)
+        features = {
+            "vwap_dist_pct": vwap_dist,
+            "momentum": ev.get("momentum_score", 0.0),
+            "regime_mult": ev.get("regime_multiplier", 0.0),
+            "ma_score": ev.get("ma_score", 0.0),
+            "value_score": ev.get("value_score", 0.0),
+            "confidence": conf,
+        }
+        if entry_filter is not None and not entry_filter(features):
+            i += 1
+            continue
+
         # Enter at this bar's close; simulate the bracket over the rest of RTH.
         after = day_bars[[bt.time() < RTH_CLOSE for bt in day_bars.index]].iloc[i + 1:]
         exit_price, reason, exit_ts = simulate_exit(
@@ -169,6 +215,10 @@ def symbol_trades_for_day(
             symbol=symbol, day=str(day), entry_time=ts, exit_time=exit_ts,
             entry_price=plan.entry_price, exit_price=round(exit_price, 4),
             shares=plan.shares, confidence=round(conf, 1), exit_reason=reason, pl=pl,
+            vwap_dist_pct=vwap_dist, momentum=round(float(ev.get("momentum_score", 0.0)), 4),
+            regime_mult=round(float(ev.get("regime_multiplier", 0.0)), 4),
+            ma_score=round(float(ev.get("ma_score", 0.0)), 4),
+            value_score=round(float(ev.get("value_score", 0.0)), 4),
         ))
         entries_used += 1
         cooldown_until = exit_ts + timedelta(minutes=config.REENTRY_COOLDOWN_MIN)
@@ -203,8 +253,13 @@ def run_backtest(
     symbols: list[str],
     days: int,
     equity: float,
+    entry_filter=None,
 ) -> dict:
-    """Run the full backtest and return an aggregate summary + the trade list."""
+    """Run the full backtest and return an aggregate summary + the trade list.
+
+    ``entry_filter`` (optional) is passed through to ``symbol_trades_for_day`` as
+    a candidate-quality gate for what-if experiments (VWAP/trend filters).
+    """
     raw: list[BtTrade] = []
     session_days: set[date] = set()
     for sym in symbols:
@@ -213,7 +268,7 @@ def run_backtest(
             continue
         for d in _session_dates(bars, days):
             session_days.add(d)
-            raw.extend(symbol_trades_for_day(sym, bars, d, equity))
+            raw.extend(symbol_trades_for_day(sym, bars, d, equity, entry_filter=entry_filter))
 
     trades = apply_concurrency(raw, config.MAX_CONCURRENT_POSITIONS)
 

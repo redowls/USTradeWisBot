@@ -154,6 +154,13 @@ BREAKOUT_FADE_CEILING = 0.5     # veto entries whose breakout_score is at/above 
                                 # from -$2,024 to -$12 and held out-of-sample (last 5
                                 # sessions: skipped set net -$183, kept book +$25). Fresh
                                 # resistance breakouts fade; don't chase the spike bar.
+VWAP_MAX_DIST_PCT = 0.25        # skip entries filled more than this % ABOVE the symbol's
+                                # session VWAP (IMP-022, 2026-07-25). Two independent
+                                # validations: the recorded-trade holdout (IMP-019/020) and
+                                # a from-scratch 30-day backtest both show entry-vs-session-
+                                # VWAP is the one clean separator — fills at/below VWAP make
+                                # money, fills stretched above it fade. Gating >+0.25% flipped
+                                # the 30-day backtest from -$183 to +$53 (win% 35->43).
 
 # --- Signal filters / thresholds ---
 RSI_OVERBOUGHT = 70             # over-extension penalty trigger
