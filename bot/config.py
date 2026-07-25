@@ -147,6 +147,13 @@ VALUE_VETO_FLOOR = 0.25         # veto breakout/BOTH entries when value_score (t
                                 # were flagged badly-extended (value 0.20/0.00/0.24)
                                 # yet still cleared confidence because value is only
                                 # 20% of the blend and could never veto.
+BREAKOUT_FADE_CEILING = 0.5     # veto entries whose breakout_score is at/above this
+                                # (IMP-021, 2026-07-25). Holdout-validated: breakout_score
+                                # is bimodal (~0 or >=0.5); the real-breakout leg was the
+                                # ENTIRE loss driver — skipping it lifted the recorded book
+                                # from -$2,024 to -$12 and held out-of-sample (last 5
+                                # sessions: skipped set net -$183, kept book +$25). Fresh
+                                # resistance breakouts fade; don't chase the spike bar.
 
 # --- Signal filters / thresholds ---
 RSI_OVERBOUGHT = 70             # over-extension penalty trigger

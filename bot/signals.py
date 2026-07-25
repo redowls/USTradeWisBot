@@ -180,6 +180,12 @@ def _classify(bo_score: float, ma: float, value: float) -> str | None:
     # JPM/XOM/ABNB were badly extended yet still traded).
     if has_breakout and value < config.VALUE_VETO_FLOOR:
         return None
+    # Strong-breakout ("fade") veto: a fresh breakout scoring at/above the ceiling
+    # reliably fades (IMP-021, holdout-validated 2026-07-25 — the real-breakout leg
+    # was the entire loss driver). Skip the entry entirely rather than fall back to
+    # an MA entry on the same breakout bar; buying the breakout bar is the problem.
+    if has_breakout and bo_score >= config.BREAKOUT_FADE_CEILING:
+        return None
     if has_breakout and has_ma:
         return "BOTH"
     if has_breakout:
