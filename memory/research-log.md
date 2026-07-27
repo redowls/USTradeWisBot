@@ -1032,3 +1032,38 @@ Service restarted: **no** (no watchlist changes; 0 open positions — nothing lo
 - **Chronic watches (NVDA 1W3 / UNH 0W3 / ENPH 0W1 / AMD 1W3 / ABNB 0W1 / MU 0W4 / AMZN 0W3)** — all above-VWAP open-fade regime, all top-liquidity large-caps, no name-specific defect. A fresh full-1R fade matures a park *discussion* only; the real lever is the ★★ VWAP entry-quality gate (IMP-020, human sign-off), NOT curation.
 - **★★ The real fix is still blocked on human sign-off** — re-escalate IMP-020 (skip fills >+0.25% above session VWAP; 07-23 was its strongest single-day evidence yet — would have turned −$70.18 into −$0.33). Watchlist churn cannot fix a strategy-wide entry-quality leak.
 - **⚠️ Cushion at its thinnest ever: equity $7,593.87 (−24.06%), only $93.87 above the −25% ($7,500) strategy-review flag.** One more ~$100 day breaches it → strategy review triggers. Protect aggressively; do NOT add names into the tariff/rate-hike/AI-capex-scrutiny tape.
+
+---
+
+## 2026-07-27 — Pre-market Research
+
+### Market context
+**Risk-on bounce extends into the busiest week of the quarter.** Weekend US–Iran ceasefire/peace-talk hopes sank oil ~7% (Brent <$88, WTI ~$85), and futures rallied hard: **S&P 500 +0.79%, Nasdaq-100 +1.34%, Dow +0.67%, Russell 2000 +1.16%**, tech-led, VIX lower. Fri 07-24 had closed mixed/stabilizing (S&P 7,411.98 +0.05%, Nasdaq Comp −0.64%) after Thu's AI-capex rout (GOOGL −7% / TSLA −14%). **This is the continuation of the Fri firming bounce, not a confirmed trend** — the AI-capex ROI scrutiny that sank Alphabet/Tesla still overhangs the hyperscalers reporting this week. **Big week: 4 Mag-7 report + FOMC + Core PCE.** Today's data: **June durable-goods orders**; today's earnings (NUE et al.) are **off-list**. 10Y still elevated; consensus is a Fed **hold Wed** with the first hike priced to September.
+- **★ Intraday-earnings scan (the 07-24 carried action item):** MSFT + META **Wed 07-29 AMC**, AAPL + AMZN **Thu 07-30 AMC**, QCOM **Wed AMC**, XOM **Fri (BMO)**. **Every on-list reporter this week reports AMC/BMO — NONE during market hours.** WisBot flattens by 15:55 ET, so AMC/BMO gaps carry **no overnight risk** → **no earnings park is warranted.** No on-list name reports *during* market hours today or any day this week.
+
+### Carried from daily review (2026-07-24)
+- **07-24 booked +$87.13 (3W/0L)** → equity close **$7,681.00** (−23.19% YTD, recovered $87 off the low; now **$181 above the −25% ($7,500) flag**, up from the thinnest-ever $93.96). BAC/COST/NFLX all drifted up and captured green at the flatten on the firming tape — the mirror image of 07-23's faded-flatten losses (**same names/signals, opposite tape → regime, not name quality**).
+- **Action item honored:** re-scan the Mag-7 intraday-earnings calendar and park any name that shifts to *during-hours* reporting — done above; all AMC/BMO → no park.
+- **★★ VWAP gate (IMP-019/020) remains the real lever, still AWAITING HUMAN SIGN-OFF** — and 07-24 was a clean out-of-sample *counterexample* (2 of 3 winners were fills >+0.25% above VWAP the gate would have skipped, costing +$65.35). The gate is **tape-dependent** (helps heavy-tape faders, saws off green bounce-day winners), not an unconditional cure — one more reason curation cannot fix it.
+- **Traceability flag (not acted on):** IMP-021/022 offline tooling (analytics.py, replay.py, scripts/replay.py, tests/test_replay.py) + backtest_result.json sit uncommitted in the tree — **left untouched/unstaged per ground rules** (code changes belong to the daily-review routine).
+
+### Watchlist review
+- **Positions: 0 open — nothing locked.** Account **PA3ESJUO8RU0 ACTIVE**, equity **$7,680.97** (last_equity $7,680.97 = flat, no trades since 07-24 close), buying power $30,723.88, trading_blocked false. Clock `is_open=false` (pre-open run). **−23.19% from $10K, $181 above the −25% ($7,500) strategy-review flag.**
+- **Intraday-earnings check (standing rule):** all 4 Mag-7 reporters (MSFT/META Wed AMC, AAPL/AMZN Thu AMC) + QCOM (Wed AMC) + XOM (Fri BMO) report AMC/BMO — **none during market hours** → **no earnings park.** No halt/binary on any on-list name today.
+- Per-symbol P&L (14d closed, 44 trades, net **−$656.28**): red **UNH −$139.23 (0W3)**, **ENPH −$124.80 (0W1)**, **AMD −$94.93 (1W3)**, **ABNB −$91.26 (0W1)**, XOM −$80.02 (0W2), QQQ −$77.08 (1W2), QCOM −$60.47 (0W2), CRM −$55.65 (0W1), **NVDA −$47.04 (1W2)**, **MU −$44.66 (0W4)**, AMZN −$39.24 (0W2), NFLX −$25.08 (1W3), AVGO −$24.18 (1W3). Green **BAC +$86.44 (3W4)**, COST +$42.01 (2W2), META +$39.40, AAPL +$32.18, INTC +$26.91, GOOG +$14.90, WMT +$5.52. **The quality names still produce; the red is uniform above-VWAP open-fade regime, not name-specific** (BAC/COST/NFLX all *won* 07-24 on the firming tape after losing 07-23 — cleanest possible regime-vs-name proof). No on-list name has never signaled → no structural-mismatch park candidate.
+- **No chronic-loser park trigger matured.** Every red name (UNH/ENPH/AMD/ABNB/QCOM/MU/AMZN/NVDA) is the standing above-VWAP open-fade regime — all liquid large-caps that fit the breakout strategy, none sub-$5/illiquid/halt-prone. MU 0W4 (14d) is the same regime + re-entry-into-fade pattern, ~$1000/sh → tiny $ risk; held per the deliberate 06-25 re-enable (AI-memory day-driver).
+- **Adds: none** — a risk-on bounce (not a confirmed trend) into a Mag-7 earnings gauntlet + FOMC Wed + Core PCE, with AI-capex ROI scrutiny still overhanging, at a **−23.19% drawdown with $181 of cushion.** Leaders/rotation already fully on-list (semis, megacaps, financials via BAC, energy via XOM). Chasing into a fragile bounce ahead of binary macro is exactly the wrong risk.
+
+### Changes applied to watchlist
+**No changes.** 26 active retained. No park trigger matured: every on-list reporter this week is AMC/BMO (no during-hours earnings risk → no park); every red name is the above-VWAP open-fade regime (the ★★ VWAP-gate strategy lever, IMP-020 / todo.md / human sign-off), **not** a name defect; no structural mismatch (no zero-signal names). 0 positions open (nothing locked). No adds — thin cushion + FOMC/Mag-7 binary week argues against chasing a fragile bounce. Conservative hold is the correct call — no churn.
+
+### Final watchlist
+26 active (unchanged): AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+(Parked: BABA, BIRD, C, JPM, WPM.)
+Service restarted: **no** (no watchlist changes; 0 open positions — nothing locked; service already active since the 07-25 15:15 UTC restart).
+
+### Notes for pre-market research (next session — Tue 07-28)
+- **★ Re-scan the intraday-earnings calendar Wed/Thu:** MSFT + META report **Wed 07-29 AMC** (gap Thu), AAPL + AMZN **Thu 07-30 AMC** (gap Fri), QCOM **Wed AMC**, XOM **Fri BMO**. All AMC/BMO = **no overnight risk** for an EOD-flatten bot → **no park** — but expect wide post-earnings intraday ranges on those names the morning after. Only a *during-hours* report warrants a park.
+- **FOMC decision Wed 07-29 + Core PCE this week** — consensus hold Wed (first hike priced to Sept); a hawkish surprise or hot PCE could whipsaw the tape. Do NOT add names into these binaries.
+- **Chronic watches (UNH 0W3 / ENPH 0W1 / AMD 1W3 / ABNB 0W1 / QCOM 0W2 / MU 0W4 / AMZN 0W2)** — all above-VWAP open-fade regime, all top-liquidity large-caps, no name-specific defect. The real lever is the ★★ VWAP entry-quality gate (IMP-020, human sign-off), NOT curation.
+- **Equity $7,680.97 (−23.19%), $181 above the −25% ($7,500) flag** — cushion improved off the low but still thin. Protect; the bounce is risk-on but unconfirmed into a Mag-7 + Fed + PCE week.
