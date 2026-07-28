@@ -3,6 +3,8 @@ entry gates performed on a given trading session.
 
   python -m scripts.gate_monitor                 # today (ET), print only
   python -m scripts.gate_monitor --date 2026-07-27
+  python -m scripts.gate_monitor --since 2026-07-27          # cumulative post-gate scorecard
+  python -m scripts.gate_monitor --since 2026-07-27 --date 2026-07-31   # bounded window
   python -m scripts.gate_monitor --telegram --out /path/result.json
 
 Combines two sources:
@@ -51,34 +53,41 @@ def _journal_counts(date_str: str) -> dict:
     return {"available": True, "vwap_skips": vwap, "log_entries": entries, "rejects": rejects}
 
 
-def _db_session(date_str: str) -> dict:
-    """Trades that got through the gates on ``date_str`` + the IMP-021 hold check."""
+_ROWS_SQL = """
+    WITH s AS (
+      SELECT trade_id, breakout_score,
+             ROW_NUMBER() OVER (PARTITION BY trade_id ORDER BY ts) rn
+      FROM dbo.signals WHERE trade_id IS NOT NULL)
+    SELECT t.symbol, t.status, t.realized_pl, t.exit_reason, t.entry_time, s.breakout_score
+    FROM dbo.trades t
+    LEFT JOIN s ON s.trade_id = t.trade_id AND s.rn = 1
+    WHERE {where}
+    ORDER BY t.entry_time
+"""
+
+
+def _fetch_rows(where: str, params: tuple) -> list[dict]:
+    """Load gate-relevant trade rows matching ``where`` (parameterised)."""
     cn = db.connect()
     cur = cn.cursor()
-    cur.execute(
-        """
-        WITH s AS (
-          SELECT trade_id, breakout_score,
-                 ROW_NUMBER() OVER (PARTITION BY trade_id ORDER BY ts) rn
-          FROM dbo.signals WHERE trade_id IS NOT NULL)
-        SELECT t.symbol, t.status, t.realized_pl, t.exit_reason, s.breakout_score
-        FROM dbo.trades t
-        LEFT JOIN s ON s.trade_id = t.trade_id AND s.rn = 1
-        WHERE CAST(t.entry_time AS DATE) = ?
-        ORDER BY t.entry_time
-        """,
-        date_str,
-    )
+    cur.execute(_ROWS_SQL.format(where=where), *params)
     rows = [{"symbol": r.symbol, "status": r.status,
              "pl": float(r.realized_pl) if r.realized_pl is not None else None,
              "exit_reason": r.exit_reason,
+             "entry_date": r.entry_time.date().isoformat() if r.entry_time is not None else None,
              "bo": float(r.breakout_score) if r.breakout_score is not None else None}
             for r in cur.fetchall()]
     cn.close()
+    return rows
 
+
+def _aggregate(rows: list[dict]) -> dict:
+    """Pure win/lose/exit/PF/IMP-021-hold summary of ``rows`` (empty-safe)."""
     closed = [r for r in rows if r["pl"] is not None]
     wins = sum(1 for r in closed if r["pl"] > 0)
     losses = len(closed) - wins
+    gross_win = sum(r["pl"] for r in closed if r["pl"] > 0)
+    gross_loss = -sum(r["pl"] for r in closed if r["pl"] < 0)
     strong_bo = [r for r in rows if r["bo"] is not None and r["bo"] >= config.BREAKOUT_FADE_CEILING]
     by_reason: dict[str, dict] = {}
     for r in closed:
@@ -93,11 +102,39 @@ def _db_session(date_str: str) -> dict:
         "losses": losses,
         "win_pct": round(100.0 * wins / len(closed), 1) if closed else 0.0,
         "net_pl": round(sum(r["pl"] for r in closed), 2),
+        # PF is None ("n/a") when there are no losing trades (or no closed trades) —
+        # honest and JSON-safe (no Infinity); mirrors scripts/report.py's "n/a".
+        "profit_factor": round(gross_win / gross_loss, 2) if gross_loss > 0 else None,
         "by_reason": by_reason,
         "imp021_held": len(strong_bo) == 0,
         "strong_breakout_leaks": [r["symbol"] for r in strong_bo],
         "symbols": [r["symbol"] for r in rows],
     }
+
+
+def _db_session(date_str: str) -> dict:
+    """Trades that got through the gates on ``date_str`` + the IMP-021 hold check."""
+    return _aggregate(_fetch_rows("CAST(t.entry_time AS DATE) = ?", (date_str,)))
+
+
+def _db_window(since_str: str, until_str: str) -> dict:
+    """Cumulative gate scorecard over the inclusive [since, until] session range.
+
+    Same shape as :func:`_db_session` plus a per-session ``sessions`` net-P&L
+    breakdown and ``n_sessions`` count — the post-IMP-021/022 era view the daily
+    monitor can't give, so the keep/tune call reads one running scorecard instead
+    of hand-summing daily runs.
+    """
+    rows = _fetch_rows("CAST(t.entry_time AS DATE) BETWEEN ? AND ?", (since_str, until_str))
+    agg = _aggregate(rows)
+    by_day: dict[str, float] = {}
+    for r in rows:
+        if r["pl"] is None or r["entry_date"] is None:
+            continue
+        by_day[r["entry_date"]] = round(by_day.get(r["entry_date"], 0.0) + r["pl"], 2)
+    agg["sessions"] = sorted(by_day.items())
+    agg["n_sessions"] = len(by_day)
+    return agg
 
 
 def format_report(date_str: str, j: dict, d: dict) -> str:
@@ -135,21 +172,62 @@ def format_report(date_str: str, j: dict, d: dict) -> str:
     return "\n".join(lines)
 
 
+def format_window_report(since_str: str, until_str: str, d: dict) -> str:
+    pf = d.get("profit_factor")
+    pf_s = "n/a" if pf is None else f"{pf:.2f}"
+    lines = [
+        f"🚦 USTradeWisBot — cumulative gate performance {since_str} → {until_str}",
+        f"  (post-IMP-021/022 era · {d['n_sessions']} session(s))",
+        "",
+        "IMP-021 breakout veto: "
+        + ("✅ held — 0 strong-breakout trades got through" if d["imp021_held"]
+           else "⚠️ LEAK: " + ", ".join(d["strong_breakout_leaks"])),
+        "",
+        f"Trades through the gates: {d['taken']}  (closed {d['closed']}, open {d['open']})",
+        f"  ✅ {d['wins']} wins / ❌ {d['losses']} losses   win rate {d['win_pct']}%   "
+        f"net ${d['net_pl']:,.2f}   PF {pf_s}",
+    ]
+    if d["by_reason"]:
+        lines.append("  by exit: " + ", ".join(
+            f"{k} {v['n']} (${v['pl']:,.2f})" for k, v in sorted(d["by_reason"].items())))
+    if d.get("sessions"):
+        lines.append("  by session: " + ", ".join(
+            f"{day} ${net:,.2f}" for day, net in d["sessions"]))
+    lines += [
+        "",
+        "Read: cumulative post-gate scorecard — judge the two gates on the trend "
+        "across sessions, not any single day. Still a thin sample; keep accruing.",
+    ]
+    return "\n".join(lines)
+
+
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     date_str = _arg(argv, "--date", datetime.now(config.MARKET_TZ).strftime("%Y-%m-%d"))
+    since_str = _arg(argv, "--since", "")
     out = _arg(argv, "--out", "")
 
-    j = _journal_counts(date_str)
-    d = _db_session(date_str)
-    report = format_report(date_str, j, d)
-    print(report)
+    if since_str:
+        # Cumulative post-gate scorecard: [--since] .. [--date|today], DB-only
+        # (journal skip-counters are per-day context, not aggregated here).
+        d = _db_window(since_str, date_str)
+        report = format_window_report(since_str, date_str, d)
+        print(report)
+        payload = {"since": since_str, "until": date_str, "db": d,
+                   "generated_at": datetime.now(timezone.utc).isoformat(),
+                   "report_text": report}
+    else:
+        j = _journal_counts(date_str)
+        d = _db_session(date_str)
+        report = format_report(date_str, j, d)
+        print(report)
+        payload = {"date": date_str, "journal": j, "db": d,
+                   "generated_at": datetime.now(timezone.utc).isoformat(),
+                   "report_text": report}
 
     if out:
         with open(out, "w") as fh:
-            json.dump({"date": date_str, "journal": j, "db": d,
-                       "generated_at": datetime.now(timezone.utc).isoformat(),
-                       "report_text": report}, fh, indent=2, default=str)
+            json.dump(payload, fh, indent=2, default=str)
         print(f"\nWrote {out}")
     if "--telegram" in argv:
         print(f"\nTelegram sent: {notify.send(report)}")

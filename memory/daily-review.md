@@ -35,6 +35,38 @@ the pre-market routine reads this section the next morning)
 
 ---
 
+## 2026-07-28 — Daily Review
+
+### Stats
+- Trades: **3 closed (2W / 1L)**, win rate **66.7%**. Net **+$31.64 (+0.42%)**. **Second live session under the IMP-021 breakout-fade veto + IMP-022 VWAP entry gate.** Small green day that recovers ~44% of Friday-through-Monday's give-back.
+- Avg win **+$16.06** (GOOG +$25.90, AAPL +$6.22) vs avg loss **−$0.48** (MSFT, a break-even scratch). Profit factor **≈ 66.9** (gross win $32.12 / gross loss $0.48) — flattered by the tiny loss; treat as "no real loser today," not a repeatable PF.
+- Max intraday drawdown: negligible — MSFT never went materially red (IMP-013 break-even stop held it at −$0.02%).
+- Account equity close **$7,640.06** (broker-confirmed, was $7,608.42 → +$31.64, matches DB **to the penny**). ~29th straight no-overnight session; account flat at the close, **broker reconciles exactly** (0 positions, 0 orphan orders).
+- Cumulative post-gate scorecard (`gate_monitor --since 2026-07-27`, the new IMP-023 view): **8 trades, 4W/4L, net −$40.88, PF 0.48** across the 2 sessions — still net-negative but thin; judge on the trend, not either day.
+
+### Trade-by-trade review
+- **GOOG** — BUY 7 @ 328.65 (09:37:47 ET), stop 323.29 (−1.63%, ~3×ATR), TP 335.59. Exit **332.35 @ 15:57 EOD_FLATTEN**, **+$25.90 (+1.13%)**. Pure-MA entry near/below session VWAP (passed IMP-022), breakout_score 0 (passed IMP-021). Drifted up all session; never reached the +1R trail-arm nor TP, flattened green at the close. **Root cause of win: clean near-VWAP MA entry into a name that trended up — exactly what the gates select for.** Day's best.
+- **AAPL** — BUY 7 @ 338.88 (09:41:00 ET), stop 333.65, TP 346.35. Exit **339.77 @ 15:57 EOD_FLATTEN**, **+$6.22 (+0.26%)**. Same profile (pure-MA, at/below VWAP). Marginal up-drift — barely green, held to flatten. HSBC upgrade (Buy, $366 PT) noted premarket; no intraday catalyst per Perplexity. **Root cause: shallow but positive drift; correct hold, small reward.**
+- **MSFT** — BUY 6 @ 394.68 (09:46:27 ET), stop 389.04, TP 403.85. Exit **394.60 @ 15:13 STOP**, **−$0.48 (−0.02%)**. This is **IMP-013 working as designed**: MSFT reached +0.5R, the stop ratcheted to ~break-even, price pulled back and scratched it out — a would-be full-1R loser (~−$34 at the original stop) converted to a −$0.48 nick. **Root cause: not a strategy failure — the break-even rescue is the intended behaviour on a fade-after-green.**
+
+### What worked / what didn't
+- **Worked:** the full gate stack fired cleanly. All 3 fills were pure-MA (IMP-021 held — 0 strong-breakout leaks) and at/below session VWAP (IMP-022 skipped 0 — nothing stretched to reject). IMP-013 turned the one fader into a scratch instead of a −$34 stop. Books tie to the broker to the penny; 0 rejects, 0 overnight.
+- **Didn't (nothing broke):** no defect today. Only nit — both winners (GOOG, AAPL) rode to the 15:57 EOD flatten rather than to TP or the +1R trail; the trail never armed on GOOG despite +1.13% (its +1R ≈ 334.01 vs a 332.35 close, so it genuinely didn't reach the arm point). No action — that's the trail behaving correctly on a slow drift, not a leak.
+- Tape context (Perplexity): **choppy / risk-off-for-tech** — S&P +0.2% (7,428.78), Nasdaq −0.2% (24,876.91), AI/chip names sold off ahead of MSFT/META (Wed AMC) and AAPL (Thu AMC) prints; no single-name catalyst on GOOG/AAPL/MSFT. The bot's mega-cap MA entries drifted up despite the soft chip tape — regime-consistent, not luck-dependent.
+
+### Lessons & improvement candidates
+1. **No trading-logic change warranted today** — a single +$31.64 day on the gates' 2nd live session is not a mandate to touch entry/exit/sizing; that would overfit. The disciplined move is to accrue the post-gate sample and let it speak. **(chosen outcome)**
+2. **Highest-impact done → IMP-023 (tooling):** `gate_monitor.py` was per-day only, so answering "are IMP-021/022 net-delivering?" meant hand-summing daily runs, and the script had **zero tests**. Added a cumulative `--since DATE` post-gate scorecard (total W/L, net, **PF**, by-exit split, per-session net, IMP-021-hold check across the window) + first pytest coverage (9 tests) built on today's real 3-trade session. Capital-neutral, no trading logic touched.
+3. **Still watching (needs more sessions, do NOT act yet):** cumulative post-gate is −$40.88/8 trades — if it stays net-negative past ~15–20 trades, revisit whether the pure-MA-near-VWAP survivor set has genuine positive expectancy or just less bleed. The residual open-fade leak (full-1R faders that never reach +0.5R) remains the strategic target; VWAP replay + regime_analysis unchanged.
+
+### Notes for pre-market research
+- **GOOG** — clean up-drift winner on a soft-tech tape; behaving well under the gates. Keep.
+- **AAPL** — only marginally green (+0.26%); HSBC Buy/$366 PT premarket. **Reports Thu 07-30 AMC** — no intraday risk (flatten 15:55 ET), but expect a post-close gap Thu; no park needed.
+- **MSFT** — **reports Wed 07-29 AMC** (along with META, QCOM). Today's entry scratched at break-even. WisBot flattens before the print, so no overnight gap risk, but Wednesday's session will be pre-earnings jittery — normal.
+- Tape is **choppy / risk-off-for-tech into FOMC (decision Wed 2pm ET) + the mega-cap prints**. AI-capex/chip scrutiny is the dominant driver. No watchlist symbol chopped into a bad fill today; nothing gapped that needs parking. 3 signals from 26 active names — gates are (correctly) keeping the book selective.
+
+---
+
 ## 2026-07-27 — Daily Review
 
 ### Stats
