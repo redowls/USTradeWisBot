@@ -1103,3 +1103,36 @@ Service restarted: **no** (no watchlist changes; 0 open positions — nothing lo
 - **Chip/AI-financing sell-off is the live regime risk** (NVDA/AMD/MU/AVGO/TSM/QCOM/INTC all down 2–5% premarket Tue on the SK Hynix/Samsung −13/14% Kospi crash + NVDA-OpenAI $250B backstop reports). Expect heavy-tape MA-faders; IMP-021/022 gates + EOD flatten are the designed guards — curation is not the lever.
 - **Chronic watches (ENPH/QCOM/UNH/AMD/ABNB/MU/AMZN/NVDA)** — all above/at-VWAP open-fade regime, top-liquidity large-caps, no name-specific defect. The open strategy questions (VWAP gate; the residual at/below-VWAP MA-fader) belong to the daily-review routine, NOT curation.
 - **Equity $7,608.42 (−23.92%), only $108 above the −25% ($7,500) flag** — cushion thinned again; one ~$110 day trips the formal strategy review. Protect aggressively into FOMC + PCE + Mag-7.
+
+---
+
+## 2026-07-29 — Pre-market Research
+
+### Market context
+**FOMC decision day (2:00pm ET)** — ~70% odds of a hold at 3.50–3.75% (CME FedWatch), but a first-hike-in-3-years risk is live under Warsh. Futures steady/slightly higher pre-open: **S&P +0.2%, Nasdaq-100 +0.3%, Dow −0.2%** (P&G drag). **Chip complex weak** — SK Hynix Q2 profit +557% YoY but below Street, Samsung/Hynix dumped, KOSPI −6% on AI-slowdown fears — a headwind for the on-list semis. **Oil +3%** on renewed Iran/Mideast hostilities (missile attack on US forces) → XOM tailwind + risk-off overhang. Mag-7 gauntlet AMC: **MSFT** (est $4.24/$87.63B), **META** (est $7.18), plus **QCOM + ARM** after the bell. Movers Ford +4%, Bloom +11% (not on list).
+
+### Carried from daily review (07-28)
+- 07-28 was +$31.64 (2W/1L) under the IMP-021/022 gates; no defect, no code change. Its notes flagged MSFT/QCOM/META (Wed 07-29 AMC), AAPL (Thu 07-30 AMC) and a choppy/risk-off-for-tech tape into FOMC. Acted on the earnings calendar below.
+- SE flagged for watch (session memory): all-time **2W/4L, −$50.52, dormant since 07-13** — modest, has wins, not a chronic 0W structural mismatch → held under watch, **not parked**.
+
+### Watchlist review
+- Positions: **0 open — nothing locked.** Account PA3ESJUO8RU0 ACTIVE, equity **$7,640.04** (−23.6% YTD, ~$140 above the −25%/$7,500 review flag). Clock is_open=false, pre-open.
+- 14d closed P&L broadly red (worst ENPH −124.80, QCOM −100.13, UNH −99.90, AMD −94.53, ABNB −91.26; best AAPL +38.21, BAC +34.97, COST +34.17). This is the documented **regime** leak (choppy/tech-off tape), not name-quality — every per-name/per-trade discriminator refuted across prior reviews. Not park triggers; parking regime-losers would be churn.
+- **Earnings binaries today (verified — Perplexity + WebSearch):** MSFT, META, QCOM all report **AMC today**. QCOM options imply a 9.34% move; Cantor cut PT to $200 (Hold). AAPL/AMZN report Thu 07-30 (no park today).
+- No add candidate clears the bar into a FOMC + triple-earnings binary day with chip-sector weakness; nothing high-conviction that isn't already listed.
+
+### Changes applied to watchlist
+- **MSFT, META, QCOM: parked 2026-07-29** — each reports earnings AMC today, on FOMC decision day. One-day event parks to remove single-name whipsaw risk on their own event day and the naked-overnight-through-earnings-gap tail risk. Precedent-consistent (MU 06-24→06-25, NFLX 07-17). **Re-enable 07-30** after the binaries resolve.
+- SE held under watch (2W/4L, dormant); no other parks; no adds (FOMC + earnings binary day, thin cushion).
+
+### Final watchlist
+23 active (reduced from 26 via three one-day event parks; within 30 cap):
+AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC MU NFLX NVDA QQQ SE SPY TSLA TSM UNH WMT XOM
+Service restarted: **yes** — active & healthy (11:50:10 UTC, MainPID alive, 0 errors in journal).
+
+### Notes for pre-market research (next session — Thu 07-30)
+- **Re-enable MSFT, META, QCOM** first thing 07-30 once their AMC prints have landed (binaries resolved) — liquid mega-caps parked only for the event day.
+- **AAPL + AMZN report Thu 07-30 AMC** → consider the same one-day event park for them tomorrow (both liquid, re-enable Fri) if the pattern holds; verify the calendar first.
+- FOMC outcome (hold vs first hike) sets Thu's regime — a hawkish surprise re-heavies the tape; don't chase breakouts into it.
+- Chip weakness (SK Hynix / AI-slowdown) + the oil spike (Iran) are the swing factors for the on-list semis (AVGO/NVDA/MU/TSM/INTC/AMD) and XOM.
+- Equity $7,640.04 (−23.6% YTD), ~$140 above the −25% ($7,500) review flag — protect; thin cushion into the binaries.
