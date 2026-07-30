@@ -1136,3 +1136,37 @@ Service restarted: **yes** — active & healthy (11:50:10 UTC, MainPID alive, 0 
 - FOMC outcome (hold vs first hike) sets Thu's regime — a hawkish surprise re-heavies the tape; don't chase breakouts into it.
 - Chip weakness (SK Hynix / AI-slowdown) + the oil spike (Iran) are the swing factors for the on-list semis (AVGO/NVDA/MU/TSM/INTC/AMD) and XOM.
 - Equity $7,640.04 (−23.6% YTD), ~$140 above the −25% ($7,500) review flag — protect; thin cushion into the binaries.
+
+---
+
+## 2026-07-30 — Pre-market Research
+
+### Market context
+**Post-FOMC, Mag-7 gauntlet continues.** Yesterday (07-29) the Fed **held at 3.50–3.75% with 3 hawkish dissents** (preferred a 25bp hike) and the tape **closed sharply lower** on the AI/chip selloff. Overnight AMC prints drove the pre-open: **MSFT +8.3%** (Azure topped $100B revenue, beat top & bottom line — the standout), **META −9%** (rev beat / EPS miss, weak Q3 outlook, 91% FCF collapse), **QCOM −5%** and **ARM −7%** (Q3 beat but handset revenue slid, broad chip-sector weakness). AI-capex ROI scrutiny remains the dominant driver. **AAPL + AMZN both report AMC today** (AAPL Q3 est ~$1.89 EPS; AMZN Q2 est ~$1.82 EPS / ~$196B rev) → wide post-close ranges into Fri, but **no overnight risk for an EOD-flatten bot.**
+
+### Carried from daily review (07-28) + last research note (07-29)
+- 07-29's note instructed: **re-enable MSFT/META/QCOM** first thing today once their AMC prints landed (binaries now resolved ✓ verified via WebSearch), and **consider a one-day event park for AAPL/AMZN** (both confirmed reporting AMC today). Acted on both below.
+- SE flagged for watch (all-time 2W/4L, −$50.52, dormant): modest, has wins, not a chronic 0W structural mismatch → **held under watch, not parked.**
+
+### Watchlist review
+- Positions: **0 open — nothing locked.** Account PA3ESJUO8RU0 **ACTIVE**, equity **$7,578.78** (last_equity flat = no trades yet today; 07-29 closed ~−$61 red). **−24.2% YTD, only ~$79 above the −25% ($7,500) strategy-review flag — thinnest cushion yet.** 0 open orders; broker reconciles flat.
+- Per-symbol P&L (14d closed, **36 trades, net −$471.62**): red **ENPH −168.48 (0W2)**, **QCOM −100.13 (0W3)**, **UNH −99.90 (0W2)**, **AMD −94.53 (1W2)**, CRM −55.65 (0W1), **MU −44.66 (0W4)**, META −37.92 (0W1), XOM −30.24 (0W1), AAPL −24.17 (1W4). Green **BAC +34.97 (2W3)**, **COST +34.17 (2W2)**, **INTC +26.91 (1W2)**, **GOOG +25.90 (1W1)**, **NFLX +20.95 (2W3)**, QQQ +16.0, AVGO +13.14, GOOGL +12.5. **Quality names still produce; the red is the documented above/at-VWAP open-fade regime, not name-specific** — no zero-signal / structural-mismatch name, no chronic-loser park trigger matured.
+- **Intraday-earnings check:** no on-list name reports *during* market hours today; AAPL/AMZN are AMC (handled via event park). No halt/binary on any on-list name intraday → no other park.
+- **Adds: none** — into continued chip/AI weakness + two more Mag-7 AMC prints, at a −24.2% drawdown with only ~$79 of cushion. All leaders/rotation already listed; chasing a name into the binary tail is the wrong risk.
+
+### Changes applied to watchlist
+- **MSFT, META, QCOM: re-enabled 2026-07-30** — their 07-29 AMC earnings resolved (verified: MSFT beat/+8% premkt, META miss/−9%, QCOM beat/−5%); one-day event park from 07-29 lifted. All three re-verified **tradable & active on Alpaca** (`/v2/assets`).
+- **AAPL, AMZN: parked 2026-07-30** — both report earnings AMC today; one-day event park to remove single-name pre-earnings whipsaw on their event day (precedent-consistent: MSFT/META/QCOM 07-29, NFLX 07-17, MU 06-24). **Re-enable 07-31** once the prints land.
+- SE held under watch; no other parks; no adds.
+
+### Final watchlist
+**24 active** (net +1 vs 23: +3 re-enabled MSFT/META/QCOM, −2 parked AAPL/AMZN; within 30 cap):
+ABNB AMD AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT XOM
+(Parked: AAPL, AMZN, BABA, BIRD, C, JPM, WPM.)
+Service restarted: **yes** — active & healthy (11:49:16 UTC, MainPID alive, 0 errors in journal).
+
+### Notes for pre-market research (next session — Fri 07-31)
+- **Re-enable AAPL + AMZN** first thing once their 07-30 AMC prints have landed (event resolved) — both liquid mega-caps parked only for the event day.
+- **Watch META (−9%) and QCOM (−5%) post-earnings behavior** — re-enabled today after gapping down hard on their prints; a gap-down that stabilizes can still produce clean intraday breakouts, but flag if they chop into repeated fades.
+- Chip/AI-capex scrutiny + META's weak outlook keep the tech tape heavy; the post-FOMC hawkish-hold + AAPL/AMZN reactions set Friday's regime. Don't chase breakouts into a re-heavying tape.
+- Equity **$7,578.78 (−24.2% YTD), only ~$79 above the −25% ($7,500) flag** — thinnest cushion yet; one ~$80 red day trips the formal strategy review. Protect aggressively.
