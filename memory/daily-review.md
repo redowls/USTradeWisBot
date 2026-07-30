@@ -35,6 +35,35 @@ the pre-market routine reads this section the next morning)
 
 ---
 
+## 2026-07-30 — Daily Review
+
+### Stats
+- Trades: **2 closed (2W / 0L)**, win rate **100%**. Net **+$62.84 (+0.83%)**. **Fourth live session under IMP-021 breakout-fade veto + IMP-022 VWAP entry gate — and the first TAKE_PROFIT of the post-gate era.**
+- Avg win **+$31.42** (INTC +$55.72, SPY +$7.12); **no loser today** → profit factor undefined/∞ (gross win $62.84 / gross loss $0). One clean green day — treat as favorable-tape confirmation, not proof of edge.
+- Max intraday drawdown: negligible — neither name went materially red (INTC ran straight up to TP; SPY only ever +0.3%).
+- Account equity close **$7,641.62** (broker-confirmed via `alpaca` MCP: last_equity 7578.78 → equity 7641.62 = **+$62.84**, matches DB **to the penny**). Positions **flat (0 overnight)**, 0 orphan orders; both fills reconcile exactly (INTC 86.5564→91.6218, SPY 738.84→741.2133). ~31st straight no-overnight session.
+- Cumulative post-gate scorecard (`gate_monitor --since 2026-07-25`, 4 sessions): **13 trades, 7W/6L, net −$39.28, PF 0.74** (07-27 −72.52 / 07-28 +31.64 / 07-29 −61.24 / 07-30 +62.84). Still net-negative but climbing off the bottom; thin sample — judge on trend.
+
+### Trade-by-trade review
+- **INTC** — BUY 11 @ 86.5564 (09:36:39 ET), stop 83.44 (−3.6%, ~ATR), TP 91.62. Exit **91.6218 @ 10:01:15 ET TAKE_PROFIT**, **+$55.72 (+5.85%)**, held ~25 min. Pure-MA entry (conf 61.43, breakout_score 0 → passed IMP-021), filled at/below session VWAP (0 IMP-022 skips). **IMP-013 worked textbook-perfect:** as price ran, the broker-side stop ratcheted 83.44 → 86.56 → 87.28 → 87.60 → 87.73 → **88.22** (locking profit above entry) before the TP limit filled at 91.62. **Root cause of win: clean near-VWAP MA entry into a chip name that trended hard on the risk-on tape — exactly what the gates select for.** Day's best and the era's first TP.
+- **SPY** — BUY 3 @ 738.84 (10:29:43 ET), stop 727.96 (−1.47%), TP 755.68. Exit **741.2133 @ 15:56:48 ET EOD_FLATTEN**, **+$7.12 (+0.32%)**. Same profile (pure-MA, conf 61.20, at/below VWAP). Reached only +0.32% so IMP-013's break-even/trail never armed; drifted up with the broad rally and flattened green at the close. **Root cause: shallow but positive drift on a rising index; correct hold, small reward.**
+
+### What worked / what didn't
+- **Worked:** the whole gate + exit stack fired cleanly on a favorable tape. Both fills were pure-MA (IMP-021 held — 0 strong-breakout leaks), both at/below session VWAP (IMP-022 rejected 0 — nothing stretched). **IMP-013 delivered its first post-gate TAKE_PROFIT** by ratcheting INTC's stop into profit. Books tie to the broker to the penny; 0 rejects, 0 overnight.
+- **Didn't (nothing broke):** no defect, no bug, no risk-control event. The only structural note is the survivor bucket is narrow — both entries sit in the [60,65] confidence / smallest 0.5% risk band (the IMP-022 follow-up's known consequence), so a green day is capped small (SPY's +0.3% only sized to +$7). Not a defect; a deliberate brake.
+- **⚠️ Tape-dependence watch (from IMP-022 obs):** today was the green/trending tape flagged as the VWAP gate's risk case ("could saw off drift-up winners"). Result: the gate skipped **0** entries today (both fills were near/below VWAP), so it **cost nothing on the green tape** — one reassuring data point that the gate isn't reflexively vetoing winners on up-days. Keep watching.
+- Tape context (Perplexity): **risk-on / trending** — S&P **+1.7%**, Nasdaq **+2.8%**, a broad tech-led rebound from Wednesday's Fed-driven selloff (rates held; post-Fed repositioning + Big-Tech-earnings digestion). INTC rode the **chip-stock rebound / tech rotation** (no INTC-specific catalyst surfaced). The bot's two MA entries drifted/ran up with the tape — regime-consistent.
+
+### Lessons & improvement candidates
+- **No change warranted today.** A single 2W/0L day on a favorable trending tape, fully broker-reconciled, with every gate and exit behaving as designed, gives **no data justification** for a trading-logic change — making one would overfit one good day and violate the ground rules (never overfit to one day, never random changes). Respectable "reviewed, no change" outcome; the disciplined move is to keep accruing the post-gate sample.
+- Standing open item (not today's): the cumulative post-gate book is still −$39 over 13 trades — the gates "stop the bleed" but haven't yet proven a positive edge (per IMP-021/022 honest caveats). Decision point remains ~15–20 trades; if it stays net-negative, revisit whether the pure-MA-near-VWAP survivor set has real positive expectancy or merely less bleed (would be the next IMP, once the sample justifies it — not today).
+- **Housekeeping gap:** there is **no 07-29 entry in this file** — that post-close review evidently didn't append (07-29 traded 1W/2L −$61.24 per `report`; captured in the cumulative scorecard above). Flagging so the sequence gap is visible; not backfilled here.
+
+### Notes for pre-market research
+- **INTC** — big intraday winner (+5.85% to TP in 25 min) riding the chip/tech rotation, no single-name catalyst. Momentum name; keep on the watchlist but expect mean-reversion after a one-day +5.85% run — don't chase a gap-up open tomorrow.
+- **SPY** — index proxy behaved as a slow-drift hold on the rally; fine to keep as a low-vol MA vehicle but it only ever sized/paid small (+0.3%).
+- Tape was strongly risk-on today (rebound from the Fed selloff); watch whether tomorrow gives back — a mean-reversion/red open would test the gates on the *un*favorable side. No watchlist change requested from the daily side.
+
 ## 2026-07-28 — Daily Review
 
 ### Stats
