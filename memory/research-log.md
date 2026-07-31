@@ -1170,3 +1170,37 @@ Service restarted: **yes** — active & healthy (11:49:16 UTC, MainPID alive, 0 
 - **Watch META (−9%) and QCOM (−5%) post-earnings behavior** — re-enabled today after gapping down hard on their prints; a gap-down that stabilizes can still produce clean intraday breakouts, but flag if they chop into repeated fades.
 - Chip/AI-capex scrutiny + META's weak outlook keep the tech tape heavy; the post-FOMC hawkish-hold + AAPL/AMZN reactions set Friday's regime. Don't chase breakouts into a re-heavying tape.
 - Equity **$7,578.78 (−24.2% YTD), only ~$79 above the −25% ($7,500) flag** — thinnest cushion yet; one ~$80 red day trips the formal strategy review. Protect aggressively.
+
+---
+
+## 2026-07-31 — Pre-market Research
+
+### Market context
+**Constructive, risk-on pre-open on cooler inflation.** June PCE landed benign — headline −0.1% m/m (3.7% YoY), core +0.1% m/m (3.3% YoY) — and Q2 GDP softened to 1.5% annualized (from 2.1%), reinforcing that inflation pressure is easing after the FOMC's 07-29 hawkish hold (3 dissents for a hike). Futures higher: **S&P +0.3%, Nasdaq-100 +0.5%**; in pre-market ETFs **SPY +0.56% ($745.85), QQQ +1.26% ($692.16)**. 10Y 4.65% / 2Y 4.24%. Mega-cap earnings drive the tape: **AMZN +9% AH** (Q2 net sales +20% to $200.6B, EPS $5.75, AWS +37% — fastest in 18 quarters), **AAPL −4% AH** (revenue beat / iPhone +22% but Cook flagged a demand-forecast shortfall). **XOM reports Q2 today BMO** (press release 5:30am CT, call 8:30am CT ≈ 9:30am ET; est ~$3.68–3.87 EPS) with oil elevated on Mideast/Suez risk. Month-end Friday.
+
+### Carried from daily review (07-28) + last research note (07-30)
+- 07-30's note instructed: **re-enable AAPL + AMZN** first thing today once their 07-30 AMC prints landed (both now resolved ✓ verified via Perplexity + WebSearch), and **watch META/QCOM** post-earnings behavior. Acted on both below.
+- SE flagged for watch (all-time 2W/4L, dormant since 07-13): modest, has wins, not a chronic 0W structural mismatch → **held under watch, not parked.**
+
+### Watchlist review
+- Positions: **0 open — nothing locked.** Account PA3ESJUO8RU0 **ACTIVE**, equity **$7,641.60** (last_equity flat = no trades yet today; recovered ~+$63 vs 07-30's $7,578.78). **−24.0% YTD, ~$142 above the −25% ($7,500) review flag** — cushion slightly restored. 0 open orders; broker reconciles flat. Clock closed (pre-open).
+- Per-symbol P&L (14d closed, **18 symbols, net −$353.13**, window-shifted improvement from −$471.62): red **ENPH −168.48 (0W2)**, **QCOM −100.13 (0W3)**, **UNH −99.90 (0W2)**, **AMD −94.53 (1W2)**, MU −44.66 (0W4), META −37.92 (0W1), XOM −30.24 (0W1), AAPL −24.17 (1W4). Green **INTC +82.63 (2W3)** (turned green on a good 07-30), **BAC +34.97 (2W3)**, **COST +34.17 (2W2)**, GOOG +25.90, NFLX +20.95, QQQ +16.0, AVGO +13.14, GOOGL +12.5, SPY +7.12. Quality names still produce; the red is the documented above/at-VWAP open-fade **regime**, not name-specific — no zero-signal / structural-mismatch name matured into a chronic-loser park trigger.
+- **Intraday-earnings / event check (verified):** **XOM reports Q2 today BMO** — press release ~6:30am ET, conference call 8:30am CT = **9:30am ET, straddling the open** → elevated single-name whipsaw on its report day; also a red 14d name (0W1). No other on-list name reports intraday/AMC today; no halts/binaries on the rest.
+- **Adds: none** — leaders/rotation already listed; at −24% drawdown with a still-thin cushion, chasing a new name on a month-end earnings-heavy day is the wrong risk. Constructive tape doesn't change curation.
+
+### Changes applied to watchlist
+- **AAPL, AMZN: re-enabled 2026-07-31** — their 07-30 AMC earnings resolved (AAPL −4% AH demand-forecast miss, AMZN +9% AH on AWS +37%); one-day event park from 07-30 lifted. Both re-verified **tradable & active on Alpaca** (`/v2/assets`).
+- **XOM: parked 2026-07-31** — reports Q2 earnings today (BMO, call at ~the open); one-day event park to remove single-name earnings whipsaw on its report day, consistent with the protect-aggressively posture and its red 14d record. Re-enable **08-03** (Mon) once the print is digested.
+- SE held under watch; no other parks; no adds.
+
+### Final watchlist
+**25 active** (net +1 vs 24: +2 re-enabled AAPL/AMZN, −1 parked XOM; within 30 cap):
+AAPL ABNB AMD AMZN AVGO BAC COST CRM ENPH GOOG GOOGL INTC META MSFT MU NFLX NVDA QCOM QQQ SE SPY TSLA TSM UNH WMT
+(Parked: XOM, BABA, BIRD, C, JPM, WPM.)
+Service restarted: **yes** — active & healthy (11:49:30 UTC, MainPID 3812438 alive, 0 restarts, exit status 0, 0 errors in journal).
+
+### Notes for pre-market research (next session — Mon 08-03)
+- **Re-enable XOM** first thing Monday once its 07-31 earnings are digested (liquid oil major parked only for its report day; oil catalyst still live on Mideast/Suez risk).
+- **Watch META (−9%) and QCOM (−5%) post-earnings drift** — still re-enabled after gapping down; flag if they chop into repeated fades rather than producing clean breakouts. Also watch AMZN (+9% gap-up) and AAPL (−4% gap-down) reaction quality on their first post-print session.
+- Cooler PCE + softer GDP eased the tape into month-end, but the FOMC hawkish-hold backdrop persists — a constructive open can still fade; the above/at-VWAP open-fade regime remains the documented leak (a curation-immune, code-side question for daily-review).
+- Equity **$7,641.60 (−24.0% YTD), ~$142 above the −25% ($7,500) flag** — cushion slightly restored but still thin; protect. SE still dormant (last trade 07-13) — keep on watch.
