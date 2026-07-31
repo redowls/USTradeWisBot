@@ -35,6 +35,52 @@ the pre-market routine reads this section the next morning)
 
 ---
 
+## 2026-07-31 — Daily Review
+
+### Stats
+- Trades: **3 closed (3W / 0L)**, win rate **100%**. Net **+$71.17 (+0.93%)**. **Fifth live session under IMP-021 breakout-fade veto + IMP-022 VWAP entry gate**, and the second green day running.
+- Avg win **+$23.72** (NVDA +$44.87, SPY +$16.87, BAC +$9.43); **no loser** → profit factor undefined (gross win $71.17 / gross loss $0).
+- Max intraday drawdown: negligible — no position went materially red; all three exited above entry.
+- Account equity close **$7,712.77** (broker-confirmed via `alpaca` MCP: last_equity 7,641.60 → equity 7,712.77 = **+$71.17**, matches DB **to the penny**). Positions **flat (0 overnight)**, 0 orphan orders — all three bracket legs (TP limit + stop) were cancelled at 19:55:40Z before the market-sell flatten. All fills reconcile exactly (BAC 61.87→62.10, NVDA 198.010833→201.75, SPY 742.55→748.173333). ~32nd straight no-overnight session.
+- Cumulative post-gate scorecard (`gate_monitor --since 2026-07-25`, 5 sessions): **16 trades, 10W/6L (62.5%), net +$31.89, PF 1.21** (07-27 −72.52 / 07-28 +31.64 / 07-29 −61.24 / 07-30 +62.84 / 07-31 +71.17). **The post-gate book has crossed into positive territory at the ~15–20-trade decision point flagged on 07-30.**
+
+### Trade-by-trade review
+| # | Sym | Entry | Exit | Conf | Type | Reason | P&L | Root cause |
+|---|-----|-------|------|------|------|--------|-----|------------|
+| 205 | BAC | 10:32:25 @61.87 | 15:55:40 @62.10 | 60.6 | MA | EOD_FLATTEN | **+$9.43** (+0.37%) | Pure-MA entry at/below session VWAP; stop 60.97 (1R = 1.45%). Only ever reached +0.26R so IMP-013's break-even never armed. Slow positive drift with the financials; correct hold, small reward (41 sh, smallest 0.5% risk bucket). |
+| 206 | NVDA | 10:44:12 @198.0108 | 15:56:42 @201.75 | 62.5 | MA | EOD_FLATTEN | **+$44.87** (+1.89%) | Day's best. Stop 194.89 (1R = 3.12 = 1.58%). **IMP-013 textbook:** at 13:37:16 (live 199.73 = +0.55R) the broker-side stop ratcheted 194.89 → **198.01 (break-even)**; at 15:50:35 (live 201.72 = +1.19R) it trailed to **198.60**, locking +0.19R. Exit at 201.75 was within **0.32% of the 202.40 TP limit** and essentially at the session high — near-zero give-back. |
+| 207 | SPY | 10:51:47 @742.55 | 15:56:43 @748.1733 | 60.6 | MA | EOD_FLATTEN | **+$16.87** (+0.76%) | Stop 731.27 (1R = 11.28 = 1.52%). Reached +0.51R only at 15:45:30 → stop raised to break-even 742.55, then flattened. Broad-index drift-up; correct hold. |
+
+All three were **pure-MA** (breakout_score 0.0000, ma_score 1.0, value_score 1.0, momentum 0.70–0.83) → **IMP-021 held, 0 strong-breakout leaks**. All three entered in a **19-minute window (10:32–10:51 ET)**, all at/below session VWAP.
+
+### What worked / what didn't
+- **Worked — and this is today's headline finding: the IMP-022 VWAP gate demonstrably SAVED money on a green tape.** It blocked **25 entry attempts across 4 distinct symbols** (MSFT×13, SE×6, NVDA×5, META×1). Replaying those skipped fills against real 1-min bars with the bot's own ~1.5% floor stop and a 15:55 flatten:
+  - **MSFT** 09:39 @459.03 → MAE **−1.81%**, **stops out −1.50%**; 09:50 @460.04 → MAE −2.02%, **stops −1.50%**; 10:01 @461.58 → MAE −2.35%, **stops −1.50%**. (MSFT *closed* at 466.44, up on the day — but it round-tripped to a 449.87 session low first, so every stretched entry would have been chopped out before the rally. The gate did not miss a winner; it dodged three stop-outs.)
+  - **META** 10:51 @551.74 → MAE −2.08%, **stops −1.50%**.
+  - **SE** 10:45 @106.85 → +0.15% EOD; 10:51 @107.25 → −0.22% EOD (two scratches).
+  - Net: **4 of 6 skipped opportunities were full 1R losers, 2 were scratches, 0 were winners.** This directly **retires the ⚠️ tape-dependence flag** raised on IMP-022 ("could saw off drift-up winners on a green tape") — today WAS the green tape (S&P +0.7%, Nasdaq +1.0%) and the gate's veto set was all-loser.
+- **Worked:** IMP-013's break-even/1R-trail armed correctly on the two trades that earned it (NVDA at +0.55R and again at +1.19R; SPY at +0.51R) and correctly stayed passive on BAC (+0.26R, never earned it). Zero give-back: NVDA exited within 0.32% of its TP.
+- **Didn't — a MEASUREMENT defect, not a trading defect.** `scripts/gate_monitor.py` reported "🚫 skipped **0** stretched-above-VWAP entries / entries logged: 0" for today, while the bot's own log recorded **25 skips and 3 entries**. Root cause: the unit sets `StandardOutput=append:/var/log/ustradewisbot/bot.log` (deploy/ustradewisbot.service:22), so **journald holds only systemd lifecycle lines** (9 lines all day) — and the monitor was counting from journald. It has therefore reported "skipped 0" on **every session since IMP-022 shipped**. Verified against the rotated logs: real skips were **07-27: 125, 07-28: 4, 07-29: 168, 07-30: 126, 07-31: 25 — 448 total, all previously reported as 0.** The 07-30 daily-review sentence "the gate skipped **0** entries today, so it cost nothing on the green tape" was **wrong on the count** (it skipped 126 across 9 symbols); the conclusion happens to be right, but it was drawn from a blind instrument. **Fixed as IMP-024 below.**
+- No defect, no bug, no risk event in the trading path: 0 rejects, no halt, no circuit-breaker, no slippage issue (DB entry/exit prices match broker fills to 6 dp), books tie to the penny.
+- Tape context (Perplexity): **choppy-but-higher, not a clean trend** — S&P 500 **+0.7%** to 7,489.72, Nasdaq **+1.0%** to 25,373.85, the index "veered between gains and losses through the day" with a late-day rally; broad rotation rather than one-directional risk-on. No single-name catalyst surfaced for BAC/NVDA/SPY/MSFT/SE/META. That chop is exactly why the stretched above-VWAP entries would have been shaken out while the at-VWAP entries drifted up.
+
+### Lessons & improvement candidates
+1. **[SHIPPED IMP-024] The monitor watching the bot's two most important changes was blind.** Highest-impact item available today: no trading-logic change is justified by a single 3W/0L session (that would overfit), but an instrument that reports 0 for a gate firing 448 times is actively corrupting the evidence base every review reads — including yesterday's. Fixed by reading the real log file.
+2. **The gates are earning their keep — keep them, do not tune them.** The 07-30 note set a decision point at ~15–20 post-gate trades: we are at **16 trades, 62.5% win, +$31.89, PF 1.21**, and today's skip-replay shows the VWAP gate removing 4 full-R losers on the exact tape type that was flagged as its risk case. The disciplined move is to let the sample keep accruing, not to touch entry logic on a green streak.
+3. **Standing structural note (not actionable today):** all three fills sat in the [60,65] confidence / smallest 0.5%-risk bucket (the known IMP-022 follow-up consequence), so a 3W/0L day still only sizes to +$71. That caps upside as much as it caps downside. Revisit sizing **only** after the post-gate book proves positive over a materially larger sample — and never by widening `MAX_RISK_PCT`.
+4. **Exit mix worth watching:** post-gate exits are 8 EOD_FLATTEN (+$81.57), 7 STOP (−$105.40), 1 TAKE_PROFIT (+$55.72). Winners are still mostly harvested by the clock rather than by a profit-taking rule — NVDA today ran to within 0.32% of its TP and still exited on the flatten. Not enough evidence yet, but if the EOD_FLATTEN bucket keeps carrying the winners, a tighter/scaled take-profit is the next logic question after the gates finish proving out.
+
+### Notes for pre-market research
+- **MSFT — the day's most instructive name.** It gapped and ran early, triggering **13 blocked entry attempts** between 09:39 and 10:01 ET (all +0.29% to +0.85% above session VWAP), then round-tripped to a 449.87 low before closing at 466.44. Every blocked fill would have stopped out. **Keep MSFT — it is not a bad name, it is a name the open-fade gate handles correctly.** Expect it to keep generating blocked attempts on gap-up mornings; that is the gate working, not a curation problem.
+- **SE — still marginal.** Six blocked attempts today (+0.66% to +1.05% above VWAP), and both would-be entries were scratches (+0.15% / −0.22%). It has now been **dormant for tradeable purposes since 07-13** while generating gate noise. Not a park trigger yet (no losses, no structural mismatch), but it is the weakest name on the list — flag if it produces another week of blocked-only activity.
+- **META** — one blocked attempt at 10:51 (+0.55% above VWAP) that would have lost a full 1R (MAE −2.08%) before closing green. Post-earnings drift is still choppy, as the 07-30 note predicted. Keep, keep watching.
+- **NVDA, BAC, SPY** — all three today's winners on clean at/below-VWAP MA entries. NVDA in particular behaved exactly as the strategy intends (trended, armed the trail, exited near the high). No action.
+- **Re-enable XOM Monday 08-03** as the 07-31 research entry planned — its Q2 print is now digested (one-day event park only).
+- **AMZN did not trade today** on its first post-print (+9% gap-up) session; **AAPL** likewise produced no fill after its −4% gap-down. Both re-enabled 07-31, so tomorrow is effectively still their first clean read — watch reaction quality.
+- Equity **$7,712.77 (−22.9% YTD), now ~$213 above the −25% ($7,500) review flag** — cushion improved two sessions running (+$134 over 07-30/07-31). Still protect aggressively; two green days do not undo a −23% drawdown.
+
+---
+
 ## 2026-07-30 — Daily Review
 
 ### Stats

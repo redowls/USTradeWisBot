@@ -8,8 +8,12 @@ entry gates performed on a given trading session.
   python -m scripts.gate_monitor --telegram --out /path/result.json
 
 Combines two sources:
-  * journald (the live service log) — counts the IMP-022 VWAP skips actually
-    fired ("above session VWAP") plus entries/rejects for context.
+  * /var/log/ustradewisbot/bot.log (+ its rotations) — counts the IMP-022 VWAP
+    skips actually fired ("above session VWAP") plus entries/rejects for context.
+    The unit writes stdout to that FILE (`StandardOutput=append:` in
+    deploy/ustradewisbot.service), so journald only ever holds systemd's own
+    lifecycle lines — reading journald reported "skipped 0" on every session
+    (IMP-024). journald stays as a fallback if the log dir is missing.
   * dbo.trades / dbo.signals — the trades that got THROUGH the gates that day,
     their win/lose/exit-reason split, and a check that IMP-021 held (every taken
     trade is pure-MA, breakout_score == 0; a strong breakout would mean the veto
@@ -23,7 +27,11 @@ rather than count what it stopped.
 
 from __future__ import annotations
 
+import glob
+import gzip
 import json
+import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -31,26 +39,81 @@ from datetime import datetime, timedelta, timezone
 from bot import config, db, notify
 
 SERVICE = "ustradewisbot.service"
+LOG_DIR = "/var/log/ustradewisbot"
+
+# "2026-07-31 09:39:48 EDT | ENTRY SKIPPED MSFT: entry 459.03 is +0.42% above ..."
+_SKIP_RE = re.compile(r"ENTRY SKIPPED ([A-Z][A-Z.\-]*)\s*:")
 
 
 def _arg(argv, flag, default):
     return argv[argv.index(flag) + 1] if flag in argv else default
 
 
-def _journal_counts(date_str: str) -> dict:
-    """Count IMP-022 VWAP skips / entries / rejects in the service log for the day."""
+def _count_log_lines(lines, date_str: str) -> dict:
+    """Pure: count IMP-022 VWAP skips / entries / rejects among ``lines`` for one day.
+
+    Every bot line is prefixed ``YYYY-MM-DD HH:MM:SS TZ | ...`` (engine._log), so the
+    date prefix is what selects the session — the caller may hand over several
+    rotations at once. ``by_symbol`` matters more than the raw attempt count: the
+    gate re-fires on the same candidate every ~60s cycle, so 25 attempts can be
+    only 4 distinct opportunities skipped.
+    """
+    vwap = entries = rejects = 0
+    by_symbol: dict[str, int] = {}
+    for ln in lines:
+        if not ln.startswith(date_str):
+            continue
+        if "above session VWAP" in ln:
+            vwap += 1
+            m = _SKIP_RE.search(ln)
+            if m:
+                by_symbol[m.group(1)] = by_symbol.get(m.group(1), 0) + 1
+        elif "ENTRY REJECTED" in ln:
+            rejects += 1
+        elif " ENTRY " in ln and "order=" in ln:
+            entries += 1
+    return {"available": True, "vwap_skips": vwap, "log_entries": entries,
+            "rejects": rejects, "by_symbol": dict(sorted(by_symbol.items())),
+            "skipped_symbols": len(by_symbol)}
+
+
+def _read_log_lines(log_dir: str = LOG_DIR):
+    """Yield every line of bot.log and its rotations (plain + .gz), newest dir order."""
+    paths = [os.path.join(log_dir, "bot.log")]
+    paths += sorted(glob.glob(os.path.join(log_dir, "bot.log.*")))
+    for path in paths:
+        if not os.path.exists(path):
+            continue
+        try:
+            opener = gzip.open if path.endswith(".gz") else open
+            with opener(path, "rt", errors="replace") as fh:
+                yield from fh
+        except OSError:  # unreadable rotation must not kill the monitor
+            continue
+
+
+def _journal_lines(date_str: str):
+    """Fallback source: journald (holds only lifecycle lines on a normal install)."""
+    out = subprocess.run(
+        ["journalctl", "-u", SERVICE, "--no-pager", "-o", "cat",
+         "--since", f"{date_str} 00:00:00", "--until", f"{date_str} 23:59:59"],
+        capture_output=True, text=True, timeout=60,
+    ).stdout
+    return out.splitlines()
+
+
+def _log_counts(date_str: str, log_dir: str = LOG_DIR) -> dict:
+    """Count IMP-022 VWAP skips / entries / rejects in the bot's own log for the day."""
     try:
-        out = subprocess.run(
-            ["journalctl", "-u", SERVICE, "--no-pager", "-o", "cat",
-             "--since", f"{date_str} 00:00:00", "--until", f"{date_str} 23:59:59"],
-            capture_output=True, text=True, timeout=60,
-        ).stdout
+        if os.path.isdir(log_dir):
+            counts = _count_log_lines(_read_log_lines(log_dir), date_str)
+            counts["source"] = "bot.log"
+            return counts
+        counts = _count_log_lines(_journal_lines(date_str), date_str)
+        counts["source"] = "journald"
+        return counts
     except Exception as exc:  # noqa: BLE001 - monitor must not crash on log access
         return {"available": False, "error": str(exc)}
-    vwap = sum(1 for ln in out.splitlines() if "above session VWAP" in ln)
-    entries = sum(1 for ln in out.splitlines() if " ENTRY " in ln and "order=" in ln)
-    rejects = sum(1 for ln in out.splitlines() if "ENTRY REJECTED" in ln)
-    return {"available": True, "vwap_skips": vwap, "log_entries": entries, "rejects": rejects}
 
 
 _ROWS_SQL = """
@@ -137,6 +200,40 @@ def _db_window(since_str: str, until_str: str) -> dict:
     return agg
 
 
+def _count_log_window(lines, since_str: str, until_str: str) -> dict:
+    """Pure: per-session VWAP-skip counts over the inclusive [since, until] range.
+
+    ISO dates compare lexicographically, so the prefix of each line is enough.
+    """
+    by_date: dict[str, int] = {}
+    syms: dict[str, set] = {}
+    for ln in lines:
+        if "above session VWAP" not in ln or len(ln) < 10:
+            continue
+        day = ln[:10]
+        if not (since_str <= day <= until_str):
+            continue
+        by_date[day] = by_date.get(day, 0) + 1
+        m = _SKIP_RE.search(ln)
+        if m:
+            syms.setdefault(day, set()).add(m.group(1))
+    return {"available": True,
+            "vwap_skips": sum(by_date.values()),
+            "sessions": [(d, n, len(syms.get(d, ()))) for d, n in sorted(by_date.items())]}
+
+
+def _log_window(since_str: str, until_str: str, log_dir: str = LOG_DIR) -> dict:
+    """Per-session VWAP-skip counts from the bot's own log (best-effort)."""
+    try:
+        if not os.path.isdir(log_dir):
+            return {"available": False, "error": f"no log dir {log_dir}"}
+        w = _count_log_window(_read_log_lines(log_dir), since_str, until_str)
+        w["source"] = "bot.log"
+        return w
+    except Exception as exc:  # noqa: BLE001 - monitor must not crash on log access
+        return {"available": False, "error": str(exc)}
+
+
 def format_report(date_str: str, j: dict, d: dict) -> str:
     lines = [
         f"🚦 USTradeWisBot — gate performance {date_str}",
@@ -144,9 +241,13 @@ def format_report(date_str: str, j: dict, d: dict) -> str:
         "IMP-022 VWAP gate:",
     ]
     if j.get("available"):
-        lines.append(f"  🚫 skipped {j['vwap_skips']} stretched-above-VWAP entries "
-                     f"(logged 'above session VWAP')")
-        lines.append(f"  entries logged: {j['log_entries']}   rejects: {j['rejects']}")
+        by_sym = j.get("by_symbol") or {}
+        lines.append(f"  🚫 skipped {j['vwap_skips']} stretched-above-VWAP entry attempts "
+                     f"across {j.get('skipped_symbols', len(by_sym))} symbol(s)")
+        if by_sym:
+            lines.append("     " + ", ".join(f"{s}×{n}" for s, n in by_sym.items()))
+        lines.append(f"  entries logged: {j['log_entries']}   rejects: {j['rejects']}"
+                     f"   (source: {j.get('source', '?')})")
     else:
         lines.append(f"  (log unavailable: {j.get('error')})")
     lines += [
@@ -172,7 +273,7 @@ def format_report(date_str: str, j: dict, d: dict) -> str:
     return "\n".join(lines)
 
 
-def format_window_report(since_str: str, until_str: str, d: dict) -> str:
+def format_window_report(since_str: str, until_str: str, d: dict, j: dict | None = None) -> str:
     pf = d.get("profit_factor")
     pf_s = "n/a" if pf is None else f"{pf:.2f}"
     lines = [
@@ -193,6 +294,12 @@ def format_window_report(since_str: str, until_str: str, d: dict) -> str:
     if d.get("sessions"):
         lines.append("  by session: " + ", ".join(
             f"{day} ${net:,.2f}" for day, net in d["sessions"]))
+    if j and j.get("available"):
+        lines += ["", f"IMP-022 VWAP gate: 🚫 {j['vwap_skips']} skipped entry attempts "
+                      f"(source: {j.get('source', '?')})"]
+        if j.get("sessions"):
+            lines.append("  by session: " + ", ".join(
+                f"{day} {n} ({k} sym)" for day, n, k in j["sessions"]))
     lines += [
         "",
         "Read: cumulative post-gate scorecard — judge the two gates on the trend "
@@ -208,20 +315,20 @@ def main(argv=None) -> int:
     out = _arg(argv, "--out", "")
 
     if since_str:
-        # Cumulative post-gate scorecard: [--since] .. [--date|today], DB-only
-        # (journal skip-counters are per-day context, not aggregated here).
+        # Cumulative post-gate scorecard: [--since] .. [--date|today].
         d = _db_window(since_str, date_str)
-        report = format_window_report(since_str, date_str, d)
+        j = _log_window(since_str, date_str)
+        report = format_window_report(since_str, date_str, d, j)
         print(report)
-        payload = {"since": since_str, "until": date_str, "db": d,
+        payload = {"since": since_str, "until": date_str, "db": d, "log": j,
                    "generated_at": datetime.now(timezone.utc).isoformat(),
                    "report_text": report}
     else:
-        j = _journal_counts(date_str)
+        j = _log_counts(date_str)
         d = _db_session(date_str)
         report = format_report(date_str, j, d)
         print(report)
-        payload = {"date": date_str, "journal": j, "db": d,
+        payload = {"date": date_str, "log": j, "db": d,
                    "generated_at": datetime.now(timezone.utc).isoformat(),
                    "report_text": report}
 

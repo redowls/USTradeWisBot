@@ -116,3 +116,106 @@ def test_format_window_report_pf_na_when_none():
     d["n_sessions"] = 1
     txt = gm.format_window_report("2026-07-28", "2026-07-28", d)
     assert "PF n/a" in txt
+
+
+# --- IMP-024: the log-file skip counters ------------------------------------
+# Real lines from /var/log/ustradewisbot/bot.log on 2026-07-31, the session that
+# exposed the defect: the monitor read journald and reported "skipped 0" while the
+# bot had actually logged 25 VWAP skips across 4 symbols that day. The unit writes
+# stdout to the FILE (StandardOutput=append:), so journald only holds systemd's own
+# lifecycle lines.
+REAL_LOG_20260731 = [
+    "2026-07-31 09:39:48 EDT | ENTRY SKIPPED MSFT: entry 459.03 is +0.42% above session VWAP 457.09 (>0.25% — stretched fill, fades)\n",
+    "2026-07-31 09:50:34 EDT | ENTRY SKIPPED MSFT: entry 460.04 is +0.49% above session VWAP 457.79 (>0.25% — stretched fill, fades)\n",
+    "2026-07-31 10:32:26 EDT | ENTRY 41 BAC @ 61.9 (conf 61) order=4a8b5e99-3de3-457a-87ad-acb9862de95a\n",
+    "2026-07-31 10:44:12 EDT | ENTRY 12 NVDA @ 197.89 (conf 62) order=d0aecba5-70fc-491b-8ac1-0d03a2242feb\n",
+    "2026-07-31 10:45:20 EDT | ENTRY SKIPPED SE: entry 106.85 is +0.75% above session VWAP 106.05 (>0.25% — stretched fill, fades)\n",
+    "2026-07-31 10:47:29 EDT | ENTRY SKIPPED NVDA: entry 198.18 is +0.32% above session VWAP 197.54 (>0.25% — stretched fill, fades)\n",
+    "2026-07-31 10:51:47 EDT | ENTRY SKIPPED META: entry 551.74 is +0.55% above session VWAP 548.72 (>0.25% — stretched fill, fades)\n",
+    "2026-07-31 10:51:48 EDT | ENTRY 3 SPY @ 742.41 (conf 61) order=efb4f04f-9f4e-4dcf-8b91-563a31cf72f5\n",
+    "2026-07-31 13:37:16 EDT | STOP RAISED NVDA 194.89 -> 198.01 (live 199.73, entry 198.01)\n",
+    # prior session, must NOT leak into today's counts (rotations are read together)
+    "2026-07-30 10:12:01 EDT | ENTRY SKIPPED AMD: entry 180.00 is +0.90% above session VWAP 178.40 (>0.25% — stretched fill, fades)\n",
+]
+
+
+def test_count_log_lines_real_20260731_session():
+    c = gm._count_log_lines(REAL_LOG_20260731, "2026-07-31")
+    assert c["available"] is True
+    assert c["vwap_skips"] == 5          # not 0 — the defect IMP-024 fixes
+    assert c["log_entries"] == 3         # BAC, NVDA, SPY
+    assert c["rejects"] == 0
+    assert c["by_symbol"] == {"META": 1, "MSFT": 2, "NVDA": 1, "SE": 1}
+    assert c["skipped_symbols"] == 4     # attempts re-fire; opportunities is the real number
+
+
+def test_count_log_lines_excludes_other_sessions():
+    """Rotated files are read as one stream — only the requested day may count."""
+    c = gm._count_log_lines(REAL_LOG_20260731, "2026-07-30")
+    assert c["vwap_skips"] == 1
+    assert c["by_symbol"] == {"AMD": 1}
+    assert c["log_entries"] == 0
+
+
+def test_count_log_lines_empty_safe():
+    c = gm._count_log_lines([], "2026-07-31")
+    assert c["vwap_skips"] == 0 and c["by_symbol"] == {} and c["skipped_symbols"] == 0
+
+
+def test_count_log_lines_counts_rejects():
+    lines = ["2026-07-31 11:00:00 EDT | ENTRY REJECTED AAPL: daily loss halt\n"]
+    c = gm._count_log_lines(lines, "2026-07-31")
+    assert c["rejects"] == 1 and c["vwap_skips"] == 0 and c["log_entries"] == 0
+
+
+def test_log_counts_reads_bot_log_file(tmp_path):
+    (tmp_path / "bot.log").write_text("".join(REAL_LOG_20260731[:8]))
+    (tmp_path / "bot.log.1").write_text("".join(REAL_LOG_20260731[8:]))
+    c = gm._log_counts("2026-07-31", log_dir=str(tmp_path))
+    assert c["source"] == "bot.log"
+    assert c["vwap_skips"] == 5 and c["skipped_symbols"] == 4
+
+
+def test_log_counts_falls_back_when_no_log_dir(monkeypatch, tmp_path):
+    monkeypatch.setattr(gm, "_journal_lines", lambda d: ["2026-07-31 09:39:48 EDT | ENTRY SKIPPED MSFT: entry 459.03 is +0.42% above session VWAP 457.09\n"])
+    c = gm._log_counts("2026-07-31", log_dir=str(tmp_path / "missing"))
+    assert c["source"] == "journald" and c["vwap_skips"] == 1
+
+
+def test_count_log_window_per_session():
+    w = gm._count_log_window(REAL_LOG_20260731, "2026-07-30", "2026-07-31")
+    assert w["vwap_skips"] == 6
+    assert w["sessions"] == [("2026-07-30", 1, 1), ("2026-07-31", 5, 4)]
+
+
+def test_count_log_window_respects_bounds():
+    w = gm._count_log_window(REAL_LOG_20260731, "2026-07-31", "2026-07-31")
+    assert w["vwap_skips"] == 5 and [d for d, _, _ in w["sessions"]] == ["2026-07-31"]
+
+
+def test_format_report_shows_real_skip_counts():
+    j = gm._count_log_lines(REAL_LOG_20260731, "2026-07-31")
+    j["source"] = "bot.log"
+    txt = gm.format_report("2026-07-31", j, gm._aggregate(TODAY_ROWS))
+    assert "skipped 5 stretched-above-VWAP entry attempts across 4 symbol(s)" in txt
+    assert "MSFT×2" in txt
+    assert "source: bot.log" in txt
+
+
+def test_format_window_report_includes_skip_series():
+    d = gm._aggregate(TODAY_ROWS)
+    d["sessions"] = [("2026-07-30", 62.84), ("2026-07-31", 71.17)]
+    d["n_sessions"] = 2
+    j = gm._count_log_window(REAL_LOG_20260731, "2026-07-30", "2026-07-31")
+    j["source"] = "bot.log"
+    txt = gm.format_window_report("2026-07-30", "2026-07-31", d, j)
+    assert "🚫 6 skipped entry attempts" in txt
+    assert "2026-07-31 5 (4 sym)" in txt
+
+
+def test_format_window_report_omits_skip_series_when_log_unavailable():
+    d = gm._aggregate(TODAY_ROWS)
+    d["sessions"] = [("2026-07-31", 71.17)]
+    d["n_sessions"] = 1
+    txt = gm.format_window_report("2026-07-31", "2026-07-31", d, {"available": False})
+    assert "skipped entry attempts" not in txt
