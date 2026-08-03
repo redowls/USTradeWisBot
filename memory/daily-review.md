@@ -35,6 +35,49 @@ the pre-market routine reads this section the next morning)
 
 ---
 
+## 2026-08-03 — Daily Review
+
+### Stats
+- Trades: **1 closed (0W / 1L)**, win rate **0%**. Net **−$5.09 (−0.066%)**. Sixth live session under IMP-021 breakout-fade veto + IMP-022 VWAP entry gate. Effectively a **flat session** — the loss is 1/15th of one average loser.
+- Avg loser **−$5.09**; no winner → profit factor **0.00** (gross win $0 / gross loss $5.09). A single 0.2% scratch, not a drawdown.
+- Max intraday drawdown: negligible. The one position' worst mark was **MAE −0.55%** against a −1.52% stop; it never went materially red.
+- Account equity close **$7,707.65** (broker-confirmed via `alpaca` MCP: last_equity 7,712.74 → equity 7,707.65 = **−$5.09**, matches DB **to the penny**). Positions **flat (0 overnight)**, cash 7,707.65, long_market_value 0. Broker shows **exactly 2 orders** all day (1 bracket buy + 1 sell-to-close); both bracket legs (TP 290.92, stop 280.25) were **cancelled at 19:55:06/19:55:11Z before** the market-sell flatten filled at 19:56:09Z — no orphans, no naked exposure. ~33rd straight no-overnight session.
+- Slippage: signal price 284.52 → fill **284.5778** = **+0.020%** (+$0.058/sh). Negligible; not a factor.
+- Cumulative post-gate scorecard (`gate_monitor --since 2026-07-25`, 6 sessions): **17 trades, 10W/7L (58.8%), net +$26.80, PF 1.17**, avg win $18.39 vs avg loss $22.44. Still **positive but thin** — the weekly's decidability bar is ~40–60 trades; we are at 17.
+
+### Trade-by-trade review
+| # | Sym | Entry | Exit | Conf | Type | Reason | P&L | Root cause |
+|---|-----|-------|------|------|------|--------|-----|------------|
+| 210 | AMZN | 14:57:40 @284.5778 (9 sh) | 15:57:09 @284.0122 | 60.54 | MA | EOD_FLATTEN | **−$5.09** (−0.199%) | Pure-MA (breakout 0.0000, ma 1.0, value 1.0, momentum 0.7026) → IMP-021 held. Stop 280.25 (1R = 1.52%), TP 290.92 (+2.23%). **Neither leg was ever threatened: MFE +0.46%, MAE −0.55%** over a 59-minute hold. Root cause is **not** stop placement, slippage, signal quality or a bug — it is **timing/participation**: AMZN closed **+2.02%** on the day (278.49 → 284.12) and had already printed its session high **287.17 before the entry**. The bot bought the late-stage flat spot after the move, then chopped sideways into the flatten. IMP-013 break-even never armed (never reached +0.5R). Correct behaviour by every rule the bot has; the trade simply had no move left to capture. |
+
+### What worked / what didn't
+- **Worked — reconciliation, risk and exit machinery, again flawless.** Broker/DB agree to the penny, brackets cancelled before liquidation, flat overnight, no circuit-breaker events, no errors inside market hours. The two `EOD flatten incomplete … Retrying next tick` lines at 15:55:06 / 15:56:07 are **IMP-002 working as designed** (async leg-cancel lag), and the position was closed at 15:56:09Z — well inside the window. Not a defect.
+- **Didn't work — participation on the day the strategy was built for.** Today was a clean **trend-up tape**: SPY **+1.10%** (749.49 → 757.72, closing 0.11% off its high), QQQ **+1.72%** (688.29 → 700.10). The bot's MA-drift edge should eat this. It took **one** trade, at **14:57**, for −0.2%.
+- **The reason is structural, and today quantifies it for the first time.** The IMP-022 VWAP gate blocked **172 entry attempts across 17 distinct symbols** — every single candidate the bot generated except AMZN. On a trending day, "stretched above session VWAP" *is* the trend: price sits above VWAP all day by construction, so the gate's veto rate rises precisely when the edge is most available. **17 of 18 distinct candidates (94%) were vetoed.**
+- **Counterfactual (new instrument, IMP-025 below) — today the gate COST money.** Replaying all 17 blocked candidates from their *first* skip print against real 1-min bars under the bot's own bracket (−1.50% floor stop / +2.25% target / 15:55 flatten): **9W/8L, avg +0.22% per trade, sum +3.76%, and ZERO stop-outs.** Two would have reached target (**NVDA** 10:01 @202.47 → TP at 11:04; **META** 09:30 @556.60 → TP at 09:33). Worst blocked was **AAPL −1.44%** — which still did not hit the stop. Because the replay uses the *floor* stop (real stops are ≥ the floor), this is a **lower bound** on what the gate cost.
+- **This is the exact opposite of 07-31**, where the same replay showed the gate dodging **4 full 1R stop-outs** (MSFT×3, META). **Both readings are correct.** The gate is tape-dependent by design: it pays on round-trip/chop tapes and it costs on one-way trend tapes. Two anecdotes pointing opposite ways is not a verdict — it is the reason a running series is now recorded rather than re-derived by hand each night.
+- **Confidence remains a constant** (60.54 today; 60.5–62.5 all of last week), as the weekly diagnosed: `WEIGHT_BREAKOUT = 0.35` is 35% of the blend and is identically 0 on every trade the bot can now take, pinning every entry to the smallest 0.5%-risk bucket (9 shares / $2,561 notional here). Left alone deliberately — renormalising would both admit marginal candidates and inflate sizing. It is an accidental brake, not a working signal.
+
+### Lessons & improvement candidates
+1. **The VWAP gate's opportunity cost is now the #1 open question — and it must be answered by a series, not a session.** Two sessions replayed, pointing opposite ways (07-31: gate saved ~4×1R; 08-03: gate cost +0.22%/trade). **Shipped tonight as measurement, not as a strategy change** (IMP-025). The decision rule to apply once ~10 sessions have accrued: if the blocked set is *persistently* positive on trend days, the fix is **not** to remove the gate but to make it **regime-aware** (e.g. relax `VWAP_MAX_DIST_PCT` only when the index is trending and the name is above a rising VWAP), so chop-day protection is preserved.
+2. **"Late entry" was tested as today's obvious culprit and REFUTED — do not pursue it.** AMZN entered with only 58 minutes of runway before the 15:55 flatten, which looks like the cause. It is not: bucketing all 206 closed trades by *runway* (minutes from entry to flatten), the **<60m band is the best bucket all-time** (n=6, 33% win but **+$11.45/trade**, PF 6.33), while 60–120m is the worst (n=8, 0% win, −$26.28/trade). Separately, TP-reaching trades hit target in a **median 45 min** (p25 16 min), so a short runway does not preclude a winner. **No case for tightening `ENTRY_CUTOFF_ET` from 15:30.** Recorded so no future review re-proposes it.
+3. **Exit geometry remains the standing #1 *strategy* lever** (weekly 2026-08-01), unchanged tonight: only **12.1% of all trades (25/206) ever reach the target**, and today added another clock-exit. Still correctly deferred — the only valid sample is the 17-trade post-gate book, and the weekly set the bar at 40–60. Do not fit an exit change to pre-07-25 breakout trades the bot can no longer take.
+4. **Housekeeping gap now four weeks old:** `bot/analytics.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py` remain uncommitted (someone else's work-in-progress; left untouched and unstaged per standing rule). This still blocks retiring the **structurally frozen** "false-breakout rate 52.7% ≥ 40.0%" verdict in `report.py`, which tonight *again* printed `NEEDS WORK` on a metric computed over a trade class that can never be added to.
+5. **Perplexity `sonar` returned stale data** — it reported Friday's close (S&P 7,489.72) as "today". Today's tape in this entry is taken from **Alpaca 1-min bars directly** (authoritative). Treat the sonar market read as unreliable for same-day close context; prefer bars.
+
+### Notes for pre-market research
+- **Tape:** strong one-way trend-up day. SPY +1.10% (757.72), QQQ +1.72% (700.10), both closing within ~0.2% of session highs. Semis/AI led. If tomorrow opens in the same regime, expect the VWAP gate to veto most candidates again — **that is expected behaviour, not a fault**; do not react by widening risk.
+- **Blocked all day, never traded (17 names):** AAPL, AMD, AVGO, BAC, GOOG, GOOGL, INTC, META, MSFT, MU, NVDA, QCOM, QQQ, SE, SPY, TSLA, TSM. These are **not** bad names — the gate blocked them for being *extended above VWAP*, and 9 of 17 would have finished green. **Do not park any of them on the strength of today.**
+- **Best blocked candidates:** NVDA (would have hit target by 11:04), META (target by 09:33), QCOM (+0.63%), TSLA (+1.25% from its 10:10 print). **Worst:** AAPL (−1.44%), AMD (−1.05%), INTC (−0.61%).
+- **Most-attempted blocks** (gate re-fires ~60s, so attempts ≫ opportunities): QQQ×20, AVGO×20, TSLA×19, QCOM×19, MSFT×14, MU×14, META×13, GOOGL×12, NVDA×11. **MU was stretched +3.30–3.77% above VWAP all afternoon** and AMD/INTC +2.5–2.8% — those are genuinely extended, correctly blocked.
+- **SE:** 7 blocked attempts, 0 entries again (+0.16% if taken). Now several sessions of blocked-only history. Still no losses attributable to it — **watch, do not park yet**, per 07-31.
+- **AMZN** traded today (only fill): closed +2.02% but printed its high at 287.17 *before* the 14:57 entry. Fine name; the issue was timing, not selection.
+- **Equity cushion:** $7,707.65, **$207.65 above** the −25% ($7,500) flag. Thinnest-ever remains $78.78 (07-29). **Never widen risk to chase it back.**
+- **Calendar:** August jobs report **Friday 08-07, 8:30 ET** (weekly flagged; verify each morning). Tail of Q2 earnings ongoing.
+- **Overnight infra note:** one `ConnectTimeout` to `paper-api.alpaca.markets` at **02:46 ET** (outside market hours, self-healed on the next tick). Consistent with the burst the weekly flagged. **Still zero occurrences inside market hours** — the 15:55 flatten has never been threatened. Keep watching; if these ever appear intraday, hardening the flatten path outranks all edge work.
+
+---
+
 ## 2026-07-31 — Daily Review
 
 ### Stats

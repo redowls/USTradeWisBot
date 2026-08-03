@@ -7,6 +7,9 @@ all pure-MA (breakout_score 0) → 2W/1L, +$31.64. Plus the two-session
 post-gate window (07-27 -$72.52 + 07-28 +$31.64).
 """
 
+import pytest
+
+from bot import config
 from scripts import gate_monitor as gm
 
 
@@ -219,3 +222,170 @@ def test_format_window_report_omits_skip_series_when_log_unavailable():
     d["n_sessions"] = 1
     txt = gm.format_window_report("2026-07-31", "2026-07-31", d, {"available": False})
     assert "skipped entry attempts" not in txt
+
+
+# ---------------------------------------------------------------------------
+# IMP-025 — VWAP-gate opportunity cost (blocked-candidate counterfactual)
+#
+# Built on the REAL 2026-08-03 session: 172 skip attempts across 17 distinct
+# symbols, exactly 1 entry (AMZN 14:57, EOD_FLATTEN -$5.09). The replay of that
+# session found the blocked set would have been mildly PROFITABLE (9W/8L,
+# +0.22%/trade, ZERO stop-outs, META and NVDA reaching target) — the opposite of
+# the 07-31 replay, which is the tape-dependence the audit exists to measure.
+# ---------------------------------------------------------------------------
+
+REAL_LOG_20260803 = [
+    "2026-08-03 09:30:08 EDT | ENTRY SKIPPED META: entry 556.60 is +1.25% above session VWAP 549.72 (>0.25% — stretched fill, fades)",
+    "2026-08-03 10:01:15 EDT | ENTRY SKIPPED NVDA: entry 202.47 is +1.33% above session VWAP 199.81 (>0.25% — stretched fill, fades)",
+    "2026-08-03 10:10:44 EDT | ENTRY SKIPPED TSLA: entry 317.63 is +0.25% above session VWAP 316.84 (>0.25% — stretched fill, fades)",
+    "2026-08-03 13:26:29 EDT | ENTRY SKIPPED AAPL: entry 307.47 is +0.58% above session VWAP 305.71 (>0.25% — stretched fill, fades)",
+    # same candidate re-firing ~60s later, chased higher — must NOT become a 2nd candidate
+    "2026-08-03 13:27:31 EDT | ENTRY SKIPPED AAPL: entry 307.36 is +0.54% above session VWAP 305.71 (>0.25% — stretched fill, fades)",
+    "2026-08-03 13:28:35 EDT | ENTRY SKIPPED AAPL: entry 307.31 is +0.52% above session VWAP 305.72 (>0.25% — stretched fill, fades)",
+    "2026-08-03 14:57:41 EDT | ENTRY 9 AMZN @ 284.52 (conf 61) order=b8fbc8b2-d397-41ee-86d9-a3ac1f69c2f9",
+    # prior session must not leak across the rotation boundary
+    "2026-07-31 09:39:48 EDT | ENTRY SKIPPED MSFT: entry 459.03 is +0.42% above session VWAP 457.11 (>0.25% — stretched fill, fades)",
+]
+
+
+def test_first_blocked_dedupes_refires_to_one_candidate_per_symbol():
+    c = gm._first_blocked(REAL_LOG_20260803, "2026-08-03")
+    assert [x["symbol"] for x in c] == ["AAPL", "META", "NVDA", "TSLA"]
+    aapl = next(x for x in c if x["symbol"] == "AAPL")
+    # the FIRST attempt (13:26:29 @ 307.47), not the later chased-higher re-fires
+    assert aapl["time"] == "13:26:29"
+    assert aapl["price"] == 307.47
+    assert aapl["stretch_pct"] == 0.58
+    assert aapl["vwap"] == 305.71
+
+
+def test_first_blocked_excludes_other_sessions_and_entries():
+    assert gm._first_blocked(REAL_LOG_20260803, "2026-07-31") == [
+        {"symbol": "MSFT", "time": "09:39:48", "price": 459.03,
+         "stretch_pct": 0.42, "vwap": 457.11}
+    ]
+    assert gm._first_blocked([], "2026-08-03") == []
+
+
+def test_replay_geometry_uses_the_floor_stop_and_rr_ratio():
+    stop, tp = gm._replay_geometry()
+    assert stop == -config.MIN_STOP_PCT
+    assert tp == pytest.approx(config.MIN_STOP_PCT * config.RR_RATIO)
+    assert stop < 0 < tp  # sign convention the replay depends on
+
+
+def _bars(*rows):
+    return [{"time": t, "high": h, "low": lo, "close": c} for t, h, lo, c in rows]
+
+
+def test_replay_blocked_reproduces_the_real_20260803_outcomes():
+    """NVDA reached target, AAPL faded to the flatten, neither hit the stop."""
+    cands = gm._first_blocked(REAL_LOG_20260803, "2026-08-03")
+    cands = [c for c in cands if c["symbol"] in ("NVDA", "AAPL")]
+    bars = {
+        # NVDA 202.47 -> +2.23% (207.00) reached at 11:04, as it really did
+        "NVDA": _bars(("10:02:00", 203.10, 202.20, 202.90),
+                      ("11:04:00", 207.50, 202.90, 207.20),
+                      ("15:55:00", 207.60, 206.90, 207.10)),
+        # AAPL 307.47 -> drifts down, no stop touched, exits on the 15:55 flatten
+        "AAPL": _bars(("13:27:00", 307.50, 306.90, 307.00),
+                      ("15:55:00", 303.30, 302.99, 303.05)),
+    }
+    g = gm._replay_blocked(cands, bars, -1.5, 2.25)
+    out = {r["symbol"]: r for r in g["results"]}
+    assert out["NVDA"]["outcome"] == "TP"
+    assert out["NVDA"]["exit_time"] == "11:04:00"
+    assert out["NVDA"]["ret_pct"] == pytest.approx(2.25)
+    assert out["AAPL"]["outcome"] == "EOD"
+    assert out["AAPL"]["ret_pct"] == pytest.approx(-1.44, abs=0.01)
+    assert g["by_outcome"] == {"EOD": 1, "TP": 1}
+    assert g["wins"] == 1 and g["losses"] == 1
+    # the day's real signature: a blocked set that would have MADE money
+    assert g["avg_ret_pct"] > 0
+    assert g["gate_paid"] is False
+
+
+def test_replay_blocked_flags_gate_paid_when_blocked_set_would_have_lost():
+    cands = [{"symbol": "XYZ", "time": "10:00:00", "price": 100.0,
+              "stretch_pct": 2.0, "vwap": 98.0}]
+    bars = {"XYZ": _bars(("10:01:00", 100.2, 98.4, 98.5))}  # low pierces the -1.5% stop
+    g = gm._replay_blocked(cands, bars, -1.5, 2.25)
+    assert g["results"][0]["outcome"] == "STOP"
+    assert g["results"][0]["ret_pct"] == pytest.approx(-1.5)
+    assert g["gate_paid"] is True
+    assert g["by_outcome"] == {"STOP": 1}
+
+
+def test_replay_blocked_takes_the_stop_when_one_bar_spans_both_legs():
+    """Pessimistic tie-break — keeps the 'gate cost money' verdict a lower bound."""
+    cands = [{"symbol": "XYZ", "time": "10:00:00", "price": 100.0,
+              "stretch_pct": 1.0, "vwap": 99.0}]
+    bars = {"XYZ": _bars(("10:01:00", 103.0, 98.0, 101.0))}  # spans stop AND target
+    g = gm._replay_blocked(cands, bars, -1.5, 2.25)
+    assert g["results"][0]["outcome"] == "STOP"
+
+
+def test_replay_blocked_ignores_bars_before_the_skip_and_is_empty_safe():
+    cands = [{"symbol": "XYZ", "time": "12:00:00", "price": 100.0,
+              "stretch_pct": 1.0, "vwap": 99.0}]
+    # a pre-skip crash must not be counted against a trade that did not exist yet
+    bars = {"XYZ": _bars(("09:31:00", 100.0, 90.0, 95.0), ("12:01:00", 100.5, 99.9, 100.4))}
+    g = gm._replay_blocked(cands, bars, -1.5, 2.25)
+    assert g["results"][0]["outcome"] == "EOD"
+    assert g["results"][0]["ret_pct"] == pytest.approx(0.4)
+
+    empty = gm._replay_blocked([], {}, -1.5, 2.25)
+    assert empty["candidates"] == 0 and empty["avg_ret_pct"] is None
+    assert empty["gate_paid"] is None
+
+
+def test_replay_blocked_marks_symbols_without_bars_as_no_data():
+    cands = [{"symbol": "XYZ", "time": "10:00:00", "price": 100.0,
+              "stretch_pct": 1.0, "vwap": 99.0}]
+    g = gm._replay_blocked(cands, {}, -1.5, 2.25)
+    assert g["results"][0]["outcome"] == "NO_DATA"
+    assert g["replayed"] == 0 and g["no_data"] == 1
+    assert g["avg_ret_pct"] is None
+
+
+def test_format_gate_cost_renders_verdict_and_degrades_cleanly():
+    cands = gm._first_blocked(REAL_LOG_20260803, "2026-08-03")
+    bars = {"NVDA": _bars(("10:02:00", 207.50, 202.20, 207.20))}
+    txt = "\n".join(gm.format_gate_cost(gm._replay_blocked(cands, bars, -1.5, 2.25)))
+    assert "opportunity cost" in txt
+    assert "gate COST" in txt          # NVDA made money -> gate cost money
+    assert "lower bound" in txt
+
+    assert "no candidates were blocked" in "\n".join(
+        gm.format_gate_cost(gm._replay_blocked([], {}, -1.5, 2.25)))
+    assert "unavailable" in "\n".join(
+        gm.format_gate_cost({"available": False, "error": "boom"}))
+
+
+def test_format_report_includes_gate_cost_only_when_supplied():
+    j = gm._count_log_lines(REAL_LOG_20260803, "2026-08-03")
+    d = gm._aggregate([{"symbol": "AMZN", "status": "CLOSED", "pl": -5.09,
+                        "exit_reason": "EOD_FLATTEN", "entry_date": "2026-08-03", "bo": 0.0}])
+    assert "opportunity cost" not in gm.format_report("2026-08-03", j, d)
+    g = gm._replay_blocked(gm._first_blocked(REAL_LOG_20260803, "2026-08-03"),
+                           {"NVDA": _bars(("10:02:00", 207.5, 202.2, 207.2))}, -1.5, 2.25)
+    assert "opportunity cost" in gm.format_report("2026-08-03", j, d, g)
+
+
+def test_first_blocked_survives_newest_first_rotation_order():
+    """_read_log_lines yields bot.log BEFORE bot.log.1, so a session split across a
+    rotation arrives newest-chunk-first. Selecting by arrival order picks the last
+    attempt of the day — the real 2026-08-03 defect (META 14:55 @ 593.53 replayed
+    instead of the 09:30 @ 556.60 the bot actually wanted in at)."""
+    newest_chunk = [
+        "2026-08-03 14:55:33 EDT | ENTRY SKIPPED META: entry 593.53 is +1.10% above session VWAP 587.07 (>0.25% — stretched fill, fades)",
+    ]
+    older_chunk = [
+        "2026-08-03 09:30:08 EDT | ENTRY SKIPPED META: entry 556.60 is +1.25% above session VWAP 549.72 (>0.25% — stretched fill, fades)",
+    ]
+    c = gm._first_blocked(newest_chunk + older_chunk, "2026-08-03")
+    assert len(c) == 1
+    assert c[0]["time"] == "09:30:08"
+    assert c[0]["price"] == 556.60
+    # and the same answer regardless of which chunk is streamed first
+    assert gm._first_blocked(older_chunk + newest_chunk, "2026-08-03") == c
