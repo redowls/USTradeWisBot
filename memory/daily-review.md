@@ -35,6 +35,87 @@ the pre-market routine reads this section the next morning)
 
 ---
 
+## 2026-08-05 — Daily Review
+
+### Stats
+- Trades: **4 closed (0W / 4L)**, win rate **0%**. Net **−$95.95 (−1.24%)**. Eighth live session under IMP-021 + IMP-022. Worst session since 07-22.
+- Avg loser **−$23.99**; no winner → **profit factor 0.00**. Losers by size: META −$41.07, GOOGL −$31.13, QQQ −$23.35, WMT −$0.40.
+- Exit mix: **STOP 2 (−$72.20)**, **EOD_FLATTEN 2 (−$23.75)**. No take-profit, no trail, no break-even arm.
+- Max intraday drawdown ≈ the full −$95.95; equity fell monotonically. **Daily-loss halt (8%) never approached** — worst point ≈ −1.3%.
+- Account equity close **$7,641.12**. Broker-reconciled via `alpaca` MCP **to the penny**: last_equity 7,737.07 → equity 7,641.12 = −$95.95, matching DB and `daily_summary` exactly. Positions **flat (0 overnight)**, cash 7,641.12, long_market_value 0. Broker shows 4 bracket buys + 4 exits, no orphan legs, no qty drift, no missed fill. ~35th straight no-overnight session.
+- Slippage: GOOGL −0.103%, QQQ −0.011%, WMT −0.099% (all favourable), **META +0.226% adverse** (signal 595.14 → fill 596.4875, +$1.35/sh ≈ $5.39 of the −$41.07). Net slippage a non-factor.
+- Cushion: **$141.12 above the −25% ($7,500) flag** — thinnest since the 07-29 low of $78.78.
+
+### Trade-by-trade review
+
+| Sym | In (ET) | Entry | Stop | stop% | stop/ATR | MFE | MAE | Out | Exit | P&L | Hold |
+|-----|---------|-------|------|-------|----------|-----|-----|-----|------|-----|------|
+| GOOGL | 09:36 | 381.85 | 376.51 | 1.40% | 5.5× | **+0.11%** | −1.59% | 11:56 | STOP 376.66 | −$31.13 | 140m |
+| QQQ | 09:41 | 726.85 | 716.03 | 1.49% | 14.9× | **+0.22%** | −1.36% | 15:57 | FLATTEN 719.06 | −$23.35 | 376m |
+| META | 09:41 | 596.49 | 586.21 | 1.72% | 7.7× | **+0.48%** | −1.76% | 11:28 | STOP 586.22 | −$41.07 | 107m |
+| WMT | 12:16 | 112.36 | 110.78 | 1.40% | 9.8× | **+0.09%** | −0.88% | 15:57 | FLATTEN 112.34 | −$0.40 | 221m |
+
+**The single decisive number is the MFE column: +0.11%, +0.22%, +0.48%, +0.09%.** Not one of the four trades ever went half a percent green. Every entry was wrong essentially from the fill.
+
+- **All four were pure `MA` signals** (`breakout_score = 0.0000` on every one — zero breakouts fired all day; IMP-021 ✅ held). Confidence 60.5–63.3, i.e. all in the *lowest* band, which is historically the *least* bad one (60–62: PF 0.92).
+- **GOOGL −$31.13 (STOP)** — bought 09:36 @381.85, six minutes after the open, near the session high (384.44). GOOGL then fell **−5.39% on the day** (7.21% range, closing at 20% of range). Root cause: **directional/regime failure, not stop placement** — and the stop was the hero here: exiting at 376.51 avoided the further ~5.4% slide to 362.38. Holding would have cost ~$116 instead of $31.
+- **META −$41.07 (STOP)** — bought 09:41 @596.49, MFE +0.48%, stopped 11:28 at −1.72%. Only trade with adverse slippage (+0.226%). META closed −1.94%. Same cause: bought strength into a fading tape.
+- **QQQ −$23.35 (FLATTEN)** — bought 09:41 @726.85, held 6h16m, never green beyond +0.22%, flattened −1.07%. Sat just above its 716.03 stop all afternoon. This is the **"faded" flatten bucket** (all-time: 39 trades, 0% win, −$833.59) — a slow bleed the stop never catches and the clock ends.
+- **WMT −$0.40 (FLATTEN)** — bought 12:16 @112.36, MFE +0.09%, flattened −0.02%. A pure scratch; correctly sized (22 sh on a 0.14% ATR name) and correctly harmless.
+- **IMP-013 break-even/trail correctly did nothing.** It arms at +0.5R; with stops at 1.40–1.72%, +0.5R ≈ +0.70–0.86%. The best MFE all day was +0.48%. Not a defect — there was simply never a profit to protect.
+
+### Market context
+Genuine **trend-down / risk-off tape, not chop**: SPY **−0.79%** closing at **4% of its daily range**, QQQ **−1.27%** closing at **1% of range** — both finished on the low after sliding all session. GOOGL was the day's disaster (−5.39%). Perplexity `sonar` returned self-contradicting index closes and no per-ticker catalysts (logged as unreliable); the numbers above are computed directly from the bot's own IEX 5-min bars and are authoritative. The bot went long four names into a session that never had an up-leg.
+
+### What worked / what didn't
+**Worked:**
+- **Risk discipline was flawless.** Four losers, worst −1.72%, total −1.24% of equity. Position sizing matched the confidence plan on all four; MAX_CONCURRENT (3 open at a time) respected; no re-entry of a stopped symbol; no entries after 15:30.
+- **The stops paid for themselves.** GOOGL alone: stopping at −1.36% instead of riding to −5.39% saved ~$85.
+- **IMP-022 VWAP gate blocked 65 attempts / 4 distinct names** (NVDA×39, INTC×20, SE×5, NFLX×1).
+- **Books reconcile perfectly**; flat into the close for the 35th straight session.
+
+**Didn't:**
+- **Entry direction.** 4/4 immediately red. No pre-trade filter in the bot looked at what the index was doing.
+- **The "faded flatten" bucket struck again** (QQQ): a position that is never green and never stopped just bleeds until 15:55.
+- **First-ever intraday loop failures** (see defect below).
+- **IMP-022 opportunity cost — `gate COST` again today:** replay of the 4 blocked candidates → **3W/1L, avg +0.29%/trade, sum +1.18%** (best NFLX +0.86%, worst NVDA −0.61%; all EOD). Running series: 07-31 gate PAID (dodged 4×1R), 08-03 gate COST (+0.22%/trade), **08-05 gate COST (+0.29%/trade)**. Two of three readings now say the gate is leaving money on the table, and both COST readings came on days the gate blocked NVDA/INTC-type names that then trended. Not yet decisive (IMP-025 asked for ~10 sessions) but the tell it predicted — *cost on trend-ish names, paid on chop* — is starting to show.
+
+### Root cause (one line)
+**All four losses share one cause: long entries into a session-long index downtrend** (SPY/QQQ closing on their lows), with MFE ≤ +0.48% on every trade — a directional failure, not a stop, sizing, slippage, exit-logic or code failure.
+
+### ⚠️ Defect found — and it is the reason today shipped a change
+The bot logged its **first two true intraday loop errors ever** at **13:55:19 ET** (`ConnectionError` on `/v2/clock`, connection refused) and **13:56:27 ET** (`APIError`). Every other loop error in the bot's entire log history (120 of them) fell outside RTH or on a weekend.
+
+This matters because of *where* `broker.get_clock()` sits: it gates the whole tick from **outside** `tick()`'s own `try/except`. When it throws, `tick()` never runs — **and neither does `eod_flatten()`**. The 15:55→16:00 flatten window is only **five ticks** wide at `POLL_INTERVAL_SEC=60`; **today's flatten already consumed three of them** (15:55:19 incomplete → 15:56:20 incomplete → 15:57:23 confirmed). Bursts of **8+ consecutive** loop failures are on record (2026-08-01, 14:01→14:10 and 15:14→15:33). **An 8-cycle burst starting at 15:55 would have consumed the entire window and carried QQQ and WMT naked overnight** — breaching the one capital-protection invariant that cannot fail.
+
+The 2026-08-01 weekly review pre-registered this exact trigger: *"if they recur intraday, hardening the flatten path becomes the priority over any edge work."* They recurred intraday today. → **IMP-026.**
+
+### Lessons & improvement candidates (ranked)
+1. **[SHIPPED — IMP-026] Clock-independent flatten watchdog.** The no-overnight rule must not depend on a network call. Highest impact because it protects capital and was pre-registered by the weekly.
+2. **[REFUTED AGAIN — do not ship] The market-regime entry gate.** Today *looks* like the perfect argument for "don't go long when the index is below its VWAP/EMA9". It is not. `scripts/regime_analysis` over all 214 trades returns **GATE VERDICT: REFUTED** — under QQQ-EMA9 bearish trades **win more** than bullish (43.9% vs 35.3%, PF 0.64 vs 0.60) and under SPY-VWAP PF 0.64 vs 0.60. The bot loses in bullish regimes too (bullish −$1,401, PF 0.62). **Shipping a regime gate on today's session would be textbook overfitting to one day against 214 trades of contrary evidence.** This is the fourth failed pre-trade discriminator after confidence (IMP-004), volume, and entry extension (IMP-010). Backlog ★'s *skip-bearish* formulation should now be considered dead; only a genuinely different regime construction could revive it.
+3. **[NEXT, when the sample allows] The "faded flatten" / never-green trade.** QQQ sat 6h16m never exceeding +0.22%. A **time-stop on trades that have not reached +0.25R by N minutes** targets the 39-trade / −$833.59 bucket directly and is the standing #1 edge lever. Blocked by the weekly's 40–60-post-gate-trade bar (now **25**) — do not ship on this session.
+4. **[WATCH] IMP-022 gate is now 2-of-3 "COST".** Keep accruing `--replay-skips` per IMP-025's rule; if trend-day COST persists, the indicated fix is regime-*aware relaxation* of `VWAP_MAX_DIST_PCT`, not removal.
+
+### Independent verdict on the strategy
+Stated plainly, as standing policy requires: **this strategy still has no demonstrated edge.** All-time 214 trades, **PF 0.62**, expectancy **−$9.65/trade**, equity 10,000 → 7,641 (**−23.6%**). The entire loss is one bucket — **STOP: 95 trades, 6.3% win, −$4,492.99, PF 0.02** — against **TAKE_PROFIT: 25 trades, 100% win, +$2,034** and **EOD_FLATTEN: 94 trades, PF 1.47, +$395**. Four independent pre-trade discriminators (confidence, volume, entry extension, market regime) have now each been tested and each **failed to separate winners from losers**. The honest reading is that entry selection carries no information and whatever edge exists lives in exit management.
+The one genuinely encouraging signal is the post-gate era: **25 trades since 07-25, 52.0% win, PF 0.85, net −$39.67** — materially better than lifetime and the only trend pointing the right way. It is still 25 trades against a 40–60 bar, and today's −$95.95 is most of its deficit. **The correct posture remains: protect capital, accrue the sample, ship defect fixes only.** That is precisely what today did.
+
+### Notes for pre-market research
+- **GOOGL — handle with care.** Fell **−5.39%** today on a 7.21% range, closing at 20% of range, after the bot bought it 6 min after the open. No catalyst confirmable from `sonar`; **the pre-market routine should establish whether this was news-driven before GOOGL is traded again.** GOOG is also on the watchlist — same underlying, correlated double-exposure risk.
+- **QQQ + SPY both closed on their lows** (1% and 4% of range). Index-tracking names gave no intraday up-leg at all; QQQ specifically produced a 6h16m never-green hold.
+- **NVDA — 39 blocked attempts, the day's most-rejected name** (persistently +0.64% to +0.80% above VWAP), yet it closed **+1.07%** and the replay says the blocked NVDA entry would have lost −0.61%. Gate behaved correctly on NVDA today.
+- **INTC — 20 blocked attempts** at an extreme +1.73% to +1.78% above VWAP; closed **+1.51%**. A persistent gap-and-go profile that this bot's VWAP gate will essentially always refuse — worth asking whether INTC is a structural mismatch for the strategy.
+- **NFLX — 1 blocked attempt, and it was the best blocked candidate (+0.86%).** Watch it.
+- **SE — 5 blocked attempts, closed +1.95% (99% of range).** SE has been flagged blocked-only since 07-31 and has still never produced a filled trade. It is now a genuine **park candidate**: it consumes gate cycles and has contributed nothing.
+- **WMT** behaved exactly as designed (0.14% ATR → 22 sh → −$0.40 scratch). No concern.
+- Watch the **August jobs report, Friday 08-07 08:30 ET** — flagged by last week's weekly review; verify timing each morning.
+- **Tape regime note:** today was a clean trend-down day, the opposite of the chop the gates were tuned on. Two consecutive sessions (08-03 trend-up, 08-05 trend-down) have now produced `gate COST` readings.
+
+### Ops note (outside the bot repo)
+**The 2026-08-04 daily review silently did not run** — `/root/claude-routines/logs/uswisbot-daily-review.20260804-212501.log` shows `timeout: failed to run command 'claude': No such file or directory`, **rc=127**. That is the **third** silent no-run in ~3 weeks (07-29 rc=1, 08-04 rc=127); 08-04's session (4 trades, 3W/1L, +$29.48) therefore has **no review entry** and this file jumps 08-03 → 08-05. The improvement engine is only as reliable as the routine that drives it. Recorded in `todo.md`; the fix is a PATH/binary issue in the cron wrapper, outside `/root/USTradeWisBot`, and needs a human or an infra-scoped run.
+
+---
+
 ## 2026-08-03 — Daily Review
 
 ### Stats

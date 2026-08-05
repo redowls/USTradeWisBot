@@ -320,6 +320,32 @@ class Engine:
             return False
         return True
 
+    def flatten_watchdog(self) -> None:
+        """Clock-independent EOD flatten, for ticks the main loop never reached.
+
+        `broker.get_clock()` gates every tick from OUTSIDE `tick()`'s own error
+        handling, so a transient API failure in the 15:55-16:00 window skips the
+        flatten entirely — that window is only five ticks wide, and bursts of 8+
+        consecutive loop failures are on record (2026-08-01). The first true
+        intraday failures landed 2026-08-05 13:55/13:56 ET; the same burst an
+        hour later would have carried QQQ/WMT overnight, and today's flatten
+        already needed three attempts. Falls back to the local ET wall clock so
+        the no-overnight rule never depends on a network call. Never raises — a
+        failed retry must not kill the loop. IMP-026.
+        """
+        if not self.market_was_open:
+            return  # no session in progress — nothing can be stranded
+        now = exits.now_et()
+        if self.flattened_on == now.date() or not exits.past_flatten_time(now):
+            return
+        self._log("flatten watchdog — loop failed inside the flatten window, "
+                  "flattening on the local ET clock")
+        try:
+            if self.eod_flatten():
+                self.flattened_on = now.date()
+        except Exception as exc:  # noqa: BLE001 - watchdog must never kill the loop
+            self._log(f"flatten watchdog error: {type(exc).__name__}: {exc}")
+
     def post_close_summary(self) -> None:
         """Write + send the daily summary once after the close."""
         today = exits.now_et().date()
@@ -398,6 +424,9 @@ class Engine:
                     self._sleep(min(max(wait, 30), 3600))
             except Exception as exc:  # noqa: BLE001 - loop must survive transient failures
                 self._log(f"loop error: {type(exc).__name__}: {exc}")
+                # The failure above may have been get_clock() itself, which means
+                # tick() — and with it the EOD flatten — never ran. IMP-026.
+                self.flatten_watchdog()
                 self._sleep(config.POLL_INTERVAL_SEC)
 
         notify.heartbeat("USTradeWisBot stopped")

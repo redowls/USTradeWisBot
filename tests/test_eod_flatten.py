@@ -190,3 +190,95 @@ def test_tick_retries_flatten_until_broker_flat(monkeypatch):
     monkeypatch.setattr(eng, "eod_flatten", lambda: True)    # next tick succeeds
     eng.tick(now)
     assert eng.flattened_on == now.date()
+
+
+# --- 5. IMP-026: the flatten must survive a broker-clock failure --------------
+#
+# 2026-08-05 13:55:19 and 13:56:27 ET produced the first true INTRADAY loop
+# errors in the bot's history (ConnectionError then APIError on /v2/clock).
+# broker.get_clock() gates the whole tick from outside tick()'s try/except, so
+# those cycles never reached eod_flatten at all. The 15:55-16:00 window is only
+# five ticks wide and that day's flatten already needed three of them, while
+# bursts of 8+ consecutive loop failures are on record (2026-08-01) — the same
+# burst an hour later would have carried QQQ/WMT overnight.
+
+def _watchdog_engine(monkeypatch, *, flatten_ok, at_hour=15, at_minute=56):
+    """Engine mid-session with the clock frozen inside the flatten window."""
+    now = exits.now_et().replace(hour=at_hour, minute=at_minute,
+                                 second=0, microsecond=0)
+    monkeypatch.setattr(exits, "now_et", lambda: now)
+    eng = engine.Engine(dry_run=False)
+    eng.market_was_open = True
+    calls: list[str] = []
+
+    def _flatten():
+        calls.append("flatten")
+        return flatten_ok
+    monkeypatch.setattr(eng, "eod_flatten", _flatten)
+    return eng, now, calls
+
+
+def test_flatten_watchdog_flattens_when_clock_call_failed(monkeypatch):
+    eng, now, calls = _watchdog_engine(monkeypatch, flatten_ok=True)
+    eng.flatten_watchdog()
+    assert calls == ["flatten"], "a failed loop inside the window must still flatten"
+    assert eng.flattened_on == now.date()
+
+
+def test_flatten_watchdog_retries_while_flatten_incomplete(monkeypatch):
+    eng, _now, calls = _watchdog_engine(monkeypatch, flatten_ok=False)
+    eng.flatten_watchdog()
+    eng.flatten_watchdog()
+    assert calls == ["flatten", "flatten"]
+    assert eng.flattened_on is None, "unconfirmed flatten must keep retrying"
+
+
+def test_flatten_watchdog_does_not_double_flatten(monkeypatch):
+    eng, now, calls = _watchdog_engine(monkeypatch, flatten_ok=True)
+    eng.flattened_on = now.date()
+    eng.flatten_watchdog()
+    assert calls == [], "already flat for the day — must not re-liquidate"
+
+
+def test_flatten_watchdog_silent_before_flatten_time(monkeypatch):
+    # 13:55 ET — exactly when today's real errors fired. Mid-session failures
+    # must NOT trigger a flatten; only failures inside the window do.
+    eng, _now, calls = _watchdog_engine(monkeypatch, flatten_ok=True,
+                                        at_hour=13, at_minute=55)
+    eng.flatten_watchdog()
+    assert calls == [], "13:55 ET is mid-session — nothing to flatten"
+
+
+def test_flatten_watchdog_silent_when_no_session_open(monkeypatch):
+    eng, _now, calls = _watchdog_engine(monkeypatch, flatten_ok=True)
+    eng.market_was_open = False          # weekend / holiday / pre-open
+    eng.flatten_watchdog()
+    assert calls == []
+
+
+def test_flatten_watchdog_never_raises(monkeypatch):
+    eng, _now, _calls = _watchdog_engine(monkeypatch, flatten_ok=True)
+
+    def _boom():
+        raise ConnectionError("paper-api.alpaca.markets: connection refused")
+    monkeypatch.setattr(eng, "eod_flatten", _boom)
+    eng.flatten_watchdog()               # must swallow — the loop has to survive
+    assert eng.flattened_on is None
+
+
+def test_loop_error_path_invokes_the_watchdog(monkeypatch):
+    """The real wiring: get_clock() raising must still reach the flatten."""
+    eng = engine.Engine(dry_run=False)
+    eng.market_was_open = True
+    fired: list[str] = []
+
+    def _clock():
+        eng.running = False              # one pass, then exit the loop
+        raise ConnectionError("Max retries exceeded with url: /v2/clock")
+    monkeypatch.setattr(broker, "get_clock", _clock)
+    monkeypatch.setattr(broker, "account_summary", lambda: {"paper": True, "equity": 7641.12})
+    monkeypatch.setattr(notify, "heartbeat", lambda msg: None)
+    monkeypatch.setattr(eng, "flatten_watchdog", lambda: fired.append("watchdog"))
+    monkeypatch.setattr(eng, "_sleep", lambda s: None)
+    eng.run()
+    assert fired == ["watchdog"], "a get_clock() failure must not skip the flatten"

@@ -279,7 +279,32 @@
 
 Ordered by expected impact; each item needs replay validation before code.
 
-★ **(TOP STRATEGY LEVER, elevated 2026-06-26) Market-regime / breakout-quality
+> **2026-08-05 — backlog ★ (skip-bearish form) is DEAD; do not re-litigate it.**
+> Today's session (0W/4L, four longs into an index closing on its low) is the most
+> seductive possible argument for a market-regime gate. `scripts/regime_analysis`
+> over all **214** trades still returns **GATE VERDICT: REFUTED** — under
+> **QQQ-EMA9** bearish trades *win more* than bullish (**43.9% vs 35.3%, PF 0.64 vs
+> 0.60**), under **SPY-VWAP** PF is **0.64 vs 0.60**, and the bot loses in bullish
+> regimes too (bullish −$1,401.14, PF 0.62). That is the **fourth** failed pre-trade
+> discriminator after confidence (IMP-004), volume, and entry extension (IMP-010).
+> Only a materially *different* regime construction could revive ★ — the
+> "only go long when SPY/QQQ is above its intraday MA/VWAP" formulation below is
+> refuted on the data and must not be shipped on the strength of a single red day.
+> The standing #1 **edge** lever is now the never-green / "faded flatten" time-stop
+> (39 trades, 0% win, −$833.59 all-time), gated on the weekly's 40–60-post-gate-trade
+> bar (currently 25).
+
+> **2026-08-05 — OPS (outside this repo, needs a human or infra-scoped run):**
+> the daily-review routine has now silently failed **three times in ~3 weeks** —
+> 07-29 (rc=1), **08-04 (rc=127: `timeout: failed to run command 'claude': No such
+> file or directory`)**, leaving 08-04 with **no review entry** despite a 4-trade
+> session. Root cause looks like a PATH/binary resolution problem in the cron
+> wrapper (`/root/claude-routines/run-routine.sh`), not a bot defect. The
+> improvement engine is only as reliable as the routine that drives it — this is a
+> latent single point of failure on the bot's whole feedback loop.
+
+★ **(TOP STRATEGY LEVER, elevated 2026-06-26 — see the 2026-08-05 note above: the
+   skip-bearish formulation is REFUTED) Market-regime / breakout-quality
    entry gate.** The entire all-time loss lives in STOP exits / false breakouts
    (PF 0.01, −$2,872; IMP-006) and the breakout-containing book (BOTH+BREAKOUT,
    38 trades = −$1,552 of the −$1,833 total). 06-24/06-25/06-26 keep showing the
