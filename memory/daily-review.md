@@ -35,6 +35,57 @@ the pre-market routine reads this section the next morning)
 
 ---
 
+## 2026-08-06 — Daily Review
+
+### Stats
+- Trades: **5 closed (1W / 4L)**, win rate **20%**. Net **−$92.27 (−1.21%)**. Ninth live session under IMP-021 + IMP-022. Second consecutive red day (08-05 −$95.95).
+- Only "winner" is META **+$0.13** — a break-even stop, not a real win. Avg loser **−$23.10**; **profit factor 0.0014**. Losers: NVDA −$36.23, WMT −$36.96, AMZN −$18.78, AAPL −$0.43.
+- Exit mix: **STOP 3 (−$73.06)**, **EOD_FLATTEN 2 (−$19.21)**. **No take-profit, no trail.** One break-even arm (META). TP-hit rate all-time now **25/224 (11%)**.
+- Max intraday drawdown ≈ the full −$92.27; equity fell monotonically. **Daily-loss halt (8%) never approached** — worst point ≈ −1.2%.
+- Account equity close **$7,548.63**. Broker-reconciled via `alpaca` MCP **to the penny**: last_equity 7,640.90 → equity 7,548.63 = −$92.27, matching DB and `daily_summary` exactly. Positions **flat (0 overnight)**, cash 7,548.63, long_market_value 0, ACTIVE, not blocked. **~36th straight no-overnight session.**
+- ⚠️ **Cushion is now $48.63 above the −25% / $7,500 strategy-review flag — the thinnest of the entire incubation** (prior low $78.78 on 07-29). **−24.5% YTD.**
+- Reliability: **zero loop errors today** (the two `ConnectionError`/`APIError` rows in the log are 08-05's). **IMP-026's flatten watchdog correctly never fired** — verify-by-absence held, exactly as pre-registered. Service `active`, NRestarts=0, 0 rejects/422.
+- Slippage negligible on all five (worst +0.036% AMZN; META filled −0.053% favourable). Sizing matched plan: every trade 0.447–0.496% of equity.
+
+### Trade-by-trade review
+MFE/MAE from real 1-min IEX bars; **MFE_R** = MFE ÷ initial 1R stop distance (the +0.5R threshold is what arms IMP-013).
+
+| # | Sym | Entry (ET) | Exit (ET) | conf | mom | MFE% / MFE_R | MAE% | Exit | P&L | Root cause |
+|---|-----|-----------|-----------|------|-----|--------------|------|------|-----|------------|
+| 223 | META | 09:42:37 @589.83 | 10:13:13 @589.86 | 60.74 | 0.72 | **+0.92% / 0.64R** | −0.16% | **STOP (break-even)** | **+$0.13** | **IMP-013 working exactly as designed.** Reached +0.64R → `STOP RAISED 581.29 → 589.83` at 09:55:09 → faded back and scratched. A would-be full-1R loss (~−$34) converted to +$0.13. **Not a strategy failure — the rescue is the intended behaviour.** |
+| 224 | NVDA | 09:43:46 @222.31 | 10:37:39 @219.02 | 60.70 | 0.71 | +0.58% / **0.39R** | −1.52% | STOP | **−$36.23** | **Full-1R fader.** Never reached +0.5R, so IMP-013 structurally could not arm. Faded from entry to the stop in 54m. |
+| 225 | WMT | 09:48:25 @112.88 | 13:13:32 @111.20 | 60.06 | 0.67 | +0.27% / **0.18R** | −1.49% | STOP | **−$36.96** | **Full-1R fader.** Barely green at any point; bled for 205m into the stop. Lowest momentum of the day (0.67, just over the 0.667 floor). |
+| 226 | AMZN | 11:27:19 @274.35 | 15:56:36 @272.26 | 60.20 | 0.68 | **+0.04% / 0.03R** | −1.18% | EOD_FLATTEN | **−$18.78** | **Never-green "faded flatten."** MFE +0.04% — literally never green beyond noise — then held **4h29m** and handed to the clock at −0.76%. Textbook member of the all-time 39-trade / 0%-win / −$833.59 faded-flatten bucket. |
+| 227 | AAPL | 15:06:14 @312.42 | 15:56:37 @312.37 | 62.65 | 0.84 | +0.16% / 0.11R | −0.20% | EOD_FLATTEN | **−$0.43** | Dead-flat 50m (range −0.20%/+0.16%), flattened for a scratch. Highest momentum of the day (0.84) and it did nothing — **momentum refuted again.** Harmless. |
+
+**Loss decomposition:** the two full-1R faders (NVDA + WMT) are **−$73.19 = 79% of the day's loss**; the never-green flatten (AMZN) is **−$18.78 = 20%**. META and AAPL are noise. This is the same leak that has defined the drawdown for nine weeks.
+
+### What worked / what didn't
+- **Worked — the gates.** IMP-022 skipped **100 stretched-above-VWAP attempts across 8 symbols** (TSM×33, MSFT×21, QCOM×20, XOM×18, INTC×3, NVDA×3, AVGO×1, AMD×1). Replaying all 8 distinct blocked candidates under the real bracket: **2W/6L, avg −0.66%/trade, sum −5.29%** → **verdict ✅ gate PAID.** IMP-021 held: **0 strong-breakout trades got through**, every entry `breakout_score` 0.0000. NVDA is the instructive case — the gate blocked it three times at +0.26/+0.32/+0.38% above VWAP, then let it in at 09:43 when it was at VWAP, and it *still* lost. **The gate is filtering the right thing; what survives simply has no edge.**
+- **Worked — capital protection.** Flat into the close, books penny-tied, no halt, no rejects, zero loop errors, watchdog silent by design.
+- **Didn't — the surviving population.** 4 of 5 trades never reached +0.5R (MFE_R 0.39 / 0.18 / 0.03 / 0.11). IMP-013 can only rescue trades that go green first, so it armed once out of five. The bot bought five names into a **choppy/risk-off tape** (Perplexity: S&P −0.2% to 7,709.96, Nasdaq −0.1% to 26,348.35, communication services the day's laggard, pressured by higher bond yields and crude; **no company-specific catalyst on any of the five**) and every one faded. This is regime + no-edge, not a defect.
+- **IMP-025 gate series** now reads **PAID / COST / COST / PAID** — genuinely tape-dependent, as designed. Keep accruing; do not act on it yet.
+
+### Lessons & improvement candidates
+1. **★ The never-green time-stop remains the #1 edge lever — and remains correctly BLOCKED.** AMZN is a picture-perfect case (MFE +0.04%, held 4h29m, −$18.78). But the 2026-08-01 weekly set an explicit bar: **do not touch entry or exit logic until the post-gate sample is decidable at ~40–60 trades.** Post-IMP-021 count is now **30** (was 16). Shipping today would be thrashing against a pre-registered decision rule I have no new evidence to overturn. **Deferred on purpose, not by omission.**
+2. **NEW FINDING — the confidence→risk ladder is structurally INERT (shipped as IMP-027).** Post-IMP-021 every entry scores `breakout_score = 0.0` *exactly* (the score is bimodal: across 219 recorded trades it is 0.0 or ≥0.5, never in between; ≥0.5 is vetoed). So confidence = `100·(0.30·ma + 0.20·val + 0.15·mom)`, ceiling **65**, and `CONFIDENCE_RISK_TABLE`'s 70/80/90 tiers are **unreachable**. Verified empirically: all **30** post-veto trades sit in **conf 60.06–63.29** and **100% sized at the floor 0.5% tier** (today 0.447–0.496%). `summary.md §5.9` "more confidence = more money" documents a mechanism that no longer runs. **The failure is SAFE (risk pinned at the floor, never the ceiling) so nothing was re-sized** — but it was invisible, and reviews have repeatedly reasoned about "conf 60–62" as if it discriminated anything.
+3. **Momentum is REFUTED — the fifth failed per-trade discriminator.** It is now the *only* varying input to confidence, and its **Pearson r with realized P&L is 0.0001 over n=145** MA-type trades. Buckets are non-monotonic and flip sign between eras (0.85+ is +$120 all-time but −$47 recent). Today's own evidence agrees: lowest-momentum WMT (0.67) and highest-momentum AAPL (0.84) both went nowhere. **Consequence: the entry decision is now a pure AND-gate — `ma == 1.0` AND `value == 1.0` AND `momentum ≥ 0.667`, then the two gates. There is nothing left to tune per-trade.** Confidence (IMP-004), volume, entry extension (IMP-007/010), time-of-day (IMP-016), index-regime (IMP-015/018) and now momentum are all dead. **Future runs: stop looking for per-trade filters. That ground is exhausted — put everything on exit geometry.**
+4. **⚠️ Recorded so it is never shipped: IMP-021's own registered follow-up is a capital-protection TRAP.** It reads "down-weight `WEIGHT_BREAKOUT` in the confidence blend now that its leg is gated out." Renormalizing the remaining three weights to sum to 1.0 lifts today's real META signal from **60.74 → ~92**, which lands on the **2.0% `MAX_RISK_PCT` cap — a 4× risk widening** with no edge behind it, dressed up as a tidy-up. **Never ship that form.** Locked as a failing-if-violated test.
+5. **Time-of-day is refuted *here*, despite working on the sibling bot.** USTradeBot shipped an opening-range blackout (its IMP-017) after finding its entire lifetime loss pre-10:00 ET. Tested on this bot's data: MA-type pre-10:00 **PF 0.82 (n=75)** vs 10:00+ **PF 0.81 (n=70)** — indistinguishable. **The sibling's fix does not transfer; do not import it.** (Consistent with IMP-016's original refutation.)
+6. **Honest verdict on the strategy.** Nine sessions post-gate: 30 trades, still net-negative, 11% TP rate all-time. The gates demonstrably remove losers (today's replay: blocked set −0.66%/trade) but **the kept book has no demonstrated edge** — it is a long-only MA-continuation book whose winners are harvested by the 15:55 clock and whose losers run to a full 1R. That asymmetry, not signal selection, is the problem. The next real change must be **exit geometry**, and it must wait for the sample bar.
+
+### Notes for pre-market research
+- **RE-ENABLE ABNB** (parked 08-06 for last night's Q2 print — one-day event park). Check the after-hours reaction first. Its independent weaknesses stand: **0W4L all-time (−$186.30), thinnest name at $22.3M/day** — if it gapped down hard *and* liquidity thinned, converting the event park into a structural one is defensible. Say which, explicitly.
+- **⚠️ FRIDAY 08-07 IS THE JULY JOBS REPORT, 8:30 ET** — verified three times this week, lands before the open, so it is **gap** risk not intraday-halt risk. ADP already printed below forecast. **Read the number before deciding any one-day park.**
+- **TSM is the day's standout blocked name — 33 VWAP vetoes**, running +0.92% to +1.05% above its own VWAP all morning. Persistently stretched, never eligible. Not a park candidate (the gate is doing its job) but worth noting it consumed a third of the day's blocked attempts. **MSFT×21, QCOM×20, XOM×18** likewise.
+- **NVDA chopped hard around its VWAP** — blocked 3×, admitted once at VWAP, then stopped for −$36.23. No NVDA-specific catalyst per Perplexity; chip strength intraday faded into the close. Nothing to park, but do not expect the VWAP gate to save NVDA on a choppy tape.
+- **AMD did not trade** (re-enabled 08-06) and produced 1 blocked attempt. Still the highest-ATR name on the list (8.66%) and third-worst all-time (−$315.09). **Watch — it has not yet had its first post-re-enable session.**
+- **QCOM remains the standing #1 park candidate** — −19.2% vs 50MA, 1W5L all-time, still no trade since 07-27 (20 blocked attempts today). **Park on the next full-1R fade**; do not park on blocked-attempt counts alone (the SE precedent).
+- **WMT and AMZN both faded from entry today** on no catalyst. Not park candidates on one session, but note WMT entered at the momentum floor (0.667) and AMZN never went green — if either repeats, they join the fader watch.
+- ⚠️ **Cushion is $48.63 above the $7,500 flag — thinnest ever.** Two more average red days trips the formal strategy review. **Do NOT widen risk, do NOT add names to manufacture activity.** If the jobs number is ugly, a smaller, higher-quality watchlist is the right posture.
+
+---
+
 ## 2026-08-05 — Daily Review
 
 ### Stats

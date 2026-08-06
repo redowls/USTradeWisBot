@@ -7,6 +7,7 @@ is an overfitting risk (summary.md §10).
 
 from __future__ import annotations
 
+from datetime import date
 from zoneinfo import ZoneInfo
 
 # --- Market timezone ---
@@ -154,6 +155,11 @@ BREAKOUT_FADE_CEILING = 0.5     # veto entries whose breakout_score is at/above 
                                 # from -$2,024 to -$12 and held out-of-sample (last 5
                                 # sessions: skipped set net -$183, kept book +$25). Fresh
                                 # resistance breakouts fade; don't chase the spike bar.
+BREAKOUT_VETO_LIVE_FROM = date(2026, 7, 25)
+                                # date BREAKOUT_FADE_CEILING went live. Analysis-only
+                                # marker (no trading effect): lets diagnostics split the
+                                # pre- and post-veto eras instead of conflating them.
+                                # See scripts/check_sizing_ladder.py (IMP-027).
 VWAP_MAX_DIST_PCT = 0.25        # skip entries filled more than this % ABOVE the symbol's
                                 # session VWAP (IMP-022, 2026-07-25). Two independent
                                 # validations: the recorded-trade holdout (IMP-019/020) and
