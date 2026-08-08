@@ -279,6 +279,41 @@
 
 Ordered by expected impact; each item needs replay validation before code.
 
+★★★ **(NEW #1 LEVER, 2026-08-07 — instrument shipped as IMP-028, change PRE-REGISTERED
+   for the next qualifying run) Close the +0.5R..+1.08R trail dead zone.**
+   `TRAIL_TRIGGER_R` and `TRAIL_DISTANCE_R` are both **1.0**, so the trail candidate at
+   the trigger (`live − 1.0R`) equals the entry price — exactly what the break-even
+   stage already set — and `STOP_RATCHET_MIN_PCT` (0.10% of entry) then blocks the
+   replace until roughly **+1.08R**. **Across that whole band the protective stop is
+   pinned at entry and captures nothing.** Post-gate evidence (36 trades since
+   2026-07-25, via `python -m scripts.exit_geometry`): 6 trades peaked ≥ +0.5R carrying
+   **$174.12** of combined peak open profit and banked **−$5.29 (capture −3.0%)**; the
+   +0.5R..+1.0R band captures **16.3%** vs **52.0%** for trades clearing +1.0R; the whole
+   book captures **−22.2%** of $667.55 of peak open profit. 2026-08-07 META #233 is the
+   worked case: it *cleared* the 1.0R trigger at +1.07R and the ratchet was blocked **by
+   two cents** (candidate 590.97 vs required 590.99), banking −$0.08 on $32.96 of peak.
+   **Do NOT ship on the in-sample grid alone.** Three pre-registered conditions, all
+   required, so the next run executes a rule rather than a hunch:
+   (1) **post-gate sample ≥ 40 closed trades** (the 2026-08-01 weekly's bar; it was
+       **36** at the 08-07 close, so ~2 sessions away);
+   (2) **an in-sample / held-out split** in the IMP-022 mould — partition post-gate
+       trades by entry day and confirm the tightening improves BOTH windows, not just
+       the pooled book (the grid below is in-sample only and every value "wins", which
+       is itself a reason for suspicion);
+   (3) **discount for IEX sparsity** — bars miss minutes and understate true ranges, so
+       simulated stops fire *less* often than real ones and any stop-TIGHTENING what-if
+       is biased optimistic. Require the delta to clear the noise budget (currently
+       **$4.73**) by a wide margin, and prefer the *most conservative* setting that
+       still clears it over the best-scoring one.
+   In-sample grid for reference (delta vs the live geometry, post-gate book):
+   `trail@1R-0.75R +$27.61` · `trail@1R-0.5R +$53.14` · `trail@0.5R-0.5R +$68.82`
+   · `trail@1R-0.25R +$72.43` · `trail@0.5R-0.25R +$73.62`.
+   **Risk note: this is a pure stop-TIGHTENING change — it can only move a stop UP, never
+   widens risk, and touches no risk limit, sizing rule or the no-overnight path.** It does
+   not require human sign-off on the risk grounds that gated IMP-019/022, but it DOES
+   need the three conditions above. Watch that it does not cut runners: INTC #203 (+1.68R
+   → TAKE_PROFIT +$55.72) and NVDA #206 (+1.26R → +$44.87) are the trades to check.
+
 > **2026-08-05 — backlog ★ (skip-bearish form) is DEAD; do not re-litigate it.**
 > Today's session (0W/4L, four longs into an index closing on its low) is the most
 > seductive possible argument for a market-regime gate. `scripts/regime_analysis`
