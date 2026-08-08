@@ -39,20 +39,23 @@ def test_take_profit_when_only_target_touched():
 
 
 def test_eod_flatten_when_neither_leg_triggers():
-    bars = _bars([(100.1, 101.0, 100.5), (100.2, 101.2, 100.8)])
+    # Highs stay under the +0.5R ratchet trigger (100.5) so no stop is ever moved.
+    bars = _bars([(100.1, 100.4, 100.2), (100.2, 100.45, 100.8)])
     price, reason, ts = backtest.simulate_exit(bars, entry=100.0, initial_stop=99.0,
                                                take_profit=110.0, eod_close=100.8)
     assert reason == "EOD_FLATTEN" and price == 100.8 and ts is not None
 
 
 def test_breakeven_ratchet_locks_a_scratch_not_a_full_loss():
-    # entry 100, initial stop 99 (1R = 1.0). Bar1 high 100.6 = +0.6R -> stop to entry(100).
-    # Bar2 dips to 99.5: with breakeven the stop is now 100, so it exits at 100 (scratch),
-    # NOT at the original 99. Confirms the IMP-013 breakeven moved the stop.
+    # entry 100, initial stop 99 (1R = 1.0). Bar1 high 100.6 = +0.6R clears the
+    # +0.5R trigger; post-IMP-029 the trail rides 0.5R below it -> stop 100.10.
+    # Bar2 dips to 99.5, so it exits at 100.10 (a small GAIN), NOT at the original
+    # 99. Confirms the ratchet moved the stop — and that IMP-029 banks the band
+    # that used to hand back a flat scratch at 100.00.
     bars = _bars([(100.1, 100.6, 100.4), (99.5, 100.2, 99.8)])
     price, reason, _ = backtest.simulate_exit(bars, entry=100.0, initial_stop=99.0,
                                               take_profit=110.0, eod_close=99.8)
-    assert reason == "STOP" and price == 100.0
+    assert reason == "STOP" and price == 100.1
 
 
 def _tr(sym, e_h, x_h, pl=1.0):

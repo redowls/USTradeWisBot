@@ -30,6 +30,12 @@ def _bars(pairs: list[tuple[float, float]]) -> pd.DataFrame:
 
 LIVE = ExitGeometry.from_config()
 
+# The geometry that was live from IMP-013 (2026-07-08) until IMP-029 (2026-08-08).
+# The tests below that reproduce RECORDED outcomes are pinned to it on purpose:
+# they document what the bot really did on those dates, so they must not follow
+# config forward. New behaviour is asserted against LIVE.
+PRE_IMP029 = ExitGeometry(0.5, 1.0, 1.0, 0.10)
+
 # --- 2026-08-07 META #233: entry 590.40, plan stop 582.73 (1R = 7.67) --------
 # Peak 598.64 at 10:59 ET = +1.07R, i.e. it CLEARED the 1.0R trail trigger.
 # Exited 14:46 via the break-even stop for -$0.08 on qty 4.
@@ -83,27 +89,95 @@ def test_ratchet_rejects_non_positive_risk():
 
 # --- The structural defect this module was built to measure -----------------
 
-def test_trail_stage_is_inert_at_its_own_trigger():
-    """With TRAIL_TRIGGER_R == TRAIL_DISTANCE_R == 1.0 the trail is a no-op.
+def test_trail_stage_was_inert_at_its_own_trigger_before_imp029():
+    """Historical: with TRAIL_TRIGGER_R == TRAIL_DISTANCE_R == 1.0 the trail was a no-op.
 
-    At exactly +1R the candidate is `live - 1.0R` == the entry price, which the
-    break-even stage already set, so the ratchet min-step blocks it. The stop is
-    therefore pinned at entry across the whole +0.5R..~+1.08R band and captures
-    nothing — the dead zone that produced today's give-backs.
+    At exactly +1R the candidate was `live - 1.0R` == the entry price, which the
+    break-even stage had already set, so the ratchet min-step blocked it. The stop
+    stayed pinned at entry across the whole +0.5R..~+1.08R band and captured
+    nothing — the dead zone that produced the 2026-08-07 give-backs and the
+    defect IMP-029 removed.
     """
-    assert config.TRAIL_TRIGGER_R == config.TRAIL_DISTANCE_R == 1.0
     risk = META_ENTRY - META_STOP
     at_one_r = META_ENTRY + 1.0 * risk
     # Stop already at break-even (the +0.5R stage moved it there).
-    assert ratchet_stop(META_ENTRY, META_STOP, META_ENTRY, at_one_r, LIVE) is None
+    assert ratchet_stop(META_ENTRY, META_STOP, META_ENTRY, at_one_r,
+                        PRE_IMP029) is None
     # META's real +1.07R peak was still blocked — by two cents.
-    assert ratchet_stop(META_ENTRY, META_STOP, META_ENTRY, 598.64, LIVE) is None
+    assert ratchet_stop(META_ENTRY, META_STOP, META_ENTRY, 598.64,
+                        PRE_IMP029) is None
+
+
+# --- IMP-029: the dead zone must stay closed --------------------------------
+
+def test_trail_is_not_inert_at_the_trigger():
+    """The live trail must lift the stop ABOVE entry as soon as price runs past it.
+
+    This is the regression guard for IMP-029. The failure mode it locks out is
+    arithmetic, not statistical: whenever TRAIL_DISTANCE_R >= TRAIL_TRIGGER_R the
+    candidate at the trigger is `live - distance*R` <= entry, i.e. no better than
+    the break-even stop, and STOP_RATCHET_MIN_PCT then blocks every replace until
+    price has run a further ratchet-min-step. Setting TRAIL_DISTANCE_R back to
+    1.0 (or above TRAIL_TRIGGER_R) reopens the dead band and fails this test.
+    """
+    risk = META_ENTRY - META_STOP
+    # Comfortably past the trigger, break-even already set: the stop MUST move up.
+    well_past = META_ENTRY + (config.TRAIL_TRIGGER_R + 0.5) * risk
+    moved = ratchet_stop(META_ENTRY, META_STOP, META_ENTRY, well_past, LIVE)
+    assert moved is not None, "trail is inert — the IMP-029 dead zone is back"
+    assert moved > META_ENTRY
+
+    # META's real +1.07R peak — blocked by two cents before IMP-029 — now trails.
+    at_real_peak = ratchet_stop(META_ENTRY, META_STOP, META_ENTRY, 598.64, LIVE)
+    assert at_real_peak is not None
+    assert at_real_peak > META_ENTRY
+
+
+def test_trail_distance_stays_below_the_trigger():
+    """Config invariant: distance >= trigger is what made the trail inert."""
+    assert config.TRAIL_DISTANCE_R < 1.0
+    assert config.TRAIL_DISTANCE_R <= config.TRAIL_TRIGGER_R
+    assert config.TRAIL_TRIGGER_R <= config.BREAKEVEN_TRIGGER_R, \
+        "the trail must arm no later than break-even, or a dead band reopens"
+
+
+def test_imp029_geometry_captures_both_of_the_weeks_giveback_trades():
+    """The two 2026-08-07 give-backs must now bank real money, not ~$0.
+
+    META #233 peaked +1.07R and NVDA #232 peaked +0.88R; both returned 100% of
+    the move under the old geometry (recorded: -$0.08 and -$0.11). NVDA is the
+    reason the trigger moved to 0.5R as well as the distance — it never reached
+    +1R, so a distance-only fix would have left it untouched.
+    """
+    meta = simulate_exit(META_BARS, META_ENTRY, META_STOP, META_TP,
+                         fallback_exit_price=590.38, geometry=LIVE)
+    assert meta.armed_trail is True
+    assert (meta.exit_price - META_ENTRY) * META_QTY > 10.0
+
+    nvda = simulate_exit(NVDA_BARS, NVDA_ENTRY, NVDA_STOP, NVDA_TP,
+                         fallback_exit_price=221.81, geometry=LIVE)
+    assert nvda.armed_trail is True, "NVDA peaked +0.88R — needs the 0.5R trigger"
+    assert nvda.exit_price > NVDA_ENTRY
+    assert (nvda.exit_price - NVDA_ENTRY) * NVDA_QTY > 5.0
+
+
+def test_imp029_never_widens_risk():
+    """A ratchet may only move a stop UP — IMP-029 must not relax that."""
+    risk = NVDA_ENTRY - NVDA_STOP
+    # Below the break-even trigger nothing moves at all.
+    assert ratchet_stop(NVDA_ENTRY, NVDA_STOP, NVDA_STOP,
+                        NVDA_ENTRY + 0.2 * risk, LIVE) is None
+    # A stop already above the candidate is never pulled back down.
+    high_stop = NVDA_ENTRY + 0.9 * risk
+    assert ratchet_stop(NVDA_ENTRY, NVDA_STOP, high_stop,
+                        NVDA_ENTRY + 1.0 * risk, LIVE) is None
 
 
 def test_meta_233_replays_to_breakeven_not_a_full_loss():
-    """The recorded 2026-08-07 META #233 outcome: STOP at the entry price, ~$0."""
+    """The recorded 2026-08-07 META #233 outcome under the THEN-live geometry:
+    STOP at the entry price, ~$0. Pinned to PRE_IMP029 — this is history."""
     result = simulate_exit(META_BARS, META_ENTRY, META_STOP, META_TP,
-                           fallback_exit_price=590.38, geometry=LIVE)
+                           fallback_exit_price=590.38, geometry=PRE_IMP029)
     assert result.exit_reason == "STOP"
     assert result.exit_price == pytest.approx(META_ENTRY)
     assert result.armed_breakeven is True
@@ -112,9 +186,10 @@ def test_meta_233_replays_to_breakeven_not_a_full_loss():
 
 
 def test_nvda_232_replays_to_breakeven_not_a_full_loss():
-    """The recorded 2026-08-07 NVDA #232 outcome: STOP at the entry price, ~$0."""
+    """The recorded 2026-08-07 NVDA #232 outcome under the THEN-live geometry:
+    STOP at the entry price, ~$0. Pinned to PRE_IMP029 — this is history."""
     result = simulate_exit(NVDA_BARS, NVDA_ENTRY, NVDA_STOP, NVDA_TP,
-                           fallback_exit_price=221.81, geometry=LIVE)
+                           fallback_exit_price=221.81, geometry=PRE_IMP029)
     assert result.exit_reason == "STOP"
     assert result.exit_price == pytest.approx(NVDA_ENTRY)
     assert result.armed_breakeven is True
@@ -144,7 +219,7 @@ def test_static_bracket_model_launders_the_recorded_exit_instead_of_modelling_it
     assert neutral.exit_price == pytest.approx(594.00)       # $14.40 off on qty 4
 
     faithful = simulate_exit(META_BARS, META_ENTRY, META_STOP, META_TP,
-                             fallback_exit_price=594.00, geometry=LIVE)
+                             fallback_exit_price=594.00, geometry=PRE_IMP029)
     assert faithful.exit_reason == "STOP"
     assert faithful.exit_price == pytest.approx(META_ENTRY)  # fallback irrelevant
 
@@ -199,7 +274,10 @@ def test_ratchet_arms_from_the_bar_after_the_trigger_not_the_same_bar():
     result = simulate_exit(bars, 100.0, 90.0, 130.0,
                            fallback_exit_price=99.0, geometry=LIVE)
     assert result.exit_reason == "STOP"
-    assert result.exit_price == pytest.approx(100.0)   # entry, not the 90.0 plan stop
+    # Bar 1 (+0.55R) arms the ratchet; bar 2 is tested against the level it set.
+    # Post-IMP-029 that level is the 0.5R trail (105.5 - 0.5*10R = 100.5), not
+    # the entry price — and emphatically not the 90.0 plan stop.
+    assert result.exit_price == pytest.approx(100.5)
 
 
 # --- Aggregation -------------------------------------------------------------
@@ -219,7 +297,7 @@ def test_replay_geometry_aggregates_todays_two_giveback_trades():
         _trade(232, "NVDA", NVDA_QTY, NVDA_ENTRY, NVDA_STOP, NVDA_TP, 221.81, -0.11),
     ]
     windows = {233: META_BARS, 232: NVDA_BARS}
-    out = replay_geometry(trades, windows, LIVE)
+    out = replay_geometry(trades, windows, PRE_IMP029)   # reproduces the RECORDED day
 
     assert out["trades"] == 2
     assert out["actual_pl"] == pytest.approx(-0.19)

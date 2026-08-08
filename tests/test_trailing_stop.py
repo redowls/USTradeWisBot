@@ -37,9 +37,22 @@ def test_breakeven_at_half_r():
     assert exits.compute_trailed_stop(100.0, 98.5, 98.5, 100.75) == 100.0
 
 
-def test_trail_at_one_r_tracks_price_minus_risk():
-    # +2R (103.00) — stop trails 1R (1.5) below live: 101.50.
-    assert exits.compute_trailed_stop(100.0, 98.5, 100.0, 103.00) == 101.5
+def test_trail_tracks_price_minus_trail_distance():
+    # +2R (103.00) — stop trails TRAIL_DISTANCE_R (0.5R = 0.75) below live: 102.25.
+    # Was 101.50 under the pre-IMP-029 1.0R distance.
+    assert exits.compute_trailed_stop(100.0, 98.5, 100.0, 103.00) == 102.25
+
+
+def test_trail_arms_at_the_breakeven_trigger_no_dead_band():
+    """IMP-029: at +0.5R..+1R the stop must ratchet, not sit pinned at entry.
+
+    Pre-IMP-029 the trail armed only at +1R and its candidate there was exactly
+    the entry price, so this whole band captured nothing. +0.8R (101.20) now
+    trails to 101.20 - 0.75 = 100.45, above the entry-level stop of 100.00.
+    """
+    moved = exits.compute_trailed_stop(100.0, 98.5, 100.0, 101.20)
+    assert moved == 100.45
+    assert moved > 100.0
 
 
 def test_ratchet_never_lowers_stop():
@@ -48,9 +61,10 @@ def test_ratchet_never_lowers_stop():
 
 
 def test_ratchet_ignores_tiny_improvements():
-    # Candidate beats the current stop by 5 cents on a $100 stock — below the
-    # 0.10% (=$0.10) minimum step, so no replace spam on every 60s tick.
-    assert exits.compute_trailed_stop(100.0, 98.5, 101.45, 102.96) is None
+    # Candidate (102.21 = 102.96 - 0.5R) beats the current stop by 5 cents on a
+    # $100 stock — below the 0.10% (=$0.10) minimum step, so no replace spam on
+    # every 60s tick.
+    assert exits.compute_trailed_stop(100.0, 98.5, 102.16, 102.96) is None
 
 
 def test_guards_zero_risk_and_missing_price():
@@ -166,7 +180,7 @@ def test_manage_stops_replaces_at_one_r(monkeypatch):
     replaced = _wire(monkeypatch, [_open_trade()], {"parent-1": parent},
                      {"NVDA": 103.0})
     actions = engine.Engine(dry_run=False).manage_stops()
-    assert replaced == [("leg-stop", 101.5)]
+    assert replaced == [("leg-stop", 102.25)]
     assert actions and actions[0]["action"] == "stop_raised"
 
 
@@ -212,7 +226,7 @@ def test_manage_stops_one_failure_does_not_stop_the_rest(monkeypatch):
                         lambda oid, px: (replaced.append((oid, px)),
                                          {"ok": True, "order_id": "n", "error": None})[1])
     engine.Engine(dry_run=False).manage_stops()
-    assert replaced == [("leg-stop", 101.5)]
+    assert replaced == [("leg-stop", 102.25)]
 
 
 def test_tick_calls_manage_stops_before_entries(monkeypatch):

@@ -86,9 +86,20 @@ MAX_ENTRY_SLIPPAGE_PCT = 1.0    # skip an entry if the LIVE price has moved more
 TRAILING_STOP_ENABLED = True
 BREAKEVEN_TRIGGER_R = 0.5       # at +0.5R unrealized, raise the stop to entry —
                                 # a trade that showed profit can no longer close red.
-TRAIL_TRIGGER_R = 1.0           # at +1R start trailing instead of sitting at entry.
-TRAIL_DISTANCE_R = 1.0          # trail this many R below the live price (ratchet:
-                                # the stop only ever moves UP).
+TRAIL_TRIGGER_R = 0.5           # IMP-029 (weekly): was 1.0. With TRAIL_DISTANCE_R
+                                # also 1.0 the trail candidate at the trigger was
+                                # live - 1R == ENTRY — exactly the level break-even
+                                # had already set — so STOP_RATCHET_MIN_PCT blocked
+                                # the replace until ~+1.08R and the whole
+                                # +0.5R..+1.08R band captured NOTHING (the trail was
+                                # inert by arithmetic, cf. the sibling bot's IMP-018).
+                                # Now the trail arms at the SAME point break-even
+                                # does, so the two stages are one continuous ratchet
+                                # with no dead band between them.
+TRAIL_DISTANCE_R = 0.5          # trail this many R below the live price (ratchet:
+                                # the stop only ever moves UP). Must stay < 1.0 or
+                                # the dead band returns; see tests/test_exit_sim.py
+                                # ::test_trail_is_not_inert_at_the_trigger.
 STOP_RATCHET_MIN_PCT = 0.10     # skip replaces that improve the stop by less than
                                 # this % of entry — the loop ticks every 60s and
                                 # Alpaca rotates the order id on every replace
