@@ -336,3 +336,104 @@ def test_geometry_label_is_readable():
     assert "be=0.5R" in LIVE.label()
     assert ExitGeometry(0.5, 1.0, 1.0, 0.1,
                         trailing_enabled=False).label().startswith("no-ratchet")
+
+
+# --- IMP-030: the counterfactual window must outlive the recorded exit -------
+# 2026-08-10 MSFT #240: entry 504.865, plan stop 497.12 (1R = 7.745), qty 4.
+# Peaked 513.72 (+1.14R) at 10:30 ET, then the IMP-029 0.5R trail took it out at
+# 10:53 for +$17.54. The bars below are the REAL 5-minute highs/lows for the FULL
+# session window, entry (09:40) through the 15:55 flatten -- deliberately running
+# ~5 hours past the live exit, because that is the span a looser trail needs.
+MSFT_ENTRY, MSFT_STOP, MSFT_QTY = 504.865, 497.12, 4
+MSFT_TP = 516.05
+MSFT_EXIT, MSFT_PL = 509.25, 17.54
+MSFT_SESSION_CLOSE = 506.15
+MSFT_BARS_FULL_SESSION = _bars([
+    (505.75, 503.54), (506.85, 504.97), (506.84, 505.69), (507.70, 505.49),
+    (508.33, 507.18), (509.46, 507.45), (509.77, 508.16), (510.52, 508.67),
+    (511.25, 509.31), (512.75, 510.49), (513.72, 512.23), (512.65, 511.46),
+    (511.73, 510.72), (510.98, 509.84), (510.50, 508.52), (509.50, 508.82),
+    (510.28, 508.49), (509.16, 508.24), (509.10, 508.37), (508.86, 507.79),
+    (509.31, 508.04), (509.88, 509.02), (509.70, 509.19), (509.51, 509.13),
+    (509.85, 509.25), (510.11, 509.70), (510.29, 509.86), (510.68, 510.07),
+    (511.06, 510.47), (511.13, 510.73), (511.09, 510.91), (511.02, 510.45),
+    (510.67, 510.40), (510.61, 509.96), (510.14, 508.96), (509.29, 508.72),
+    (508.75, 507.83), (508.10, 506.85), (507.22, 506.56), (508.38, 506.79),
+    (509.06, 506.92), (507.91, 507.13), (507.98, 507.14), (507.88, 507.62),
+    (508.18, 507.73), (508.40, 507.97), (508.59, 508.17), (508.38, 508.21),
+    (508.35, 507.15), (507.19, 506.56), (506.68, 505.76), (506.30, 505.72),
+    (505.62, 505.09), (505.55, 504.98), (505.42, 504.75), (505.64, 504.66),
+    (505.53, 504.81), (505.32, 504.98), (505.60, 504.82), (505.72, 504.95),
+    (505.84, 505.18), (505.64, 505.25), (506.13, 505.70), (506.33, 505.83),
+    (506.33, 505.88), (505.87, 505.33), (505.96, 505.50), (505.75, 505.30),
+    (505.39, 505.01), (505.22, 504.35), (505.27, 504.46), (505.53, 504.98),
+    (505.39, 505.03), (505.39, 504.37), (505.52, 504.07), (506.93, 505.45),
+])
+
+
+def _msft_trade():
+    return _trade(240, "MSFT", MSFT_QTY, MSFT_ENTRY, MSFT_STOP, MSFT_TP,
+                  MSFT_EXIT, MSFT_PL, reason="STOP")
+
+
+def test_imp030_reverted_geometry_is_not_the_live_answer():
+    """The bug: a looser trail was scored as if it had exited where live did.
+
+    Truncated at the recorded 10:53 exit, the pre-IMP-029 1R/1R trail never got
+    a bar low enough to fire, fell through to the fallback, and reported MSFT's
+    live +$17.54 straight back as its own counterfactual. Over the full session
+    its 505.98 stop really does get hit -- for +$4.46.
+    """
+    trades = [_msft_trade()]
+    windows = {240: MSFT_BARS_FULL_SESSION}
+    fallbacks = {240: MSFT_SESSION_CLOSE}
+
+    reverted = replay_geometry(trades, windows, PRE_IMP029, fallbacks)
+    row = reverted["rows"][0]
+
+    assert row["sim_reason"] == "STOP"
+    assert row["sim_pl"] == pytest.approx(4.46, abs=0.10)
+    # The whole point: it must NOT come back as the live result.
+    assert row["sim_pl"] != pytest.approx(MSFT_PL, abs=1.0)
+    # ...and the measured benefit of IMP-029 on this trade is the difference.
+    assert MSFT_PL - row["sim_pl"] == pytest.approx(13.08, abs=0.15)
+
+
+def test_imp030_live_geometry_still_reproduces_the_recorded_exit():
+    """Widening the window must not disturb fidelity on the shipped geometry.
+
+    IMP-029's trail fires at 10:53 in reality; bars after it are unreachable, so
+    the extra ~5 hours are inert here and the sim still lands on the live exit.
+    """
+    trades = [_msft_trade()]
+    out = replay_geometry(trades, {240: MSFT_BARS_FULL_SESSION}, LIVE,
+                          {240: MSFT_SESSION_CLOSE})
+    row = out["rows"][0]
+
+    assert row["sim_reason"] == "STOP" == row["actual_reason"]
+    assert row["sim_pl"] == pytest.approx(19.94, abs=0.10)
+    assert row["armed_trail"] is True
+    assert row["mfe_r"] == pytest.approx(1.14, abs=0.02)
+
+
+def test_imp030_fallback_map_is_optional_and_per_trade():
+    """Omitting the map keeps the old per-trade recorded-exit fallback."""
+    trades = [_msft_trade()]
+    # A static bracket never triggers on this path: its 497.12 stop is never hit
+    # and the 516.05 target never prints, so the result IS the fallback.
+    static = ExitGeometry(0.5, 1.0, 1.0, 0.10, trailing_enabled=False)
+
+    without = replay_geometry(trades, {240: MSFT_BARS_FULL_SESSION}, static)
+    with_map = replay_geometry(trades, {240: MSFT_BARS_FULL_SESSION}, static,
+                               {240: MSFT_SESSION_CLOSE})
+
+    assert without["rows"][0]["sim_reason"] == "EOD_FLATTEN"
+    assert without["rows"][0]["sim_pl"] == pytest.approx(
+        (MSFT_EXIT - MSFT_ENTRY) * MSFT_QTY, abs=0.01)      # legacy: live exit
+    assert with_map["rows"][0]["sim_pl"] == pytest.approx(
+        (MSFT_SESSION_CLOSE - MSFT_ENTRY) * MSFT_QTY, abs=0.01)   # honest: 15:55
+
+    # An unmapped trade_id must fall back to its own recorded exit, not crash.
+    partial = replay_geometry(trades, {240: MSFT_BARS_FULL_SESSION}, static, {})
+    assert partial["rows"][0]["sim_pl"] == pytest.approx(
+        without["rows"][0]["sim_pl"], abs=0.01)

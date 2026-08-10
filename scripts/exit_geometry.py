@@ -19,12 +19,13 @@ from __future__ import annotations
 import argparse
 import sys
 
-from bot import db
+from bot import config, db
 from bot.data import get_bars_for_symbols
 from bot.exit_sim import ExitGeometry, giveback_rows, replay_geometry
 
 POST_GATE_START = "2026-07-25"   # IMP-021 + IMP-022 shipped after this close
 BARS_PER_SYMBOL = 6000           # ~390 RTH 1-min bars/day -> ~15 sessions
+PRE_IMP029_TRAIL_R = 1.0         # the trigger/distance IMP-029 replaced (both 1.0)
 
 
 def load_trades(since: str) -> list[dict]:
@@ -37,12 +38,28 @@ def load_trades(since: str) -> list[dict]:
     )
 
 
-def bars_by_trade(trades: list[dict]) -> dict:
-    """trade_id -> the 1-min bar window from entry to exit, same session."""
+def bars_by_trade(trades: list[dict]) -> tuple[dict, dict]:
+    """trade_id -> the 1-min window from entry to the 15:55 flatten, + fallbacks.
+
+    The window deliberately runs past the trade's ACTUAL exit, out to the EOD
+    flatten (IMP-030). Truncating it at the recorded exit — as this did until
+    2026-08-10 — left a candidate geometry that would have held LONGER with no
+    bars to hold through, so ``simulate_exit`` fell straight to its fallback and
+    reported the live result back as the counterfactual. Worked example: MSFT
+    #240 (08-10) replayed under the pre-IMP-029 1R/1R trail as +$17.54, i.e.
+    identical to what the shipped 0.5R/0.5R geometry actually banked, when the
+    honest full-session answer is +$4.46 — a $13.08 error that hid the entire
+    measured benefit of the change being judged.
+
+    The second return value maps trade_id -> that session's closing price, so a
+    candidate whose legs never trigger is priced at the flatten it would really
+    have taken instead of at the live exit.
+    """
     symbols = sorted({t["symbol"] for t in trades})
     all_bars = get_bars_for_symbols(symbols, n_bars=BARS_PER_SYMBOL,
                                     timeframe="1Min")
     out: dict = {}
+    fallbacks: dict = {}
     for t in trades:
         df = all_bars.get(t["symbol"])
         if df is None or df.empty:
@@ -51,11 +68,12 @@ def bars_by_trade(trades: list[dict]) -> dict:
         window = df[df.index.strftime("%Y-%m-%d") == day]
         window = window[
             (window.index.strftime("%H:%M") >= t["entry_time"].strftime("%H:%M"))
-            & (window.index.strftime("%H:%M") <= t["exit_time"].strftime("%H:%M"))
+            & (window.index.strftime("%H:%M") <= config.FLATTEN_ET)
         ]
         if not window.empty:
             out[t["trade_id"]] = window
-    return out
+            fallbacks[t["trade_id"]] = float(window["close"].iloc[-1])
+    return out, fallbacks
 
 
 def _mislabelled(result: dict) -> int:
@@ -92,10 +110,10 @@ def main(argv: list[str]) -> int:
     if not trades:
         print(f"No closed trades since {args.since}.")
         return 0
-    windows = bars_by_trade(trades)
+    windows, fallbacks = bars_by_trade(trades)
 
     live = ExitGeometry.from_config()
-    baseline = replay_geometry(trades, windows, live)
+    baseline = replay_geometry(trades, windows, live, fallbacks)
     budget = baseline["abs_error"]
 
     print("=" * 78)
@@ -116,13 +134,13 @@ def main(argv: list[str]) -> int:
     static = ExitGeometry(live.breakeven_trigger_r, live.trail_trigger_r,
                           live.trail_distance_r, live.ratchet_min_pct,
                           trailing_enabled=False)
-    static_run = replay_geometry(trades, windows, static)
+    static_run = replay_geometry(trades, windows, static, fallbacks)
     print("\nStatic bracket — what bot/replay.py models (no ratchet):")
     _print_run(static_run, None)
     print(f"    exits mislabelled vs recorded: {_mislabelled(static_run)}"
           f"/{static_run['trades']}  (all real STOPs reported as EOD_FLATTEN)")
-    print("    its small $ error is an artefact: the EOD fallback IS the recorded"
-          "\n    exit price, so ratchet-caused exits fall through to the answer.")
+    print("    since IMP-030 this is priced at the 15:55 close over a full-session"
+          "\n    window, not at the recorded exit, so it no longer inherits the answer.")
 
     print("\nGive-back cohort (peaked >= +0.5R, banked <= $1):")
     gb = giveback_rows(baseline["rows"])
@@ -138,9 +156,16 @@ def main(argv: list[str]) -> int:
     else:
         print("  (none)")
 
+    prior = ExitGeometry(live.breakeven_trigger_r, PRE_IMP029_TRAIL_R,
+                         PRE_IMP029_TRAIL_R, live.ratchet_min_pct)
+    print("\nReverted geometry — what the book would have done WITHOUT IMP-029:")
+    _print_run(replay_geometry(trades, windows, prior, fallbacks), budget)
+    print("    only computable since IMP-030 widened the window past the live exit;"
+          "\n    a looser trail holds longer, so truncated bars used to hide it.")
+
     print("\nWhat-if grid (trail distance below the running high, in R):")
     for dist in list(args.trail) or [0.75, 0.5, 0.35, 0.25]:
-        for trigger in (live.trail_trigger_r, 0.5):
+        for trigger in sorted({live.trail_trigger_r, 0.5, 1.0}):
             if trigger < dist:
                 continue    # trail would sit below entry at the trigger: pointless
             cand = ExitGeometry(
@@ -149,7 +174,7 @@ def main(argv: list[str]) -> int:
                 trail_distance_r=dist,
                 ratchet_min_pct=live.ratchet_min_pct,
             )
-            _print_run(replay_geometry(trades, windows, cand), budget)
+            _print_run(replay_geometry(trades, windows, cand, fallbacks), budget)
 
     print("\nRead: 'captured %' is realized P&L as a share of total peak open "
           "profit.\nA delta inside the noise budget is bar-resolution artefact, "

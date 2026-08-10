@@ -209,12 +209,19 @@ def replay_geometry(
     trades: list[dict],
     bars_by_trade: dict,
     geometry: ExitGeometry,
+    fallback_by_trade: dict | None = None,
 ) -> dict:
     """Replay every trade under ``geometry``; return the aggregate + per-trade rows.
 
-    ``trades`` are DB rows (trade_id/symbol/qty/entry_price/stop_price/
+    ``trades`` are DB rows (trade_id/qty/entry_price/stop_price/
     take_profit_price/exit_price/realized_pl/exit_reason); ``bars_by_trade`` maps
-    trade_id -> the entry..exit bar window. Trades without bars are skipped.
+    trade_id -> the bar window to walk. Trades without bars are skipped.
+
+    ``fallback_by_trade`` maps trade_id -> the price to use when neither leg
+    triggers. Pass the **session-end close** together with an entry..15:55 window
+    (IMP-030) so a candidate that would have held PAST the live exit is judged on
+    real bars. Omit it and each trade falls back to its own recorded exit price,
+    which is only correct when the window itself ends at that exit.
 
     ``abs_error`` (sum of |sim - actual|) is the simulation noise budget for the
     CURRENT geometry — a what-if's ``delta`` has to clear it to mean anything.
@@ -233,8 +240,10 @@ def replay_geometry(
             continue
         qty = float(t["qty"])
         tp = float(t["take_profit_price"]) if t.get("take_profit_price") else None
-        sim = simulate_exit(bars, entry, plan_stop, tp,
-                            float(t["exit_price"]), geometry)
+        fallback = float(t["exit_price"])
+        if fallback_by_trade is not None and t["trade_id"] in fallback_by_trade:
+            fallback = float(fallback_by_trade[t["trade_id"]])
+        sim = simulate_exit(bars, entry, plan_stop, tp, fallback, geometry)
         rows.append({
             "trade_id": t["trade_id"],
             "symbol": t["symbol"],

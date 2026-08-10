@@ -35,6 +35,66 @@ the pre-market routine reads this section the next morning)
 
 ---
 
+## 2026-08-10 — Daily Review
+
+### Stats
+- Trades: **4 closed (1W / 3L)**, win rate **25.0%**. Net **+$3.76 (+0.050%)**. **First green day since 08-04** and the end of a four-red run (08-05 −$95.95, 08-06 −$92.27, 08-07 −$16.45).
+- Winner: MSFT **+$17.54**. Losers: SE **−$9.24**, QQQ **−$3.89**, SPY **−$0.65**. Avg winner **+$17.54** / avg loser **−$4.59**; **payoff 3.82**, **profit factor 1.27** (gross win $17.54 / gross loss $13.78). The first PF > 1 since 08-04.
+- **The whole day is one trade, and it is the trade IMP-029 was built for.** MSFT is +466% of the net; the other three net −$13.78.
+- Exit mix: **STOP 1 (+$17.54)** — a *profitable* stop, the ratchet firing above entry — and **EOD_FLATTEN 3 (−$13.78)**. No take-profit; TP-hit rate all-time now **25/235 (10.6%)**.
+- Worst mark-to-market ≈ **−$25** (SE's −0.57R MAE dominating); the 8% daily-loss halt was never remotely approached (worst ≈ −0.3%).
+- Account equity close **$7,535.33**. Broker-reconciled via `alpaca` MCP **to the cent**: last_equity 7,531.57 → equity 7,535.33 = **+$3.76**, matching DB `daily_summary` exactly. Cash 7,535.33, long_market_value 0, **0 positions**, ACTIVE, not blocked. All 4 buy fills and all 4 sell fills tie to the DB entry/exit prices exactly; every bracket leg was cancelled at the flatten, **no orphans**.
+- ⚠️ **Cushion is $35.33 above the −25% / $7,500 strategy-review flag** — up from $31.57 on Friday, still the thinnest band of the incubation. **−24.65% YTD.** One average red day of last week (−$92 to −$96) still trips the formal review.
+- Reliability: **zero loop errors**, NRestarts=0, service `active` since the 08-08 20:09 UTC weekly restart. **No naked overnight — ~38 consecutive clean sessions.** The 15:55 flatten again needed **two ticks** (15:55:29 incomplete → 15:56:31–43 confirmed flat) — IMP-002 retry working as designed.
+- Slippage: only SE has a logged intent — signalled 114.97, filled **115.08 (+0.096% adverse)**. MSFT's protective stop sat at 509.76 and filled **509.25 (−0.10%)**, normal for a market-triggered stop.
+
+### Market context
+**A trending, risk-on tape — the regime this strategy exists to capture.** S&P 500 **+0.62% to 7,757.64**, a record close; Nasdaq Composite **+1.30% to 26,690.61**, tech-led (Perplexity `sonar`; no stock-specific catalyst found for MSFT or SE). The bot netted **+0.05%** against an index up 0.62% — directionally right, hugely under-participating.
+**The index trades explain the under-participation and are the day's structural lesson.** QQQ and SPY were both entered **in the first 90 seconds (09:30 / 09:31)** and both bled all session on a day their underlying indices rose ~1%. That is only possible because **the entire index gain was the overnight gap**: the bot bought the gap-up open print and the cash session went nowhere (QQQ MFE +0.23R, SPY +0.20R over 6.4 hours). Buying the open on an index ETF is buying the one part of the move that already happened.
+
+### Trade-by-trade review
+MFE/MAE from real 5-min IEX bars over each trade's entry→exit window; **MFE_R** = MFE ÷ initial 1R stop distance (+0.5R arms break-even, and since IMP-029 also arms the trail).
+
+| # | Sym | Entry (ET) | Exit (ET) | conf | mom | MFE_R | MAE_R | Exit | P&L | Root cause |
+|---|-----|-----------|-----------|------|-----|-------|-------|------|-----|------------|
+| 240 | MSFT | 09:37 @504.865 | 10:53 @509.25 | 61.05 | 0.99 | **+1.14R** | −0.17R | **STOP (trail)** | **+$17.54** | **The IMP-029 trade.** Ran to +1.14R in 53 min, the trail ratcheted the stop up **seven times** (497.12 → 504.91 → 505.73 → 506.41 → 507.07 → 507.88 → 508.69 → **509.76**, broker-confirmed replace chain) and banked **+0.57R**. 100% of its bars closed green. Nothing to fix. |
+| 238 | QQQ | 09:30 @722.207 | 15:56 @720.91 | 62.96 | 0.86 | +0.23R | −0.18R | EOD_FLATTEN | −$3.89 | **Bought the gap-up open.** Never reached +0.5R, so no ratchet stage ever armed; only 33% of bars closed green. Held 6h26m to die on the clock. Not a stop-placement or signal-quality failure — an **entry-timing** failure. |
+| 239 | SPY | 09:31 @772.793 | 15:56 @772.577 | 62.77 | 0.85 | +0.20R | −0.08R | EOD_FLATTEN | −$0.65 | Same trade as #238 one minute later — **duplicate exposure to a single index bet**. 74% of bars green yet MFE never cleared +0.25R: pure drift, no impulse. Effectively a scratch. |
+| 241 | SE | 14:32 @115.08 | 15:56 @114.64 | 60.00 | 0.67 | +0.14R | **−0.57R** | EOD_FLATTEN | −$9.24 | **Never green** — 1 of 17 bars closed above entry. Lowest confidence (60.00, the floor) and weakest momentum (0.67) of the day, entered late (14:32) with only 83 min of runway. Textbook member of the ★ never-green cohort. |
+
+### IMP-029 verdict — first live session (the point of today)
+IMP-029 (weekly, shipped 08-08: `TRAIL_TRIGGER_R` and `TRAIL_DISTANCE_R` 1.0 → 0.5) pre-registered its pass condition as *"fewer trades peaking ≥+0.5R and banking ~$0"*. Today:
+- **Exactly one trade armed the trail (MSFT #240), and it passed.** Honest full-session counterfactual: under the pre-IMP-029 1R/1R geometry MSFT's stop would have sat at **505.98** and been taken out for **+$4.46**; the shipped 0.5R/0.5R geometry stopped at **509.85** for **+$17.54**. **+$13.08 attributable to IMP-029 on one trade** — and it is the difference between a green day (+$3.76) and a red one (−$9.32).
+- **The give-back cohort did not grow**: still n=6, none from today. No trade peaked ≥+0.5R and banked ~$0.
+- **The fail condition (winners cut short) did not trigger.** MSFT banked +0.57R of a +1.14R peak; the geometry it replaced would have banked +0.14R of the same peak.
+- **Honest caveat: n=1 armed trade.** This is a pass, not a confirmation. IMP-029 stays; no stacking. The book-level read (below) is the stronger evidence.
+
+### What worked / what didn't
+- **Worked:** the exit ratchet, unambiguously and for the first time in live trading. A *profitable STOP exit* is a new event in this bot's history — every prior STOP bucket entry was a loss. The 08-08 weekly change is doing exactly what it was shipped to do.
+- **Worked:** risk discipline. 4 trades, max 3 concurrent, no halt, no overnight, no errors, flatten clean.
+- **Didn't work:** **entry timing at the open on index ETFs.** QQQ+SPY = 2 of 4 trades, both filled inside 90 seconds of the bell, both buying an overnight gap, both dead money for 6.4 hours. They also consumed 2 of the 3 concurrent-position slots for the entire session, so the book could not take anything else until SE at 14:32.
+- **Didn't work:** the never-green cohort, again. SE was the largest loser and never traded above entry after the first bar.
+- **Unchanged concern:** `breakout_score = 0.0000` and `broke_level = NULL` on **all four** trades. Every entry today — as on recent sessions — was an MA + momentum drift entry, not a breakout. The "breakout bot" has not taken a breakout in some time; the edge it is actually trading is MA drift. This is a *strategy-premise* question, not a parameter question, and it belongs to the weekly.
+- The **IMP-022 VWAP gate** again did most of the filtering: ~50 logged vetoes across **AMZN, ABNB, CRM, WMT, XOM** (ABNB repeatedly at +0.8–1.5% above VWAP). None of the vetoed names were traded; the gate's cost/benefit remains the open question IMP-025 instrumented.
+
+### Lessons & improvement candidates
+Ranked by expected impact. **Today shipped IMP-030 (measurement only) and deliberately did NOT touch trading logic** — Monday is IMP-029's first clean live session and stacking a second exit change would destroy attribution, exactly as IMP-029's own note pre-registered.
+1. **★★ Never-green time-stop** — still the #1 remaining lever (all-time: 39 trades that never closed a bar above entry, 0% win, −$833.59; SE #241 today adds to it). Now measurable honestly for the first time thanks to IMP-030. **Needs its own in-sample/held-out pass; candidate for the next engine change once IMP-029 has ~a week of live reads.**
+2. **★★ Opening-print entries on index ETFs (QQQ/SPY).** New evidence today. Note this is **NOT** the sibling bot's opening-range blackout: the all-time entry-hour split here shows **09:30–09:59 n=127, −$1,045.52, avg −$8.23** vs **≥10:00 n=102, −$1,123.74, avg −$11.02**, and post-gate **09:30–09:59 avg −$3.99 vs ≥10:00 avg −$3.11** — i.e. **a blanket opening blackout is NOT justified on this book and must not be copied from USTradeBot's IMP-017.** The narrower, better-supported idea is **gap-aware entry on index ETFs specifically** (skip an ETF entry whose session has already gapped and whose first bars are flat vs VWAP). Needs a proper sample before shipping — recorded, not actioned.
+3. **★ Duplicate index exposure.** QQQ and SPY inside 90 seconds is one bet held twice and cost 2 of 3 position slots all day. A correlation/one-index-ETF-at-a-time cap is cheap and risk-*reducing*, but today is n=1; gather more sessions.
+4. **Strategy premise: zero breakout scores.** Escalate to the weekly review — if the bot never takes a breakout, the breakout scoring and the false-breakout verdict in `scripts.report` are measuring something the strategy no longer does.
+5. **Grid observation, explicitly NOT actioned:** post-IMP-030 the what-if grid likes tighter trails (`trail@1R-0.25R` → sim −$20.18 vs live −$62.12). **Every one of those deltas is inside the $171.43 noise budget and the whole grid is in-sample.** Do not chase it; it is a weekly question with a held-out split, not a daily one.
+
+### Notes for pre-market research
+- **MSFT — today's only winner and the cleanest trend entry of the week** (+1.14R MFE, 100% green bars, conf 61). Behaved exactly as the strategy intends. **Keep, high priority.**
+- **QQQ / SPY — flag for gap handling, do not park.** Both gapped up and then went flat for the whole cash session; the bot bought the open both times. Tomorrow, if either shows a large pre-market gap, prefer *not* opening at the bell — and note they are **one bet, not two**: consider holding at most one index ETF at a time so they don't eat the 3-slot book.
+- **SE — chronic-loser watch escalates.** Now **0W/5** with today's −$9.24 (prior: −$4.56 on 08-04). Entered at the confidence floor (60.00) with the weakest momentum of the day, and never traded green. It is also the lowest-liquidity ADR on the list. **Recommend parking SE** unless pre-market shows a specific catalyst.
+- **Chopped above VWAP, never entered (gate did its job): ABNB** (repeatedly +0.8–1.5% above VWAP, the most persistent all day), **CRM** (+0.95–1.10%), **AMZN** (+0.76–0.84%), **WMT** (+0.42–0.55%, ~20 vetoes), **XOM** (+0.57%). All five trended up but never offered a fill at/below VWAP — these are the names the gate is costing us on if it is costing anything. Worth a look at whether any deserve a pullback-entry variant.
+- **AMZN** remains 0W/5 all-time and did not trade again today (gate-blocked, not signal-less) — the standing park candidate.
+- Tape was trending risk-on to record highs; if that persists, expect more above-VWAP vetoes and few fills. The book had only 1 free slot from 09:37 to 15:56.
+
+---
+
 ## 2026-08-07 — Daily Review
 
 ### Stats
