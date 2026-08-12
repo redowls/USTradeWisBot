@@ -329,6 +329,68 @@ Ordered by expected impact; each item needs replay validation before code.
 > (39 trades, 0% win, −$833.59 all-time), gated on the weekly's 40–60-post-gate-trade
 > bar (currently 25).
 
+> **2026-08-12 — ★ NEVER-GREEN TIME-STOP: GATE REACHED, LEVER REFUTED. DEMOTE IT.**
+> The post-gate book hit **47 trades** today, clearing the 40–60 bar above, so the
+> lever was tested (IMP-032). It fails on its own terms. Measured from real 1-min
+> bars: only **2 of 47** post-gate trades never printed green, and **18 of the 19
+> post-gate STOP exits DID print green first** — the losses go green and *reverse*,
+> they do not go straight down. A time-scratch what-if peaks at **+$44.90 on 4
+> scratched trades (T=15min)** and decays to **+$3.84 at T=45min**: non-monotone
+> over a 2-to-6-trade population, i.e. noise. The "faded flatten" half has likewise
+> collapsed post-gate — **12 trades, −$114.94, avg −$18.93 → −$9.58**. **The VWAP
+> gate (IMP-021/022) appears to have already removed most of the population this
+> lever was aimed at**, which is why the all-time figure (39 trades) no longer
+> describes the book the bot actually trades. **Do not ship a never-green scratch.**
+>
+> **What replaces it as the concentration — with an explicit warning attached.**
+> Of the 19 post-gate stops, the **10 that reached +0.5R and armed break-even cost
+> −$15.77 in total**; the **9 that never reached it cost −$330.71**, essentially the
+> entire post-gate stop loss, with peaks clustered just under the trigger (+0.42R,
+> +0.39R, +0.28R, +0.18R). That makes `BREAKEVEN_TRIGGER_R` the highest-leverage
+> exit parameter — **but it is NOT currently shippable.** The IMP-032 sweep prices
+> both sides (rescues *and* winners scratched) and returns **0.5R → −$63.30, 0.4R →
+> −$73.86, 0.35R → −$17.18, 0.3R → −$19.49, 0.25R → −$41.49, 0.2R → −$38.12** —
+> non-monotone, $56 swings between adjacent triggers, and **every row (including the
+> live baseline and every row of the trail grid) inside the $248.18 noise budget.**
+> Run `python -m scripts.exit_geometry` before proposing any exit change.
+>
+> **The real blocker is measurement precision, and it should be the weekly's agenda
+> item.** 47 trades and IEX 1-min bars cannot resolve a $50–150 effect against a
+> $248 noise budget. Until either the sample grows or the simulation gets a finer
+> data source, **no exit-geometry change is justifiable on this evidence — and that
+> retroactively weakens the basis for IMP-029.**
+
+> **2026-08-12 — ⚠️ OPS / DEPLOYMENT GAP (needs a human — I am not permitted to
+> resolve it): LIVE CODE IS NOT IN VERSION CONTROL.** The 08-11 daily-review run
+> wrote and validated **IMP-031** (break-even armed off the highest price *printed*
+> rather than the ~60s poll sample — `bot/exits.py` `peak_high_since` +
+> `compute_trailed_stop(high_price=...)`, `bot/engine.py` batched 1-min bar fetch)
+> but ended before committing. The **08-12 11:50:49 UTC restart loaded it, so it has
+> been live since this morning** and drove today's session. It is **not committed**,
+> has **no commit hash**, and a `git checkout`/redeploy would **silently revert live
+> trading behaviour**. I verified the tree is healthy (**248 tests passed** before my
+> own change, smoke + check_exits ALL GREEN, service active, 0 errors) and recorded
+> it as IMP-031 in `memory/improvement-log.md`, but the routine's standing rule
+> forbids me staging files I did not modify, so **the files remain unstaged**:
+> `bot/engine.py`, `bot/exits.py`, `bot/exit_sim.py` (08-11), plus an older
+> unrelated set `bot/analytics.py`, `bot/replay.py`, `scripts/replay.py` (07-20/22)
+> and `tests/test_exit_sim.py`, `tests/test_replay.py`, `tests/test_trailing_stop.py`.
+> **Ask: a human should review and commit (or revert) these.** This is the second
+> reliability failure of the routine that drives the improvement loop — see the
+> 2026-08-05 OPS note above.
+
+> **2026-08-12 — Index ETFs have unreachable bracket legs (engine, for the weekly).**
+> Post-gate SPY+QQQ are **6 trades, ALL SIX exiting EOD_FLATTEN, net −$7.04**. Their
+> 1R is pinned at the `MIN_STOP_PCT` **1.50%** floor and their TP at **+2.25%**,
+> while SPY's *entire* daily range on 08-12 was **0.45%** (771.30–774.74). Neither
+> leg can physically fire, so every index-ETF trade is a guaranteed multi-hour
+> flatten coin-flip occupying **1 of only 3** concurrency slots — SPY #250 held one
+> for 5h11m today to lose $3.14. They lose almost nothing; they also cannot win.
+> This is a **sizing/stop-geometry mismatch** (a floor calibrated for single names
+> applied to a low-vol index), **not** a watchlist defect — do not park them from the
+> daily routine. Options for the weekly: a per-symbol ATR-relative stop floor, or
+> excluding instruments whose typical daily range is below the floor.
+
 > **2026-08-05 — OPS (outside this repo, needs a human or infra-scoped run):**
 > the daily-review routine has now silently failed **three times in ~3 weeks** —
 > 07-29 (rc=1), **08-04 (rc=127: `timeout: failed to run command 'claude': No such

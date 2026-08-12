@@ -4,6 +4,7 @@ Usage:
   python -m scripts.exit_geometry                 # baseline + default what-if grid
   python -m scripts.exit_geometry --since 2026-07-25
   python -m scripts.exit_geometry --trail 1.0 0.5 # add custom trail distances (R)
+  python -m scripts.exit_geometry --breakeven 0.3 # add custom break-even triggers (R)
 
 Only post-IMP-021/022 trades are loaded by default: the pre-2026-07-25 book is
 populated by breakout entries the bot can no longer take, so fitting exit
@@ -26,6 +27,7 @@ from bot.exit_sim import ExitGeometry, giveback_rows, replay_geometry
 POST_GATE_START = "2026-07-25"   # IMP-021 + IMP-022 shipped after this close
 BARS_PER_SYMBOL = 6000           # ~390 RTH 1-min bars/day -> ~15 sessions
 PRE_IMP029_TRAIL_R = 1.0         # the trigger/distance IMP-029 replaced (both 1.0)
+BREAKEVEN_SWEEP = [0.4, 0.35, 0.3, 0.25, 0.2]   # live trigger is added automatically
 
 
 def load_trades(since: str) -> list[dict]:
@@ -76,6 +78,36 @@ def bars_by_trade(trades: list[dict]) -> tuple[dict, dict]:
     return out, fallbacks
 
 
+def breakeven_candidates(live: ExitGeometry,
+                         triggers: list[float]) -> list[ExitGeometry]:
+    """Geometries that vary ONLY the break-even trigger; trail held at ``live``.
+
+    The what-if grid has always swept the TRAIL and never this, yet the post-gate
+    book says the break-even trigger is where the money is (IMP-032). Of the 19
+    STOP exits since 2026-07-25, the 10 that reached +0.5R and armed break-even
+    cost **-$15.77 in total**, while the 9 that never reached it cost **-$330.71**
+    — essentially the entire stop loss sits in trades that peaked BELOW the
+    trigger. Their peaks cluster just under it (+0.42R, +0.39R, +0.28R, +0.18R),
+    so where the trigger sits, not how the trail behaves, decides whether they
+    are rescued.
+
+    The live trigger is always included so the sweep carries its own baseline
+    row, and the list is sorted high->low so that baseline reads first.
+    """
+    wanted = sorted({round(float(t), 4) for t in triggers}
+                    | {live.breakeven_trigger_r}, reverse=True)
+    return [
+        ExitGeometry(
+            breakeven_trigger_r=trigger,
+            trail_trigger_r=live.trail_trigger_r,
+            trail_distance_r=live.trail_distance_r,
+            ratchet_min_pct=live.ratchet_min_pct,
+            trailing_enabled=live.trailing_enabled,
+        )
+        for trigger in wanted
+    ]
+
+
 def _mislabelled(result: dict) -> int:
     """Replayed exits whose REASON disagrees with what really happened.
 
@@ -104,6 +136,8 @@ def main(argv: list[str]) -> int:
                         help=f"earliest entry date (default {POST_GATE_START})")
     parser.add_argument("--trail", nargs="*", type=float, default=[],
                         help="extra TRAIL_DISTANCE_R values to test")
+    parser.add_argument("--breakeven", nargs="*", type=float, default=[],
+                        help="extra BREAKEVEN_TRIGGER_R values to test")
     args = parser.parse_args(argv)
 
     trades = load_trades(args.since)
@@ -175,6 +209,19 @@ def main(argv: list[str]) -> int:
                 ratchet_min_pct=live.ratchet_min_pct,
             )
             _print_run(replay_geometry(trades, windows, cand, fallbacks), budget)
+
+    print("\nBreak-even trigger sweep (trail held at the live "
+          f"{live.trail_trigger_r:g}R/{live.trail_distance_r:g}R):")
+    for cand in breakeven_candidates(live, list(args.breakeven) or BREAKEVEN_SWEEP):
+        run = replay_geometry(trades, windows, cand, fallbacks)
+        _print_run(run, budget)
+        print(f"    armed break-even {run['armed_breakeven']:2d}/{run['trades']}"
+              f"   trail-above-entry {run['armed_trail']:2d}/{run['trades']}")
+    print("    Lowering the trigger arms the stop on SMALLER excursions: it rescues"
+          "\n    trades that peaked below +0.5R and reversed, and it scratches "
+          "trades that\n    dip back to entry before running. This sweep prices both"
+          " sides at once —\n    the raw 'stops rescued' count does not, and is an "
+          "upper bound only.")
 
     print("\nRead: 'captured %' is realized P&L as a share of total peak open "
           "profit.\nA delta inside the noise budget is bar-resolution artefact, "
