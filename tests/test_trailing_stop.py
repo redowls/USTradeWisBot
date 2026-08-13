@@ -78,6 +78,113 @@ def test_disabled_via_config(monkeypatch):
     assert exits.compute_trailed_stop(100.0, 98.5, 98.5, 103.0) is None
 
 
+# --- 1b. IMP-031 — break-even arms off the PRINTED high, not the 60s sample ----
+# The loop polls latest_trade_price once per POLL_INTERVAL_SEC, so before this
+# the break-even stage tested a point sample and any excursion that lived and
+# died between two ticks was invisible. Real case: NFLX #244 on 2026-08-11.
+
+NFLX_ENTRY = 76.19          # broker fill, 09:39:23 ET
+NFLX_STOP = 74.84           # original plan stop -> 1R = 1.35
+NFLX_BE_TRIGGER = 76.865    # entry + 0.5R
+NFLX_PRINTED_HIGH = 76.89   # the 09:56 1-min bar's high — the only bar to reach it
+NFLX_TICK_PRICE = 76.815    # that bar's close, i.e. what a poll plausibly saw
+
+
+def test_imp031_breakeven_arms_on_a_high_the_tick_price_missed():
+    """The regression: NFLX #244 must reach break-even instead of a full -1R.
+
+    The tape printed 76.89 against a 76.865 trigger; every 1-min CLOSE in the
+    trade stayed below it, so the polled price never armed anything and the
+    trade ran to its original stop for -$44.55 (85% of the day's net loss).
+    With the printed high the stop moves to entry and the loss becomes a scratch.
+    """
+    # What the bot did: the sampled price alone never triggers.
+    assert exits.compute_trailed_stop(
+        NFLX_ENTRY, NFLX_STOP, NFLX_STOP, NFLX_TICK_PRICE) is None
+    # What it does now: the printed high arms break-even at the entry price.
+    assert exits.compute_trailed_stop(
+        NFLX_ENTRY, NFLX_STOP, NFLX_STOP, NFLX_TICK_PRICE,
+        NFLX_PRINTED_HIGH) == NFLX_ENTRY
+    assert NFLX_PRINTED_HIGH >= NFLX_BE_TRIGGER > NFLX_TICK_PRICE
+
+
+def test_imp031_high_water_mark_only_moves_the_stop_up():
+    """Capital-protection invariant: a printed high can never widen risk.
+
+    The break-even candidate is the ENTRY price and nothing above it, so the
+    worst this stage can do is scratch a trade — it can never place the stop
+    below where it already sits, and it can never move a trail down.
+    """
+    # A huge high cannot push the break-even stop above entry...
+    assert exits.compute_trailed_stop(
+        NFLX_ENTRY, NFLX_STOP, NFLX_STOP, NFLX_TICK_PRICE, 999.0) == NFLX_ENTRY
+    # ...and cannot pull an already-higher stop back down.
+    assert exits.compute_trailed_stop(
+        NFLX_ENTRY, NFLX_STOP, 76.50, NFLX_TICK_PRICE, NFLX_PRINTED_HIGH) is None
+    # A high BELOW the live price is ignored (max of the two is used).
+    assert exits.compute_trailed_stop(100.0, 98.5, 98.5, 100.75, 99.0) == 100.0
+
+
+def test_imp031_trail_still_follows_the_live_price_not_the_high():
+    """Scope guard: only the BREAK-EVEN stage reads the high.
+
+    Trailing off the running high tightens the trail, and tightening is what
+    sparse IEX bars bias optimistic (bot/exit_sim.py). Measured on the recorded
+    book it also cut two winners (AMD #179 -$48.06, BAC #189 -$9.23), so the
+    trail deliberately still tracks the live price.
+    """
+    # Live at +0.5R (trail candidate == entry) with the high far above: the stop
+    # is the entry price, NOT high - 0.5R (which would be 101.75).
+    assert exits.compute_trailed_stop(100.0, 98.5, 98.5, 100.75, 103.0) == 100.0
+    # Live at +2R trails off live (102.25), unaffected by an even higher print.
+    assert exits.compute_trailed_stop(100.0, 98.5, 100.0, 103.0, 110.0) == 102.25
+
+
+def test_imp031_defaults_and_guards_are_unchanged():
+    """Omitting high_price must reproduce the pre-IMP-031 behaviour exactly."""
+    for live in (100.60, 100.75, 101.20, 103.00):
+        assert (exits.compute_trailed_stop(100.0, 98.5, 98.5, live)
+                == exits.compute_trailed_stop(100.0, 98.5, 98.5, live, None))
+    # Guards still bite even with a high present.
+    assert exits.compute_trailed_stop(100.0, 100.0, 100.0, 105.0, 110.0) is None
+    assert exits.compute_trailed_stop(100.0, 98.5, 98.5, None, 110.0) is None
+
+
+# --- 1c. IMP-031 — peak_high_since ---------------------------------------------
+
+def _bars(rows):
+    """rows = [(ET 'YYYY-MM-DD HH:MM', high)] -> a tz-aware ET OHLC frame."""
+    import pandas as pd
+    idx = pd.DatetimeIndex([pd.Timestamp(t) for t, _ in rows]).tz_localize(
+        config.MARKET_TZ)
+    return pd.DataFrame({"high": [h for _, h in rows],
+                         "low": [h - 1 for _, h in rows],
+                         "close": [h for _, h in rows]}, index=idx)
+
+
+def test_peak_high_since_windows_to_this_session_after_entry():
+    from datetime import datetime
+    bars = _bars([
+        ("2026-08-10 15:00", 99.0),   # yesterday — must be excluded
+        ("2026-08-11 09:31", 80.0),   # today but BEFORE entry — excluded
+        ("2026-08-11 09:39", 76.30),  # the entry minute — included
+        ("2026-08-11 09:56", 76.89),  # the print that matters
+        ("2026-08-11 13:00", 75.10),
+    ])
+    entry = datetime(2026, 8, 11, 9, 39, 23)   # naive ET, as the DB stores it
+    assert exits.peak_high_since(bars, entry) == 76.89
+
+
+def test_peak_high_since_fails_open():
+    from datetime import datetime
+    entry = datetime(2026, 8, 11, 9, 39, 23)
+    assert exits.peak_high_since(None, entry) is None
+    assert exits.peak_high_since(_bars([]), entry) is None
+    assert exits.peak_high_since(_bars([("2026-08-11 09:39", 76.3)]), None) is None
+    # A session with no bars at/after the entry minute yields nothing.
+    assert exits.peak_high_since(_bars([("2026-08-11 09:31", 80.0)]), entry) is None
+
+
 # --- 2. resolve_stop_leg --------------------------------------------------------
 
 def _leg(id_, type_="stop", status="held", replaced_by=None, stop_price="98.5"):
@@ -155,17 +262,22 @@ def test_replace_stop_order_never_raises(monkeypatch):
 
 # --- 4. engine.manage_stops -----------------------------------------------------
 
-def _open_trade(symbol="NVDA", stop=98.5, oid="parent-1"):
+def _open_trade(symbol="NVDA", stop=98.5, oid="parent-1", entry_time=None):
     return {"trade_id": 1, "symbol": symbol, "qty": 10, "entry_price": 100.0,
             "stop_price": stop, "take_profit_price": 102.25,
-            "alpaca_order_id": oid}
+            "alpaca_order_id": oid, "entry_time": entry_time}
 
 
-def _wire(monkeypatch, trades, parents, live, replace_results=None):
+def _wire(monkeypatch, trades, parents, live, replace_results=None, bars=None):
     replaced: list[tuple[str, float]] = []
     monkeypatch.setattr(logbook, "get_open_trades", lambda: list(trades))
     monkeypatch.setattr(execution, "get_order", lambda oid: parents[oid])
     monkeypatch.setattr(data, "latest_trade_price", lambda sym: live.get(sym))
+    # IMP-031: manage_stops batches a 1-min bar pull for the break-even
+    # high-water mark. Stub it so no test reaches the network; the default {}
+    # is the fail-open path (no bars -> previous last-trade-only behaviour).
+    monkeypatch.setattr(data, "get_bars_for_symbols",
+                        lambda symbols, **kw: dict(bars or {}))
 
     def _replace(order_id, new_stop):
         replaced.append((order_id, new_stop))
@@ -221,12 +333,59 @@ def test_manage_stops_one_failure_does_not_stop_the_rest(monkeypatch):
     monkeypatch.setattr(logbook, "get_open_trades", lambda: trades)
     monkeypatch.setattr(execution, "get_order", _get_order)
     monkeypatch.setattr(data, "latest_trade_price", lambda sym: 103.0)
+    monkeypatch.setattr(data, "get_bars_for_symbols", lambda symbols, **kw: {})
     replaced = []
     monkeypatch.setattr(execution, "replace_stop_order",
                         lambda oid, px: (replaced.append((oid, px)),
                                          {"ok": True, "order_id": "n", "error": None})[1])
     engine.Engine(dry_run=False).manage_stops()
     assert replaced == [("leg-stop", 102.25)]
+
+
+def test_manage_stops_arms_breakeven_off_the_session_high(monkeypatch):
+    """IMP-031 wiring: the batched 1-min pull feeds the break-even stage.
+
+    Replays NFLX #244 (2026-08-11) through the engine: the polled price is the
+    09:56 bar CLOSE, which never reached the +0.5R trigger, while that bar's
+    HIGH did. The stop must be replaced at the entry price.
+    """
+    from datetime import datetime
+    entry_time = datetime(2026, 8, 11, 9, 39, 23)
+    trade = {"trade_id": 244, "symbol": "NFLX", "qty": 33,
+             "entry_price": NFLX_ENTRY, "stop_price": NFLX_STOP,
+             "take_profit_price": 77.68, "alpaca_order_id": "parent-1",
+             "entry_time": entry_time}
+    parent = SimpleNamespace(id="parent-1", filled_avg_price=str(NFLX_ENTRY),
+                             legs=[_leg("leg-stop", stop_price=str(NFLX_STOP))])
+    bars = {"NFLX": _bars([("2026-08-11 09:39", 76.235),
+                           ("2026-08-11 09:56", NFLX_PRINTED_HIGH),
+                           ("2026-08-11 10:30", 76.26)])}
+    replaced = _wire(monkeypatch, [trade], {"parent-1": parent},
+                     {"NFLX": NFLX_TICK_PRICE}, bars=bars)
+    actions = engine.Engine(dry_run=False).manage_stops()
+    assert replaced == [("leg-stop", NFLX_ENTRY)]
+    assert actions and actions[0]["to"] == NFLX_ENTRY
+
+    # Same tick with no bars available (the fail-open path) = what the bot did
+    # before IMP-031: nothing arms and the trade keeps riding to the full stop.
+    replaced = _wire(monkeypatch, [trade], {"parent-1": parent},
+                     {"NFLX": NFLX_TICK_PRICE})
+    assert engine.Engine(dry_run=False).manage_stops() == []
+    assert replaced == []
+
+
+def test_manage_stops_survives_a_bar_fetch_failure(monkeypatch):
+    """A data hiccup must never stop the ratchet — it degrades, not fails."""
+    parent = _parent([_leg("leg-stop")])
+    replaced = _wire(monkeypatch, [_open_trade()], {"parent-1": parent},
+                     {"NVDA": 103.0})
+
+    def _boom(symbols, **kw):
+        raise RuntimeError("data feed down")
+    monkeypatch.setattr(data, "get_bars_for_symbols", _boom)
+    actions = engine.Engine(dry_run=False).manage_stops()
+    assert replaced == [("leg-stop", 102.25)]      # trail still ran off live
+    assert actions and actions[0]["action"] == "stop_raised"
 
 
 def test_tick_calls_manage_stops_before_entries(monkeypatch):

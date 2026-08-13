@@ -199,6 +199,13 @@ REGIME_MULT_FAIL = 0.0          # no trend -> suppress
 # --- Time rules (US Eastern) ---
 ENTRY_CUTOFF_ET = "15:30"       # no new entries after this
 FLATTEN_ET = "15:55"            # force-close all positions at/after this
+FLATTEN_SETTLE_TIMEOUT_SEC = 8.0  # bounded wait, per phase, for the broker's ASYNC state to
+                                # settle during the flatten: legs actually cancelled before
+                                # liquidating, then actually flat before returning. Alpaca took
+                                # 3.1s to cancel and 3.8s to fill on 2026-08-13, so 8s clears
+                                # both with room; two phases still cost <= 16s of a 60s poll and
+                                # of the five-minute 15:55->16:00 runway. IMP-033.
+FLATTEN_SETTLE_POLL_SEC = 0.5
 
 # --- Default watchlist seed (liquid, high-volume US names) ---
 DEFAULT_WATCHLIST = [

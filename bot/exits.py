@@ -13,6 +13,7 @@ All times compare in US Eastern explicitly.
 
 from __future__ import annotations
 
+import time as wallclock
 from datetime import datetime, time
 
 from . import broker, config, execution
@@ -139,33 +140,76 @@ _STOP_LEG_TYPES = {"STOP", "STOP_LIMIT", "TRAILING_STOP"}
 _REPLACEABLE = {"NEW", "ACCEPTED", "HELD", "PENDING_NEW"}
 
 
+def peak_high_since(bars, since) -> float | None:
+    """Highest price the tape PRINTED for this trade since ``since``, or None.
+
+    ``bars`` is an intraday OHLC frame with a tz-aware ET index (what
+    ``data.get_bars_for_symbols`` returns); ``since`` is the trade's entry time
+    (naive ET, as stored in the DB). Both sides are compared as ``YYYY-MM-DD`` /
+    ``HH:MM`` strings so a naive DB timestamp can never trip over the frame's
+    tz-awareness — the same dodge ``scripts/exit_geometry.bars_by_trade`` uses,
+    which keeps the live bot and the simulator reading the identical window.
+
+    Returns None for a missing/empty frame or an empty window so the caller can
+    fail open onto the previous last-trade-only behaviour. IMP-031.
+    """
+    if bars is None or since is None or len(bars) == 0:
+        return None
+    if "high" not in getattr(bars, "columns", []):
+        return None
+    idx = bars.index
+    window = bars[(idx.strftime("%Y-%m-%d") == since.strftime("%Y-%m-%d"))
+                  & (idx.strftime("%H:%M") >= since.strftime("%H:%M"))]
+    if len(window) == 0:
+        return None
+    high = float(window["high"].max())
+    return high if high > 0 else None
+
+
 def compute_trailed_stop(
     entry_price: float,
     initial_stop: float,
     current_stop: float,
     live_price: float | None,
+    high_price: float | None = None,
 ) -> float | None:
     """New (higher) stop price for a long, or None when the stop should not move.
 
     R is anchored to the ORIGINAL plan stop (entry - initial_stop), never the
     already-moved stop — anchoring to the moved stop would shrink 1R on every
     ratchet and chase the price straight into noise.
-      * >= BREAKEVEN_TRIGGER_R unrealized -> stop to entry.
-      * >= TRAIL_TRIGGER_R -> stop trails TRAIL_DISTANCE_R below the live price.
+      * >= BREAKEVEN_TRIGGER_R printed -> stop to entry.
+      * >= TRAIL_TRIGGER_R live -> stop trails TRAIL_DISTANCE_R below the live price.
     Monotonic: only returns a stop ABOVE the current one, and only when the
     improvement clears STOP_RATCHET_MIN_PCT of entry (no 60s replace churn).
+
+    ``high_price`` (IMP-031) is the highest price the tape printed since entry.
+    The engine polls ``latest_trade_price`` once per POLL_INTERVAL_SEC, so
+    without it the break-even stage tests a ~60s point SAMPLE and misses any
+    excursion that happened between two ticks — NFLX #244 (2026-08-11) printed
+    76.89 against a 76.865 trigger for part of one minute, never armed, and rode
+    to a full -1R for -$44.55 (85% of that day's loss). Only the BREAK-EVEN
+    stage reads it: moving the stop to entry on a price the market really traded
+    is pure loss-avoidance, whereas trailing off the running high tightens the
+    trail, and tightening is exactly what sparse IEX bars bias optimistic (see
+    bot/exit_sim.py). Defaults to ``live_price``, so every existing caller keeps
+    its previous behaviour.
     """
     if not config.TRAILING_STOP_ENABLED or live_price is None:
         return None
     risk = entry_price - initial_stop
     if risk <= 0 or entry_price <= 0:
         return None
-    gain_r = (live_price - entry_price) / risk
-    if gain_r >= config.TRAIL_TRIGGER_R:
+    peak = live_price if high_price is None else max(live_price, high_price)
+    candidate: float | None = None
+    if (live_price - entry_price) / risk >= config.TRAIL_TRIGGER_R:
         candidate = live_price - config.TRAIL_DISTANCE_R * risk
-    elif gain_r >= config.BREAKEVEN_TRIGGER_R:
-        candidate = entry_price
-    else:
+    if (peak - entry_price) / risk >= config.BREAKEVEN_TRIGGER_R:
+        # A ratchet takes the best of the two stages; with TRAIL_DISTANCE_R <=
+        # TRAIL_TRIGGER_R (the shipped 0.5R/0.5R) the trail candidate is already
+        # >= entry, so this max() is a no-op today and a guard if either moves.
+        candidate = entry_price if candidate is None else max(candidate, entry_price)
+    if candidate is None:
         return None
     min_step = entry_price * config.STOP_RATCHET_MIN_PCT / 100.0
     if candidate <= current_stop + min_step:
@@ -218,7 +262,48 @@ def _position_snapshot(reason: str) -> list[dict]:
     return snapshot
 
 
-def flatten_all(reason: str = "EOD_FLATTEN") -> list[dict]:
+def _settle(check, sleep, timeout: float | None = None, poll: float | None = None) -> bool:
+    """Poll ``check()`` until it is True or ``timeout`` seconds have been spent.
+
+    Bounded and non-raising: a broker error during a probe counts as "not
+    settled yet", so the caller always falls through to the next phase rather
+    than letting a transient API failure abort a flatten. IMP-033.
+    """
+    timeout = config.FLATTEN_SETTLE_TIMEOUT_SEC if timeout is None else timeout
+    poll = config.FLATTEN_SETTLE_POLL_SEC if poll is None else poll
+    probes = max(1, int(timeout / poll)) if poll > 0 else 1
+    for attempt in range(probes):
+        try:
+            if check():
+                return True
+        except Exception:  # noqa: BLE001 - a failed probe is just "not yet"
+            pass
+        if attempt < probes - 1:
+            sleep(poll)
+    return False
+
+
+def shares_released(positions) -> bool:
+    """True when no position still has shares held by a working order.
+
+    Alpaca reports ``qty_available`` < ``qty`` while a bracket leg holds the
+    shares, and DELETE /v2/positions/{sym} is rejected (held_for_orders) until
+    the leg's cancel actually SETTLES — which is async and lands seconds after
+    cancel_orders() has already returned. A position that does not report
+    qty_available is treated as released, so a missing field can never stall
+    the flatten. IMP-033.
+    """
+    for p in positions:
+        qty = abs(_to_float(getattr(p, "qty", None)) or 0.0)
+        available = _to_float(getattr(p, "qty_available", None))
+        if available is None:
+            continue
+        if abs(available) + 1e-9 < qty:
+            return False
+    return True
+
+
+def flatten_all(reason: str = "EOD_FLATTEN", sleep=None) -> list[dict]:
     """Cancel all open orders and market-sell every position. No overnight holds.
 
     Returns a snapshot of what was flattened (taken before liquidation). The
@@ -229,17 +314,34 @@ def flatten_all(reason: str = "EOD_FLATTEN") -> list[dict]:
     its own position. The bulk close_all_positions(cancel_orders=True) raced the
     async cancel and left C/AMZN/BAC stranded for two overnights (06-16 -> 06-18);
     the caller (engine.eod_flatten) re-checks positions and retries until flat. IMP-002.
+
+    Cancelling first was necessary but not sufficient: cancel_orders() returns
+    before the cancels settle, so the closes below still raced them and EVERY
+    first pass failed. On 2026-08-13 the stop legs cancelled at 19:55:23.596Z
+    and the limit legs only at 19:55:26.706Z — 3.1s later — so the pass that ran
+    at 19:55:23.6 submitted ZERO liquidation orders and burned a whole 60s poll;
+    the same first-pass failure appears on 10 of the last 10 sessions and needed
+    a SECOND retry on 6 of them, leaving the bot long at 15:57 with five minutes
+    of runway to the close. So each phase now waits, bounded, for the broker
+    state it depends on: shares released before closing, flat before returning.
+    Both waits fail open (proceed anyway on timeout) and IMP-002's outer retry
+    is untouched, so this can only shorten the exposure, never extend it. IMP-033.
     """
+    sleep = wallclock.sleep if sleep is None else sleep
     snapshot = _position_snapshot(reason)
+    if not snapshot:
+        return snapshot
     try:
         broker.cancel_all_orders()
     except Exception:  # noqa: BLE001 - liquidation below is the priority; verified by caller
         pass
+    _settle(lambda: shares_released(broker.get_positions()), sleep)
     for snap in snapshot:
         try:
             broker.close_position(snap["symbol"])
-        except Exception:  # noqa: BLE001 - any failure surfaces via the caller's position re-check
-            pass
+        except Exception as exc:  # noqa: BLE001 - also surfaces via the caller's position re-check
+            snap["flatten_error"] = f"{type(exc).__name__}: {exc}"
+    _settle(lambda: not broker.get_positions(), sleep)
     return snapshot
 
 

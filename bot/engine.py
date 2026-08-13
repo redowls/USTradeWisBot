@@ -24,6 +24,12 @@ from . import (
     sizing,
 )
 
+# 1-min bars pulled per tick for the break-even high-water mark (IMP-031). A
+# regular session is 390 minutes, so this always spans the whole day back to the
+# earliest possible entry, and the batched call covers at most
+# MAX_CONCURRENT_POSITIONS symbols.
+RATCHET_HIGH_BARS = 390
+
 
 class Engine:
     def __init__(self, dry_run: bool = False):
@@ -65,11 +71,27 @@ class Engine:
         (following the replace chain) every tick, so nothing is lost across the
         nightly restart, and the DB stop_price stays the ORIGINAL plan stop —
         it is the risk anchor that defines 1R.
+
+        The break-even test reads the highest price PRINTED since entry, not
+        just this tick's last trade (IMP-031) — one batched 1-min bar call for
+        the <= MAX_CONCURRENT_POSITIONS open symbols. Fails open: no bars means
+        no `high_price`, i.e. exactly the previous last-trade-only behaviour.
         """
         if not config.TRAILING_STOP_ENABLED:
             return []
         actions: list[dict] = []
-        for t in logbook.get_open_trades():
+        open_trades = logbook.get_open_trades()
+        if not open_trades:
+            return actions
+        try:
+            session_bars = data.get_bars_for_symbols(
+                sorted({t["symbol"] for t in open_trades}),
+                n_bars=RATCHET_HIGH_BARS, timeframe="1Min",
+            )
+        except Exception as exc:  # noqa: BLE001 - the ratchet must still run
+            self._log(f"manage_stops bar fetch failed: {type(exc).__name__}: {exc}")
+            session_bars = {}
+        for t in open_trades:
             oid = t.get("alpaca_order_id")
             if not oid:
                 continue
@@ -84,8 +106,11 @@ class Engine:
                     continue  # stop filled/canceled or unresolved — leave alone
                 current_stop = float(stop_leg.stop_price)
                 live = data.latest_trade_price(t["symbol"])
+                peak = exits.peak_high_since(
+                    session_bars.get(t["symbol"]), t.get("entry_time"),
+                )
                 new_stop = exits.compute_trailed_stop(
-                    entry, float(t["stop_price"]), current_stop, live,
+                    entry, float(t["stop_price"]), current_stop, live, peak,
                 )
                 if new_stop is None:
                     continue
@@ -99,7 +124,9 @@ class Engine:
                                     "from": current_stop, "to": new_stop,
                                     "order_id": res["order_id"]})
                     self._log(f"STOP RAISED {t['symbol']} {current_stop:.2f} -> "
-                              f"{new_stop:.2f} (live {live:.2f}, entry {entry:.2f})")
+                              f"{new_stop:.2f} (live {live:.2f}, "
+                              f"peak {peak if peak is None else round(peak, 2)}, "
+                              f"entry {entry:.2f})")
                 else:
                     # Old stop still working — position stays protected; retry
                     # next tick off the freshly-resolved leg.
@@ -273,6 +300,11 @@ class Engine:
             self._log(f"[dry] would flatten {len(open_trades)} open trade(s)")
             return True
         snapshot = {s["symbol"]: s for s in exits.flatten_all("EOD_FLATTEN")}
+        # A rejected liquidation used to be swallowed silently, which is how a
+        # 100%-failure-rate first pass hid for 10 straight sessions. IMP-033.
+        for sym, snap in snapshot.items():
+            if snap.get("flatten_error"):
+                self._log(f"FLATTEN REJECTED {sym}: {snap['flatten_error']}")
         remaining = {s.upper() for s in broker.open_position_symbols()}
         for t in open_trades:
             if t["symbol"].upper() in remaining:

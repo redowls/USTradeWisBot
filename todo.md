@@ -279,6 +279,43 @@
 
 Ordered by expected impact; each item needs replay validation before code.
 
+🚩🚩 **HUMAN DECISION REQUIRED (2026-08-13) — the stop is the entire lifetime loss,
+   and every alternative to it is a risk-widening change I am not permitted to take.**
+   All-time by exit reason: `EOD_FLATTEN` **n=110 +$423.93 PF 1.47**, `TAKE_PROFIT`
+   **n=25 +$2,033.75**, **`STOP` n=105 −$4,697.03 PF 0.02, 7.6% win.** Post-gate the
+   same shape holds: flattens +$115.76 (PF 1.93), TP +$55.72, **stops −$386.20 (PF
+   0.08)**. **Every exit path this bot owns is profitable except the stop.** Holding the
+   20 post-gate stopped trades to the 15:55 flatten instead would have been **−$273.26
+   vs −$386.20, a +$112.94 delta** (2026-08-13 CRM #253 alone: −$39.72 actual vs
+   **+$75.60** held — it stopped at 11:50 and closed near the session high).
+   **NOT TAKEN, and not takeable by this routine:** widening or removing a stop is a
+   risk limit, and the delta is bought by accepting an **unbounded** intraday tail in
+   place of a bounded one — GOOGL #217 would go −$31.13 → **−$116.77** and ENPH #200
+   −$43.68 → **−$73.08**. The no-overnight rule caps the horizon but not the size.
+   **Options for the human, in order of my preference:**
+   (1) do nothing and treat the drawdown as the answer (see the escalation below);
+   (2) authorise a *bounded* experiment — e.g. a per-trade hard-dollar cap wider than
+       1R but tighter than the session tail — explicitly, in writing, with a sample
+       size and a stop-out condition agreed in advance;
+   (3) authorise nothing on the stop and instead retire the entry signal.
+   **Do not let a routine take this decision by increments.**
+
+🚩🚩 **STRATEGY ESCALATION (restated 2026-08-13, now overdue): no demonstrated edge,
+   and the account is back below the −25% review line at $7,464.62 (−25.35%).**
+   240 closed trades, 38.6% win, **PF 0.61**, −$2,239.35. The *post-VWAP-gate* book —
+   the best version this bot has ever been — is **51 trades, PF 0.61, expectancy
+   −$4.21/trade**. **Ten entry/exit discriminators have now been tested and refuted**
+   (confidence, volume, extension, time-of-day, index-EMA regime, opening-range
+   blackout, never-green time-stop, break-even-trigger sweep, and as of today
+   stop-distance/floor-binding and the time-conditioned MFE scratch). The breakout
+   premise is disproven and banned; the bot now trades only conf-60–63 `MA` signals.
+   Bucketing post-gate trades by *session range ÷ 1R* shows the bot is **net positive
+   where its exit logic physically cannot fire (ratio <1.0: +$28.86, PF 2.64) and net
+   negative where it can (ratio >2.5: −$88.58, PF 0.39)** — the signature of a
+   zero-edge entry plus a −1R tail. **This is a human decision point: fund it, retire
+   it, or rebuild the entry signal from scratch. Parameter work is not the answer and
+   this routine will keep declining to pretend otherwise.**
+
 ★★★ **(NEW #1 LEVER, 2026-08-07 — instrument shipped as IMP-028, change PRE-REGISTERED
    for the next qualifying run) Close the +0.5R..+1.08R trail dead zone.**
    `TRAIL_TRIGGER_R` and `TRAIL_DISTANCE_R` are both **1.0**, so the trail candidate at
@@ -621,6 +658,32 @@ Ordered by expected impact; each item needs replay validation before code.
   `scripts/report.py` (IMP-007). Third failed per-trade discriminator after
   confidence (IMP-004) and volume — reinforces backlog ★ (market-regime gate) as the
   only viable lever.
+
+- ~~**Use the stop distance / whether the `MIN_STOP_PCT` 1.5% floor binds as an entry
+  discriminator**~~ **[REFUTED 2026-08-13].** Motivated by that day's three
+  EOD_FLATTEN trades whose 1R stop was **wider than the symbol's entire session
+  range** (GOOG 1.74% stop vs a 0.99% range = 0.57×; QQQ 1.49% vs 1.35%; NVDA 1.47%
+  vs 1.55%), which makes the whole exit apparatus — break-even, trail, target, stop —
+  physically unreachable. The *outcome* split is real (post-gate range/1R <1.0 →
+  +$28.86 PF 2.64; >2.5 → −$88.58 PF 0.39), but the **entry-time** proxy is flat:
+  all-time floor-bound (stop ≤1.55%) **n=167 PF 0.63** vs ATR-driven (>1.55%) **n=73
+  PF 0.56**; post-gate **0.61 vs 0.60**. Realised range, not entry-time ATR, is what
+  separates the buckets, and realised range is not knowable at entry. Ninth failed
+  per-trade discriminator.
+
+- ~~**Time-conditioned "scratch the trade if MFE hasn't reached X·R by T minutes"**~~
+  **[REFUTED 2026-08-13].** The successor to IMP-032's never-green time-stop, aimed at
+  a much larger population: post-gate, trades peaking below **+0.25R** are **n=20,
+  −$313.05, 10% win, PF 0.02** — more than the entire post-gate loss. Swept a **42-cell
+  grid** (X ∈ {0.15, 0.20, 0.25, 0.30, 0.40, 0.50}R × T ∈ {15, 20, 30, 45, 60, 90,
+  120} min) against the real 1-min bars of all 51 post-gate trades. **Every
+  non-degenerate cell is negative** (0.25R@45min −$36.15; 0.20R@30min −$44.04;
+  0.30R@30min −$88.72; 0.15R@60min −$80.39). The only positive cells are the
+  15-minute corner (0.50R@15 **+$176.12**, 0.40R@15 +$122.31), which cut ~45 of 51
+  trades and profit purely by removing exposure from a negative-expectancy book.
+  **An exit rule whose optimum is "stop trading" is the no-edge result in disguise,
+  not a rule** — it belongs to the strategy escalation above, not to the exit logic.
+  Tenth failed discriminator.
 
 ## Completed phases
 

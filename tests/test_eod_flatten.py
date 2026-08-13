@@ -24,7 +24,10 @@ def test_flatten_all_cancels_orders_before_closing_positions(monkeypatch):
                                         {"symbol": "BAC", "market_value": 2585.20}])
     monkeypatch.setattr(broker, "cancel_all_orders", lambda: calls.append("cancel"))
     monkeypatch.setattr(broker, "close_position", lambda s: calls.append(f"close_{s}"))
-    snap = exits.flatten_all("EOD_FLATTEN")
+    # IMP-033 settles between the phases off broker.get_positions(); already flat
+    # here, so both waits pass on their first probe.
+    monkeypatch.setattr(broker, "get_positions", lambda: [])
+    snap = exits.flatten_all("EOD_FLATTEN", sleep=lambda s: None)
     assert calls[0] == "cancel", "orders must be canceled before any position close"
     assert set(calls[1:]) == {"close_C", "close_BAC"}
     assert {s["symbol"] for s in snap} == {"C", "BAC"}
@@ -36,14 +39,17 @@ def test_flatten_all_closes_every_position_even_if_one_raises(monkeypatch):
                         lambda reason: [{"symbol": "C", "market_value": 1.0},
                                         {"symbol": "BAC", "market_value": 1.0}])
     monkeypatch.setattr(broker, "cancel_all_orders", lambda: None)
+    monkeypatch.setattr(broker, "get_positions", lambda: [])
 
     def _close(sym):
         if sym == "C":
             raise RuntimeError("held_for_orders")  # must not stop BAC
         closed.append(sym)
     monkeypatch.setattr(broker, "close_position", _close)
-    exits.flatten_all("EOD_FLATTEN")
+    snap = exits.flatten_all("EOD_FLATTEN", sleep=lambda s: None)
     assert closed == ["BAC"]
+    # IMP-033: the rejection is recorded rather than silently swallowed.
+    assert {s["symbol"] for s in snap if s.get("flatten_error")} == {"C"}
 
 
 # --- 2/3. eod_flatten verification --------------------------------------------
