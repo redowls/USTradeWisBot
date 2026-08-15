@@ -144,11 +144,38 @@ def equivalent_symbols(symbol: str) -> set[str]:
 
 # Confidence -> risk fraction (% of equity). summary.md §5.9.
 # Each entry: (min_confidence_inclusive, risk_pct). Sorted ascending.
+#
+# IMP-035 (weekly, 2026-08-15) — FLAT. The ladder used to read
+# (60,0.5) (70,1.0) (80,1.5) (90,2.0), i.e. "more confidence = more money", up to
+# 4x risk at the top rung. The whole-book record says the confidence score is
+# ANTI-predictive, monotonically, across every band it has ever reached (n=244):
+#
+#   conf band    n     avg P&L    avg notional
+#   <65        176     -$3.03        $3,763
+#   65-75       28    -$15.10        $5,879
+#   75-85       28    -$30.25        $9,254
+#   >=85        12    -$42.28       $11,446
+#
+# The 68 trades at conf >=65 are 28% of the book and -$1,777 of the -$2,311
+# lifetime loss (77%). This is not an era artefact: over the window where both
+# signal families were live (06-08..07-24), breakout-carrying signals averaged
+# -$26.04/trade on $8,385 notional vs -$2.39/trade on $4,360 for MA-only.
+# The ladder was sizing UP in proportion to a score that predicts losses.
+#
+# IMP-027 already found this trap and built tests to WATCH it
+# (tests/test_sizing_ladder.py) but left it armed; it is currently dormant only
+# because IMP-021's veto pins live confidence into a ~3-point band at the floor.
+# Dormant is not disarmed — one scorer change re-arms 3-4x sizing on the leg that
+# lost $1,784. Flattening is risk-REDUCING and touches no risk invariant:
+# MAX_RISK_PCT stays 2.0, DAILY_LOSS_HALT_PCT 8.0, MAX_CONCURRENT_POSITIONS 3.
+#
+# Re-steepening this table requires evidence that confidence predicts P&L with
+# the correct SIGN. `sizing.ladder_risk_is_non_increasing()` enforces that.
 CONFIDENCE_RISK_TABLE = [
     (60, 0.5),
-    (70, 1.0),
-    (80, 1.5),
-    (90, 2.0),   # capped at MAX_RISK_PCT
+    (70, 0.5),
+    (80, 0.5),
+    (90, 0.5),
 ]
 MIN_CONFIDENCE = 60             # minimum confidence to take a trade
 MA_SIGNAL_MIN = 0.6             # ma_score at/above this counts as an MA signal

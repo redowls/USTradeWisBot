@@ -1,9 +1,17 @@
 """Position sizing & stop/target levels (todo.md Phase 5).
 
-"More confidence = more money" done safely (summary.md §5.9):
+Sizing (summary.md §5.9, as amended by IMP-035 on 2026-08-15):
   1. Confidence -> risk fraction of equity, from CONFIDENCE_RISK_TABLE.
   2. Risk fraction + stop distance -> share count, so dollar risk stays constant
      regardless of price: shares = floor(equity * risk_frac / stop_distance).
+
+§5.9's original rule was "more confidence = more money". **That rule is
+withdrawn.** Over the whole 244-trade book the confidence score is monotonically
+ANTI-predictive (conf <65 avg -$3.03/trade; >=85 avg -$42.28), so the ladder was
+committing up to 4x the capital to the trades most likely to lose. The table is
+now flat and `ladder_risk_is_non_increasing()` keeps it that way: risk may never
+again rise with confidence without evidence that confidence predicts P&L with
+the correct sign. See bot/config.py:CONFIDENCE_RISK_TABLE for the full record.
 
 MAX_RISK_PCT (2%) is a HARD ceiling enforced here regardless of the table, and
 the result is additionally capped by available buying power. Sizing keys off
@@ -38,10 +46,25 @@ class PositionPlan:
         return asdict(self)
 
 
+def ladder_risk_is_non_increasing(table=None) -> bool:
+    """True when CONFIDENCE_RISK_TABLE never buys MORE risk for MORE confidence.
+
+    The guard IMP-027's diagnostics were missing. Confidence is anti-predictive
+    on this book, so a rung that rises with confidence is a capital-protection
+    defect, not a feature — and it can be re-introduced silently by a scorer
+    change, a weight renormalization (see tests/test_sizing_ladder.py) or an
+    innocent-looking edit to the table. Pure function, no side effects.
+    """
+    rungs = config.CONFIDENCE_RISK_TABLE if table is None else table
+    pcts = [pct for _min_conf, pct in rungs]
+    return all(later <= earlier for earlier, later in zip(pcts, pcts[1:]))
+
+
 def risk_fraction_for_confidence(confidence: float) -> float:
     """Map confidence -> risk % of equity via the table, hard-capped at MAX_RISK_PCT.
 
-    Returns 0.0 below MIN_CONFIDENCE (no trade).
+    Returns 0.0 below MIN_CONFIDENCE (no trade). Since IMP-035 the table is flat,
+    so every permitted trade sizes at the floor rung regardless of confidence.
     """
     if confidence < config.MIN_CONFIDENCE:
         return 0.0

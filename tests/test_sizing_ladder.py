@@ -82,17 +82,20 @@ def test_ceiling_still_admits_trades_at_all():
     assert ladder.confidence_ceiling(0.0) >= config.MIN_CONFIDENCE
 
 
-def test_sub_veto_breakout_would_lift_the_risk_tier():
-    """The latent inverse risk this diagnostic exists to monitor.
+def test_sub_veto_breakout_no_longer_lifts_the_risk_tier():
+    """The latent inverse risk this diagnostic monitored — DISARMED by IMP-035.
 
     breakout_score is bimodal today (0.0 or >=0.5), so this path has never
-    fired — but a scorer change putting it at 0.49 buys the 1.5% tier, 3x the
-    risk of every trade the bot actually takes, on IMP-021's toxic leg.
+    fired — but a scorer change putting it at 0.49 used to buy the 1.5% tier,
+    3x the risk of every trade the bot actually takes, on IMP-021's toxic leg.
+    The scorer still lifts confidence to 82.15 (that half is unchanged and worth
+    watching); what changed is that confidence no longer buys size, because the
+    conf-75-85 cohort averaged -$30.25/trade over 28 trades.
     """
     ev = _ev(config.BREAKOUT_FADE_CEILING - 0.01, 1.0, 1.0, 1.0)
     assert confidence.score(ev) == pytest.approx(82.15, abs=0.01)
-    assert sizing.risk_fraction_for_confidence(confidence.score(ev)) == 1.5
-    assert ladder.breakout_tier_lift(ev) == pytest.approx(1.0)
+    assert sizing.risk_fraction_for_confidence(confidence.score(ev)) == 0.5
+    assert ladder.breakout_tier_lift(ev) == pytest.approx(0.0)
 
 
 def test_no_breakout_component_means_no_tier_lift():
@@ -101,13 +104,16 @@ def test_no_breakout_component_means_no_tier_lift():
         assert ladder.breakout_tier_lift(_ev(bo, ma, val, mom)) == 0.0
 
 
-def test_naive_weight_renormalization_would_quadruple_risk(monkeypatch):
-    """IMP-021's registered follow-up is a capital-protection TRAP.
+def test_naive_weight_renormalization_no_longer_quadruples_risk(monkeypatch):
+    """IMP-021's registered follow-up WAS a capital-protection trap — now defused.
 
     "Down-weight WEIGHT_BREAKOUT now that its leg is gated out" sounds like
-    tidy-up. Renormalizing the remaining three weights to sum to 1.0 lifts
-    today's real META signal from 60.74 to ~92 and straight to the 2.0%
-    MAX_RISK_PCT cap — a 4x risk widening with no edge behind it. Never ship it.
+    tidy-up. Renormalizing the remaining three weights to sum to 1.0 still lifts
+    today's real META signal from 60.74 to ~92 — but since IMP-035 flattened the
+    ladder that no longer reaches the 2.0% cap, so the 4x risk widening this test
+    was written to forbid is now structurally impossible rather than merely
+    forbidden by convention. The confidence inflation is still wrong and the
+    renormalization should still not ship; it just can no longer cost capital.
     """
     total = config.WEIGHT_MA + config.WEIGHT_VALUE + config.WEIGHT_MOMENTUM
     monkeypatch.setattr(config, "WEIGHT_BREAKOUT", 0.0)
@@ -117,8 +123,8 @@ def test_naive_weight_renormalization_would_quadruple_risk(monkeypatch):
 
     meta = confidence.score(_ev(0.0, 1.0, 1.0, 0.7162))
     assert meta > 90.0
-    assert sizing.risk_fraction_for_confidence(meta) == 2.0
-    assert sizing.risk_fraction_for_confidence(meta) == 4 * 0.5
+    assert sizing.risk_fraction_for_confidence(meta) == 0.5
+    assert sizing.risk_fraction_for_confidence(meta) != 4 * 0.5
 
 
 def test_summarize_on_todays_real_set():
