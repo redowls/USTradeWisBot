@@ -326,6 +326,20 @@ def flatten_all(reason: str = "EOD_FLATTEN", sleep=None) -> list[dict]:
     state it depends on: shares released before closing, flat before returning.
     Both waits fail open (proceed anyway on timeout) and IMP-002's outer retry
     is untouched, so this can only shorten the exposure, never extend it. IMP-033.
+
+    The two phases wait on different things and needed different budgets. On
+    IMP-033's first live session (2026-08-14) the cancel phase settled in 5.0s
+    and pass 1 did submit all three liquidations — but Alpaca then took
+    12.4-15.0s to fill them, against a shared 8s budget, so the fill wait timed
+    out at 19:55:25 while the sells were in flight (they filled 19:55:29-31) and
+    the caller cried "EOD flatten incomplete" over a book that was about to be
+    flat. That false alarm is the same message a genuine stranded position
+    raises, and it also defers the exit records a whole poll (DB exit_time
+    15:56:28 vs the true 15:55:29 fill). The fill phase therefore gets its own
+    FLATTEN_FILL_TIMEOUT_SEC, sized off 36 measured EOD liquidations. It is a
+    reporting wait, not an exposure wait: the sells are already working before
+    it starts, and it is skipped entirely when no close was accepted, so a
+    rejected pass still hands straight back to IMP-002's retry. IMP-034.
     """
     sleep = wallclock.sleep if sleep is None else sleep
     snapshot = _position_snapshot(reason)
@@ -336,12 +350,16 @@ def flatten_all(reason: str = "EOD_FLATTEN", sleep=None) -> list[dict]:
     except Exception:  # noqa: BLE001 - liquidation below is the priority; verified by caller
         pass
     _settle(lambda: shares_released(broker.get_positions()), sleep)
+    submitted = 0
     for snap in snapshot:
         try:
             broker.close_position(snap["symbol"])
+            submitted += 1
         except Exception as exc:  # noqa: BLE001 - also surfaces via the caller's position re-check
             snap["flatten_error"] = f"{type(exc).__name__}: {exc}"
-    _settle(lambda: not broker.get_positions(), sleep)
+    if submitted:
+        _settle(lambda: not broker.get_positions(), sleep,
+                timeout=config.FLATTEN_FILL_TIMEOUT_SEC)
     return snapshot
 
 

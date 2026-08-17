@@ -226,12 +226,21 @@ REGIME_MULT_FAIL = 0.0          # no trend -> suppress
 # --- Time rules (US Eastern) ---
 ENTRY_CUTOFF_ET = "15:30"       # no new entries after this
 FLATTEN_ET = "15:55"            # force-close all positions at/after this
-FLATTEN_SETTLE_TIMEOUT_SEC = 8.0  # bounded wait, per phase, for the broker's ASYNC state to
-                                # settle during the flatten: legs actually cancelled before
-                                # liquidating, then actually flat before returning. Alpaca took
-                                # 3.1s to cancel and 3.8s to fill on 2026-08-13, so 8s clears
-                                # both with room; two phases still cost <= 16s of a 60s poll and
-                                # of the five-minute 15:55->16:00 runway. IMP-033.
+FLATTEN_SETTLE_TIMEOUT_SEC = 8.0  # bounded wait for the CANCEL phase: the bracket legs must
+                                # actually release the shares before the liquidation is sent,
+                                # or DELETE /v2/positions is rejected held_for_orders. Measured
+                                # leg-cancel latency: 3.1s (2026-08-13), 5.0s (2026-08-14), so
+                                # 8s clears the worst on record with room. IMP-033.
+FLATTEN_FILL_TIMEOUT_SEC = 25.0  # bounded wait for the FILL phase: the liquidation orders are
+                                # already in flight, so this only decides whether the flatten
+                                # CONFIRMS itself or hands a false "incomplete" to the caller.
+                                # Sized off the broker record, 16 sessions / 36 EOD liquidations
+                                # (07-24..08-14): median fill 2.8s, p90 8.7s, max 15.0s — and the
+                                # worst fill of the SESSION is what this must cover, which
+                                # exceeded 8s on 3 of those 16 (08-06 8.1s, 08-10 8.7s, 08-14
+                                # 15.0s). 25s covers every session on record at 1.7x the max and
+                                # both phases together still fit inside one 60s poll and the
+                                # five-minute 15:55->16:00 runway. IMP-034.
 FLATTEN_SETTLE_POLL_SEC = 0.5
 
 # --- Default watchlist seed (liquid, high-volume US names) ---
