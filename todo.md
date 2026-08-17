@@ -279,6 +279,30 @@
 
 Ordered by expected impact; each item needs replay validation before code.
 
+🚩🚩 **HUMAN DECISION REQUIRED (2026-08-17) — the routine has now shipped LIVE,
+   UNVERSIONED code TWICE, and the failure is silent.** IMP-031 (written 08-11,
+   discovered 08-12) and IMP-034 (written 08-14, live from the 08-15 restart,
+   committed only today 08-17) were both authored, validated and **deployed** by a
+   run that then ended before Step 5 (commit + push). In both cases the bot behaved
+   *correctly* — the fix was real and running — so nothing alarmed, while the code
+   existed **only in the working tree**. A `git checkout`, a redeploy, or a fresh
+   clone would have silently reverted a live capital-protection fix on the
+   no-overnight path, with no signal at all.
+   **Both incidents were caught only because a later run happened to read
+   `git status`.** That is luck, not a control.
+   **NOT FIXABLE BY THIS ROUTINE** — it is a defect in how the routine and the
+   deployment relate, not in the bot. **Two options for the human:**
+   (a) make Step 5 non-skippable — commit+push BEFORE `systemctl restart`, so the
+       running tree is by construction a committed tree; or
+   (b) deploy from a clean checkout rather than the working directory, so
+       uncommitted code physically cannot go live.
+   **(a) is the cheaper fix and also the safer ordering** — validation already
+   completes before deployment, so moving the commit ahead of the restart costs
+   nothing and removes the entire failure class.
+   ⚠️ Until this is resolved, **every run must check `git status` for live-but-
+   uncommitted code before doing anything else**, and the daily review must treat
+   an uncommitted `bot/` file as an incident, not as housekeeping.
+
 🚩🚩 **HUMAN DECISION REQUIRED (2026-08-13) — the stop is the entire lifetime loss,
    and every alternative to it is a risk-widening change I am not permitted to take.**
    All-time by exit reason: `EOD_FLATTEN` **n=110 +$423.93 PF 1.47**, `TAKE_PROFIT`
