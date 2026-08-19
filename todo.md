@@ -302,21 +302,30 @@ Ordered by expected impact; each item needs replay validation before code.
    ⚠️ Until this is resolved, **every run must check `git status` for live-but-
    uncommitted code before doing anything else**, and the daily review must treat
    an uncommitted `bot/` file as an incident, not as housekeeping.
-   **→ 2026-08-19 UPDATE: THIRD OCCURRENCE, and the failure has now hit in all
-   three possible orders.** The 08-18 daily-review run authored, validated,
-   committed AND pushed **IMP-036** (`d96d6ff`, 20:49:49 UTC) and then died on the
-   account's Claude session limit (`rc=1`) — leaving the code correctly versioned
-   but with **no improvement-log entry and no daily-review entry at all**. So the
-   tally is now: IMP-031 live+uncommitted, IMP-034 live+uncommitted+undeployed,
-   IMP-036 committed+unrecorded. **This instance was benign** (analysis-only code,
-   no live-path file, no restart owed, bot bit-identical) and was reconstructed by
-   the 08-19 manual catch-up — **again only because a later run read `git log`.**
-   Note this occurrence is NOT prevented by option (a): committing before the
-   restart would have saved the code, which was already saved, and lost the record
-   anyway. **The complete fix is to write the memory entry BEFORE the commit**, or
-   to have the routine emit its review to a file incrementally as it goes, so a
-   mid-run death cannot discard the analysis. Recommend (a) **and** memory-first
-   ordering together.
+   **→ 2026-08-19 UPDATE: THIRD OCCURRENCE, and it lands INSIDE Step 5 — which
+   means option (a) above is NOT sufficient.** The 08-18 daily-review run authored,
+   validated and committed **IMP-036** (`d96d6ff`, 20:49:49 UTC), then died on the
+   account's Claude session limit (`rc=1`) **between `git commit` and `git push`**.
+   Result: the code existed in exactly one place — this VPS's working tree — with
+   **no remote copy, no improvement-log entry and no daily-review entry.** It was
+   invisible: the 08-19 catch-up only discovered the missing push because its own
+   `git push` printed the range `9be4754..ce10175`, i.e. the remote had never seen
+   IMP-036 at all. Tally: IMP-031 live+uncommitted, IMP-034 live+uncommitted+
+   undeployed, IMP-036 committed+unpushed+unrecorded.
+   **This instance was benign in effect** (analysis-only code, no live-path file,
+   no restart owed, bot bit-identical), but the same 30-second interruption one
+   commit earlier is precisely IMP-034, which sat live and unversioned for 3 days.
+   ⚠️ **Option (a) would not have prevented this one** — the commit had already
+   happened; what was lost was the push and the record. **Revised recommendation,
+   all three together:**
+   (a) commit+push BEFORE `systemctl restart` (unchanged — still right);
+   (c) treat **commit+push as ONE step that is retried**, never two, so a tree can
+       never be ahead of the remote at the moment a run dies; and
+   (d) **memory-first ordering** — write the daily-review/improvement-log entry
+       BEFORE touching git, so a mid-run death loses the commit (recoverable, the
+       analysis survives) rather than the analysis (unrecoverable).
+   **(d) is the highest-value of the three**: code left in a tree is discoverable
+   by `git status`, but an unwritten review is simply gone.
 
 🚩🚩 **HUMAN DECISION REQUIRED (2026-08-13) — the stop is the entire lifetime loss,
    and every alternative to it is a risk-widening change I am not permitted to take.**
