@@ -302,6 +302,21 @@ Ordered by expected impact; each item needs replay validation before code.
    ⚠️ Until this is resolved, **every run must check `git status` for live-but-
    uncommitted code before doing anything else**, and the daily review must treat
    an uncommitted `bot/` file as an incident, not as housekeeping.
+   **→ 2026-08-19 UPDATE: THIRD OCCURRENCE, and the failure has now hit in all
+   three possible orders.** The 08-18 daily-review run authored, validated,
+   committed AND pushed **IMP-036** (`d96d6ff`, 20:49:49 UTC) and then died on the
+   account's Claude session limit (`rc=1`) — leaving the code correctly versioned
+   but with **no improvement-log entry and no daily-review entry at all**. So the
+   tally is now: IMP-031 live+uncommitted, IMP-034 live+uncommitted+undeployed,
+   IMP-036 committed+unrecorded. **This instance was benign** (analysis-only code,
+   no live-path file, no restart owed, bot bit-identical) and was reconstructed by
+   the 08-19 manual catch-up — **again only because a later run read `git log`.**
+   Note this occurrence is NOT prevented by option (a): committing before the
+   restart would have saved the code, which was already saved, and lost the record
+   anyway. **The complete fix is to write the memory entry BEFORE the commit**, or
+   to have the routine emit its review to a file incrementally as it goes, so a
+   mid-run death cannot discard the analysis. Recommend (a) **and** memory-first
+   ordering together.
 
 🚩🚩 **HUMAN DECISION REQUIRED (2026-08-13) — the stop is the entire lifetime loss,
    and every alternative to it is a risk-widening change I am not permitted to take.**
