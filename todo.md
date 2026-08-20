@@ -733,6 +733,35 @@ Ordered by expected impact; each item needs replay validation before code.
   not a rule** — it belongs to the strategy escalation above, not to the exit logic.
   Tenth failed discriminator.
 
+- ~~**Block entries in the last N minutes before `ENTRY_CUTOFF_ET` ("no time to
+  reach the target before the 15:55 flatten")**~~ **[REFUTED 2026-08-19 —
+  BACKWARDS].** Prompted by AAPL #269, entered 15:29:06 (51s before the cutoff),
+  green on **0 of its 26 minutes** and flattened for −$1.37, with a 1.48R target
+  it could not reach while its stop stayed fully live. The mechanism is
+  believable and the conclusion is the opposite: run through
+  `bot/discriminator.py --stat time-of-day` at seven thresholds (240/270/285/300/
+  315/330/345 min after the open), the edge of refusing late entries is
+  **negative at every one** (−$1.97 to −$20.01/trade). Late entries are the
+  bot's **best** cohort — at ≥315 min (14:45 ET) **n=11, +$76.25, PF 4.60, 36.4%
+  win**, era-controlled identical (all 11 post-date the pre-gate week), against a
+  book that loses overall; collateral 122–128% (ENPH +$61.76, NVDA +$25.85).
+  Twelfth failed discriminator. **Do not reopen on the strength of another late
+  scratch — n=1 late losers are already priced into the +$76.25.**
+
+- ~~**Refuse entries whose fill is more than X% ABOVE the signal-bar close
+  (entry-slippage filter)**~~ **[REFUTED 2026-08-19 — COLLATERAL].** Unusually
+  strong on two of three checks: **positive edge in all three cohorts at every
+  threshold** (+$2.28…+$26.06/trade) and it **passes the era control outright** —
+  the pre-gate share of the refused cohort's P&L is **0%**, so unlike the ATR/1R
+  trap this is a wholly modern effect. Killed on **collateral**: at +0.10–0.20%
+  it discards **51–65%** worth of net-positive symbols (**GOOGL +$87.03, META
+  +$44.67, BAC +$36.44, AAPL +$32.32**) against the 25% cap; at ≥0.25% the
+  era-controlled cohort also falls under n=20. Thirteenth failed discriminator.
+  **The finding underneath it is real and was NOT discarded** — the trades are
+  mispriced in SIZE, not in selection, and that is what **IMP-037** fixes
+  (`sizing.resize_for_live_risk`, refuses nothing). Any future attempt to gate on
+  entry slippage must first explain why sizing-to-live-risk is insufficient.
+
 ## Completed phases
 
 - **2026-06-11 · PHASE-001** — pytest suite (22 tests: exits gates, P&L,
