@@ -261,6 +261,28 @@ class Engine:
                           f"(|move|>{config.MAX_ENTRY_SLIPPAGE_PCT}% — stale-signal "
                           f"gap {direction}; stop/TP would be mispriced)")
                 continue
+            # --- Live-risk re-size (IMP-037) ---
+            # The bracket is anchored to the signal close but fills live, so an
+            # accepted up-move inside the guard band above leaves the stop
+            # further from the real fill than the sizer assumed — risk per share
+            # becomes stop_distance + move while the share count still divides
+            # by stop_distance. IMP-008 named this ("silently inflating
+            # per-share risk above the plan") and fixed only the skip case.
+            # 106 of 253 closed trades (41.9%) risked more than their budget,
+            # worst +72.5%. Clamped to min(planned, live-risk) so it can only
+            # ever REDUCE size; a favourable fill never buys more.
+            resized = sizing.resize_for_live_risk(plan, live, equity)
+            if not resized.tradable:
+                actions.append({"symbol": resized.symbol, "confidence": conf,
+                                "action": "skip", "detail": resized.skip_reason})
+                continue
+            if resized.shares != plan.shares:
+                self._log(f"SIZE REDUCED {plan.symbol}: {plan.shares} -> "
+                          f"{resized.shares} shares (live {live:.2f} vs signal "
+                          f"{plan.entry_price:.2f}; real risk/share "
+                          f"{live - plan.stop_price:.4f} vs planned "
+                          f"{plan.stop_distance:.4f})")
+            plan = resized
             if self.dry_run:
                 actions.append({"symbol": plan.symbol, "confidence": conf,
                                 "action": "would_buy", "shares": plan.shares,

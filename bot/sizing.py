@@ -21,7 +21,7 @@ buying_power, never the deprecated PDT fields (summary.md §10).
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, replace
 
 from . import config
 
@@ -95,6 +95,73 @@ def entry_slippage_pct(live_price: float | None, entry_price: float | None) -> f
     if live_price is None or entry_price is None or entry_price <= 0:
         return None
     return (live_price - entry_price) / entry_price * 100.0
+
+
+def resize_for_live_risk(
+    plan: PositionPlan, live_price: float | None, equity: float,
+) -> PositionPlan:
+    """Re-derive the share count against the LIVE per-share risk. NEVER increases it.
+
+    Closes the hole IMP-008 named on 2026-06-30 and did not fix. `plan_position`
+    anchors entry/stop/take-profit to the SIGNAL-BAR CLOSE and sizes with
+    ``shares = floor(budget / stop_distance)``, but the order is a MARKET buy
+    that fills at the LIVE price. When the market has run up by `d` since the
+    signal bar, the stop does not move with it, so the real risk per share is
+    ``stop_distance + d`` while the share count still assumes `stop_distance`.
+    IMP-008 recorded this exactly — *"the stop now sits that much further from
+    the real fill, silently inflating per-share risk above the plan"* — then
+    shipped only the guard that SKIPS gaps beyond MAX_ENTRY_SLIPPAGE_PCT (1.0%),
+    leaving the whole accepted band 0..1.0% sizing off a risk it does not take.
+
+    Measured over all 253 closed trades (2026-08-19 review):
+
+        106 trades (41.9%) risked MORE than their budget; mean overshoot +8.6%
+        worst: SE 2026-07-02 risked $144.54 against an $83.81 budget (+72.5%)
+        post-gate: 34 of 64 (53.1%) over budget
+        2026-08-19 CRM: fill 0.21% above the signal close turned a $36.00
+                        budget into $41.04 at risk (+14.0%)
+
+    The ceiling is structural, not incidental: MAX_ENTRY_SLIPPAGE_PCT (1.0%) over
+    a MIN_STOP_PCT (1.5%) stop admits up to **+67%** more risk than budgeted, so
+    a trade sized at the ladder's 0.5% floor can quietly risk ~0.83% of equity.
+
+    Strictly RISK-REDUCING by construction: the result is ``min`` of the planned
+    share count and the live-risk share count, so a FAVOURABLE fill (live below
+    the signal close) can never buy extra size — it just leaves the plan alone.
+    Stop, take-profit and the risk fraction are untouched: `stop_distance` still
+    defines 1R, so every downstream R-multiple stays comparable across the book.
+    Fails open (returns the plan unchanged) when the live price is unknown, so a
+    data hiccup can never block or resize an entry unpredictably.
+    """
+    if not plan.tradable or live_price is None or equity <= 0:
+        return plan
+    if live_price <= 0 or plan.stop_price <= 0 or plan.shares < 1:
+        return plan
+
+    live_risk_per_share = live_price - plan.stop_price
+    # A live price at/below the stop is the down-gap case IMP-009 already skips
+    # upstream; never divide by it, and never let it inflate the share count.
+    if live_risk_per_share <= 0:
+        return plan
+    if live_risk_per_share <= plan.stop_distance:
+        return plan  # favourable/neutral fill — size never grows
+
+    budget = equity * (plan.risk_fraction_pct / 100.0)
+    shares = min(plan.shares, math.floor(budget / live_risk_per_share))
+    if shares >= plan.shares:
+        return plan
+    if shares < 1:
+        return _skip(plan.symbol, plan.confidence, plan.entry_price,
+                     "live_risk_size<1_share")
+
+    actual_risk = shares * plan.stop_distance
+    return replace(
+        plan,
+        shares=shares,
+        dollar_risk=round(actual_risk, 2),
+        dollar_risk_pct=round(100.0 * actual_risk / equity, 4) if equity > 0 else 0.0,
+        notional=round(shares * plan.entry_price, 2),
+    )
 
 
 def vwap_distance_pct(entry_price: float | None, session_vwap: float | None) -> float | None:
