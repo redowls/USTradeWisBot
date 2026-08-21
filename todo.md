@@ -762,6 +762,29 @@ Ordered by expected impact; each item needs replay validation before code.
   (`sizing.resize_for_live_risk`, refuses nothing). Any future attempt to gate on
   entry slippage must first explain why sizing-to-live-risk is insufficient.
 
+- ~~**Concurrency pacing: "do not spend all three slots in the first N minutes"**~~
+  **[REFUTED 2026-08-20 — ERA SIGN-FLIP + INSUFFICIENT MODERN SAMPLE].** Carried
+  since 2026-08-11 as *"the strongest un-refuted entry-side idea"* and deferred
+  three times for sample. Motivated again on 08-20: all three slots filled
+  09:41:36-09:43:51 (135 seconds), two of the three trades were red within four
+  minutes and green on 3% of their minutes, and the book was frozen for 6h12m on
+  a -1.0% Nasdaq day. Distinct from the opening-range blackout (REFUTED 2026-08-10,
+  IMP-030) — the mechanism is slot *allocation*, not time of day. Tested through
+  `bot/discriminator.py` (encoding: value 1.0 for a trade that was the 3rd
+  CONCURRENT position AND entered within X minutes of the open, 0.0 otherwise;
+  threshold 1.0): **NOT SUPPORTED at any window — ERA_ARTEFACT (X=10),
+  INSUFFICIENT_DATA (X=15), REFUTED (X=20/30/45/60).** The kill is a clean sign
+  flip: era-controlled, the early 3rd slot is the bot's **best** cohort (X=15:
+  **n=19, +$228.84, PF 1.78**, so refusing it costs **-$15.82/trade**), while
+  post-gate it is **n=5, -$102.53, PF 0.15**. Post-gate n is 3-15 at every
+  window, far under the 20-trade bar; at X=45 the rule discards **83% worth of
+  net-positive symbols** (TSLA +$262.59, MSFT +$95.45, GOOG +$40.90) against the
+  25% cap. **Fourteenth failed discriminator.** Do not reopen on another day
+  where the book froze early and the tape reversed — 08-10, 08-11 and 08-20 all
+  look like that, and era-controlled that is the profitable cohort. A future
+  tooling IMP could add this encoding to `scripts/entry_discriminator.py` as a
+  built-in `--stat slot-pace` so it re-runs as the book grows.
+
 ## Completed phases
 
 - **2026-06-11 · PHASE-001** — pytest suite (22 tests: exits gates, P&L,

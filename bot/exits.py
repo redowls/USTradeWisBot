@@ -246,6 +246,66 @@ def resolve_stop_leg(entry_order, fetch, max_hops: int = 5):
     return None
 
 
+# --- Naked-position protection (IMP-038) ------------------------------------
+
+# What manage_stops should do about an open trade whose bracket stop leg has
+# vanished. resolve_stop_leg() returns None for THREE different broker states —
+# the stop filled (position closed), the stop was cancelled (position may still
+# be OPEN and is then completely unprotected), or the leg could not be resolved
+# — and the engine treated all three as "nothing to do".
+NAKED_NONE = "none"        # no live position behind the missing leg
+NAKED_ALERT = "alert"      # position open with no stop, but price is above it
+NAKED_ENFORCE = "enforce"  # position open with no stop AND price is at/below it
+
+
+def naked_position_action(position_held: bool, live_price, plan_stop) -> str:
+    """Verdict for an open trade whose bracket stop leg is gone.
+
+    Measured on 2026-08-20 over all 27 TAKE_PROFIT exits in the book: Alpaca's
+    OCO releases the stop leg as soon as the limit leg becomes marketable, and
+    on **10 of the 27** the limit did not fill immediately — leaving a real long
+    position with no working stop for 0.8s to **1,594.3s (26m34s)** (BAC #149,
+    2026-07-14: stop cancelled 14:04:30Z, limit filled 14:31:04Z). Cumulative
+    naked exposure 2,163.6s. Every one of those windows resolved profitably, so
+    it has never cost money — which is why it stayed invisible.
+
+    ``execution.replace_stop_order``'s docstring claims "a failed replace leaves
+    the old stop working, so the position is never unprotected". That claim is
+    about the REPLACE path and it is fine; what was never true is the engine's
+    inference that a missing leg means a closed position.
+
+    Fails safe in the quiet direction: an unknown/invalid live price or plan
+    stop can raise the alert but can never trigger enforcement, because closing
+    a position on a price we could not read is a worse failure than waiting one
+    more 60s poll.
+    """
+    if not position_held:
+        return NAKED_NONE
+    live = _to_float(live_price)
+    stop = _to_float(plan_stop)
+    if live is None or stop is None or stop <= 0 or live <= 0:
+        return NAKED_ALERT
+    return NAKED_ENFORCE if live <= stop else NAKED_ALERT
+
+
+def resolve_limit_leg_id(entry_order) -> str | None:
+    """Id of the bracket's take-profit leg while it is still cancellable.
+
+    Returns None once the leg is filled/cancelled/expired, so the caller never
+    tries to cancel an order that has already done its job. Mirrors
+    resolve_stop_leg's status rules, minus the replace chain: the take-profit
+    limit is never replaced by this bot.
+    """
+    for leg in getattr(entry_order, "legs", None) or []:
+        if _enum_tail(getattr(leg, "type", None)) != "LIMIT":
+            continue
+        if _enum_tail(getattr(leg, "status", "")) not in _REPLACEABLE:
+            return None
+        leg_id = getattr(leg, "id", None)
+        return str(leg_id) if leg_id else None
+    return None
+
+
 # --- End-of-day flatten -----------------------------------------------------
 
 def _position_snapshot(reason: str) -> list[dict]:

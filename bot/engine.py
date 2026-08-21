@@ -31,6 +31,14 @@ from . import (
 RATCHET_HIGH_BARS = 390
 
 
+def _px(value) -> str:
+    """Price for a log/alert line, never raising on a missing or odd value."""
+    try:
+        return f"{float(value):.2f}"
+    except (TypeError, ValueError):
+        return "unknown"
+
+
 class Engine:
     def __init__(self, dry_run: bool = False):
         self.dry_run = dry_run
@@ -40,6 +48,9 @@ class Engine:
         self.flattened_on: date | None = None
         self.summarized_on: date | None = None
         self.halted_on: date | None = None
+        # (trade_date, symbol) already alerted as unprotected — one Telegram
+        # alert per position, not one per 60s poll. IMP-038.
+        self._naked_alerted: set[tuple[date, str]] = set()
 
     # --- logging ---
     def _log(self, msg: str) -> None:
@@ -76,6 +87,13 @@ class Engine:
         just this tick's last trade (IMP-031) — one batched 1-min bar call for
         the <= MAX_CONCURRENT_POSITIONS open symbols. Fails open: no bars means
         no `high_price`, i.e. exactly the previous last-trade-only behaviour.
+
+        A stop leg that will not resolve is NOT the same thing as a closed
+        position: Alpaca's OCO releases the stop the moment the take-profit
+        limit becomes marketable, and on 10 of the book's 27 TAKE_PROFIT exits
+        the limit then took 0.8s-26m34s to fill, leaving a live long with no
+        working stop. That state is now checked against the broker's own
+        position list and enforced rather than skipped in silence. IMP-038.
         """
         if not config.TRAILING_STOP_ENABLED:
             return []
@@ -83,6 +101,7 @@ class Engine:
         open_trades = logbook.get_open_trades()
         if not open_trades:
             return actions
+        held: set[str] | None = None  # broker positions, fetched at most once
         try:
             session_bars = data.get_bars_for_symbols(
                 sorted({t["symbol"] for t in open_trades}),
@@ -103,7 +122,14 @@ class Engine:
                 entry = float(entry_fill)
                 stop_leg = exits.resolve_stop_leg(parent, execution.get_order)
                 if stop_leg is None:
-                    continue  # stop filled/canceled or unresolved — leave alone
+                    # The leg is gone. Either the position closed (the ordinary
+                    # TP/STOP path) or it is open and unprotected. IMP-038.
+                    if held is None:
+                        held = self._held_symbols()
+                    act = self._handle_naked_position(t, parent, held)
+                    if act is not None:
+                        actions.append(act)
+                    continue
                 current_stop = float(stop_leg.stop_price)
                 live = data.latest_trade_price(t["symbol"])
                 peak = exits.peak_high_since(
@@ -135,6 +161,79 @@ class Engine:
                 self._log(f"manage_stops error {t.get('symbol')}: "
                           f"{type(exc).__name__}: {exc}")
         return actions
+
+    # --- naked-position protection (IMP-038) ---
+    def _held_symbols(self) -> set[str]:
+        """Symbols the BROKER says we are long right now; empty set on failure.
+
+        Failing to an empty set is deliberate: it reproduces the pre-IMP-038
+        behaviour (treat a missing stop leg as a closed position) rather than
+        alerting or liquidating on an API hiccup.
+        """
+        try:
+            return {s.upper() for s in broker.open_position_symbols()}
+        except Exception as exc:  # noqa: BLE001 - never break the ratchet loop
+            self._log(f"naked-position check failed: {type(exc).__name__}: {exc}")
+            return set()
+
+    def _handle_naked_position(self, trade: dict, parent, held: set[str]) -> dict | None:
+        """Alert on — and if price has breached, close — an unprotected long.
+
+        Enforcement is deliberately narrow: it fires only when the tape is
+        already at or below the trade's ORIGINAL plan stop, i.e. only when the
+        broker's stop would have fired had it still existed. It never invents a
+        tighter stop, never touches a protected position, and never widens risk.
+
+        The sibling limit leg is cancelled FIRST — a working bracket leg holds
+        the shares (held_for_orders) and would reject the liquidation, which is
+        the 2026-06-16 C/AMZN/BAC failure that IMP-002 fixed for the EOD path.
+        Cancelling before selling also rules out both legs filling, which would
+        flip the account short.
+
+        The DB exit record is left to the existing 15:55 flatten path, which
+        prices any trade whose broker position is gone off the REAL fill
+        (IMP-003/IMP-005). That books it as EOD_FLATTEN rather than STOP —
+        accepted knowingly: the P&L is correct and same-session, and inventing
+        a second booking path for a branch that has never fired in 256 trades
+        is how the flatten path earned five separate bug fixes.
+        """
+        symbol = str(trade["symbol"]).upper()
+        live = data.latest_trade_price(symbol)
+        plan_stop = trade.get("stop_price")
+        action = exits.naked_position_action(symbol in held, live, plan_stop)
+        if action == exits.NAKED_NONE:
+            return None
+        live_txt = _px(live)
+        stop_txt = _px(plan_stop)
+        msg = (f"UNPROTECTED {symbol}: position open with no working bracket "
+               f"stop leg (live {live_txt}, plan stop {stop_txt})")
+        key = (exits.now_et().date(), symbol)
+        if key not in self._naked_alerted:
+            self._naked_alerted.add(key)
+            self._log(msg)
+            if not self.dry_run:
+                notify.error_alert(msg)
+        if action != exits.NAKED_ENFORCE:
+            return None
+        if self.dry_run:
+            self._log(f"[dry] would enforce plan stop on {symbol}")
+            return None
+        limit_leg_id = exits.resolve_limit_leg_id(parent)
+        if limit_leg_id:
+            try:
+                execution.cancel_order(limit_leg_id)
+            except Exception as exc:  # noqa: BLE001 - the close below is the priority
+                self._log(f"naked-position cancel failed {symbol}: "
+                          f"{type(exc).__name__}: {exc}")
+        try:
+            broker.close_position(symbol)
+        except Exception as exc:  # noqa: BLE001 - retried on the next poll
+            self._log(f"SOFT STOP FAILED {symbol}: {type(exc).__name__}: {exc}")
+            return None
+        self._log(f"SOFT STOP {symbol}: liquidated at market — live {live_txt} "
+                  f"at/below plan stop {stop_txt} with no stop leg")
+        return {"symbol": symbol, "action": "soft_stop",
+                "live": live, "plan_stop": float(plan_stop)}
 
     # --- entries ---
     def consider_entries(self, now: datetime | None = None) -> list[dict]:
