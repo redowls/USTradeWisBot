@@ -138,6 +138,9 @@ _STOP_LEG_TYPES = {"STOP", "STOP_LIMIT", "TRAILING_STOP"}
 # Statuses in which Alpaca will accept a PATCH on the leg. A bracket's stop leg
 # sits HELD while the take-profit limit is the working OCO order.
 _REPLACEABLE = {"NEW", "ACCEPTED", "HELD", "PENDING_NEW"}
+# Terminal-ish statuses that mean the stop leg SOLD (or is selling) the shares,
+# as opposed to being cancelled out from under the position. IMP-039.
+_STOP_LEG_FILLED = {"FILLED", "PARTIALLY_FILLED"}
 
 
 def peak_high_since(bars, since) -> float | None:
@@ -217,14 +220,15 @@ def compute_trailed_stop(
     return round(candidate, 2)
 
 
-def resolve_stop_leg(entry_order, fetch, max_hops: int = 5):
-    """The CURRENT stop leg of a bracket, following Alpaca's replace chain.
+def _walk_stop_leg(entry_order, fetch, max_hops: int = 5):
+    """The bracket's stop leg at the END of Alpaca's replace chain, any status.
 
     Every replace rotates the order id: the old leg goes status=replaced with
     ``replaced_by`` pointing at its successor (losing track of the rotation is
     USTradeBot's 422 "order already replaced" loop). ``fetch`` is an order
-    lookup (execution.get_order in production, a dict in tests). Returns the
-    active leg object, or None when the stop is filled/canceled/missing.
+    lookup (execution.get_order in production, a dict in tests). Returns None
+    only when there is no stop leg to speak of — no leg on the parent, or a
+    replace chain that dead-ends or runs past ``max_hops``.
     """
     legs = getattr(entry_order, "legs", None) or []
     leg = next(
@@ -235,15 +239,51 @@ def resolve_stop_leg(entry_order, fetch, max_hops: int = 5):
     for _ in range(max_hops):
         if leg is None:
             return None
-        status = _enum_tail(getattr(leg, "status", ""))
-        if status == "REPLACED":
-            replaced_by = getattr(leg, "replaced_by", None)
-            if not replaced_by or str(replaced_by) == str(getattr(leg, "id", "")):
-                return None
-            leg = fetch(str(replaced_by))
-            continue
-        return leg if status in _REPLACEABLE else None
+        if _enum_tail(getattr(leg, "status", "")) != "REPLACED":
+            return leg
+        replaced_by = getattr(leg, "replaced_by", None)
+        if not replaced_by or str(replaced_by) == str(getattr(leg, "id", "")):
+            return None
+        leg = fetch(str(replaced_by))
     return None
+
+
+def resolve_stop_leg(entry_order, fetch, max_hops: int = 5):
+    """The CURRENT, still-working stop leg of a bracket, or None.
+
+    None means "no leg the ratchet can PATCH" and lumps three broker states
+    together — the stop filled, the stop was cancelled, or the leg could not be
+    resolved. Callers that need to tell those apart must ask ``stop_leg_filled``
+    as well; that conflation is what IMP-038 half-fixed and IMP-039 finished.
+    """
+    leg = _walk_stop_leg(entry_order, fetch, max_hops)
+    if leg is None:
+        return None
+    return leg if _enum_tail(getattr(leg, "status", "")) in _REPLACEABLE else None
+
+
+def stop_leg_filled(entry_order, fetch, max_hops: int = 5) -> bool:
+    """True when the bracket's stop leg has (partly) FILLED. IMP-039.
+
+    A filled stop leg is an exit in progress, not a missing stop, and the two
+    are indistinguishable through ``resolve_stop_leg`` alone. Observed live on
+    2026-08-21: UNH #275's trailed stop (leg c3e90c63, 390.55) filled at
+    16:04:22.502Z and ``GET /v2/positions`` still listed UNH on the poll that
+    landed in the same second, so IMP-038 declared a position "unprotected"
+    that had already been sold. Its enforcement arm is gated on the ORIGINAL
+    plan stop, which every ordinary stop-out satisfies by construction (111 of
+    261 closed trades) — MU #273 stopped at 961.31 against a 961.59 plan stop
+    the same morning and missed the same window by 53 seconds. Enforcing there
+    would cancel the sibling leg and market-sell a position the broker had
+    already flattened, i.e. open a short.
+
+    PARTIALLY_FILLED counts as filled for this purpose: the same stop order is
+    still working for the untouched remainder, so the residual long is covered.
+    """
+    leg = _walk_stop_leg(entry_order, fetch, max_hops)
+    if leg is None:
+        return False
+    return _enum_tail(getattr(leg, "status", "")) in _STOP_LEG_FILLED
 
 
 # --- Naked-position protection (IMP-038) ------------------------------------

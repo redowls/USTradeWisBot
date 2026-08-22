@@ -94,6 +94,11 @@ class Engine:
         the limit then took 0.8s-26m34s to fill, leaving a live long with no
         working stop. That state is now checked against the broker's own
         position list and enforced rather than skipped in silence. IMP-038.
+
+        A stop leg that FILLED is not that state and is skipped before the
+        position list is consulted: the stop is what closed the trade, and the
+        position list lags it by a fraction of a second (UNH #275, 2026-08-21).
+        IMP-039.
         """
         if not config.TRAILING_STOP_ENABLED:
             return []
@@ -124,6 +129,11 @@ class Engine:
                 if stop_leg is None:
                     # The leg is gone. Either the position closed (the ordinary
                     # TP/STOP path) or it is open and unprotected. IMP-038.
+                    if exits.stop_leg_filled(parent, execution.get_order):
+                        # ...or the stop itself is what closed it, and the
+                        # broker's position list has not caught up yet. That is
+                        # an exit in progress, not a naked long. IMP-039.
+                        continue
                     if held is None:
                         held = self._held_symbols()
                     act = self._handle_naked_position(t, parent, held)
