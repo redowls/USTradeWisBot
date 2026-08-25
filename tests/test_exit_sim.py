@@ -78,6 +78,22 @@ def test_ratchet_matches_live_compute_trailed_stop(live_price):
         exits.compute_trailed_stop(NVDA_ENTRY, NVDA_STOP, NVDA_STOP, live_price)
 
 
+@pytest.mark.parametrize("live_price", [218.00, 221.82, 223.00, 224.76, 232.00])
+@pytest.mark.parametrize("high_price", [None, 218.00, 223.00, 232.00])
+def test_ratchet_matches_live_with_a_high_water_mark(live_price, high_price):
+    """IMP-031 added ``high_price`` to both — the parity guard must cover it.
+
+    ``simulate_exit`` already feeds each bar's HIGH in as ``live_price``, which
+    is precisely why the simulator has always modelled a bot that sees every
+    print while the live loop saw a ~60s sample. The parameter exists here so
+    the two implementations stay provably identical, not so the sim changes.
+    """
+    assert ratchet_stop(NVDA_ENTRY, NVDA_STOP, NVDA_STOP, live_price, LIVE,
+                        high_price) == \
+        exits.compute_trailed_stop(NVDA_ENTRY, NVDA_STOP, NVDA_STOP, live_price,
+                                   high_price)
+
+
 def test_ratchet_disabled_returns_none():
     geo = ExitGeometry(0.5, 1.0, 1.0, 0.10, trailing_enabled=False)
     assert ratchet_stop(NVDA_ENTRY, NVDA_STOP, NVDA_STOP, 230.0, geo) is None
