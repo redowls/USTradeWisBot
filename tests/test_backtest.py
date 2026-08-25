@@ -48,14 +48,15 @@ def test_eod_flatten_when_neither_leg_triggers():
 
 def test_breakeven_ratchet_locks_a_scratch_not_a_full_loss():
     # entry 100, initial stop 99 (1R = 1.0). Bar1 high 100.6 = +0.6R clears the
-    # +0.5R trigger; post-IMP-029 the trail rides 0.5R below it -> stop 100.10.
-    # Bar2 dips to 99.5, so it exits at 100.10 (a small GAIN), NOT at the original
-    # 99. Confirms the ratchet moved the stop — and that IMP-029 banks the band
-    # that used to hand back a flat scratch at 100.00.
+    # trigger; post-IMP-040 the trail rides 0.25R below it -> stop 100.35.
+    # Bar2 dips to 99.5, so it exits at 100.35 (a small GAIN), NOT at the original
+    # 99. Confirms the ratchet moved the stop — and that the tighter IMP-040
+    # ratchet banks MORE of the band that used to hand back a flat scratch at
+    # 100.00 (it was 100.10 under IMP-029's 0.5R trail).
     bars = _bars([(100.1, 100.6, 100.4), (99.5, 100.2, 99.8)])
     price, reason, _ = backtest.simulate_exit(bars, entry=100.0, initial_stop=99.0,
                                               take_profit=110.0, eod_close=99.8)
-    assert reason == "STOP" and price == 100.1
+    assert reason == "STOP" and price == 100.35
 
 
 def _tr(sym, e_h, x_h, pl=1.0):

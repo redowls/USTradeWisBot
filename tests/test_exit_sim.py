@@ -36,6 +36,13 @@ LIVE = ExitGeometry.from_config()
 # config forward. New behaviour is asserted against LIVE.
 PRE_IMP029 = ExitGeometry(0.5, 1.0, 1.0, 0.10)
 
+# The geometry that was live from IMP-029 (2026-08-08) until IMP-040
+# (2026-08-24), when the whole ratchet slid 0.5R -> 0.25R. Same rule as above:
+# tests that reproduce a RECORDED outcome are pinned to the geometry that
+# actually produced it, so they keep documenting history rather than drifting
+# with config. See tests/test_imp040_ratchet_scaling.py for the new behaviour.
+PRE_IMP040 = ExitGeometry(0.5, 0.5, 0.5, 0.10)
+
 # --- 2026-08-07 META #233: entry 590.40, plan stop 582.73 (1R = 7.67) --------
 # Peak 598.64 at 10:59 ET = +1.07R, i.e. it CLEARED the 1.0R trail trigger.
 # Exited 14:46 via the break-even stop for -$0.08 on qty 4.
@@ -287,8 +294,11 @@ def test_ratchet_arms_from_the_bar_after_the_trigger_not_the_same_bar():
     break-even and the NEXT bar's low takes it out.
     """
     bars = _bars([(105.5, 99.0), (100.5, 98.0)])
+    # Pinned to PRE_IMP040 on purpose: this test is about the ARMING SEMANTICS
+    # (arm on bar N, test the new level on bar N+1), not about which ratchet is
+    # live, and its hand-computed levels below are 0.5R arithmetic.
     result = simulate_exit(bars, 100.0, 90.0, 130.0,
-                           fallback_exit_price=99.0, geometry=LIVE)
+                           fallback_exit_price=99.0, geometry=PRE_IMP040)
     assert result.exit_reason == "STOP"
     # Bar 1 (+0.55R) arms the ratchet; bar 2 is tested against the level it set.
     # Post-IMP-029 that level is the 0.5R trail (105.5 - 0.5*10R = 100.5), not
@@ -349,7 +359,10 @@ def test_giveback_rows_selects_the_dead_zone_cohort():
 
 
 def test_geometry_label_is_readable():
-    assert "be=0.5R" in LIVE.label()
+    # Assert the SHAPE of the label, not a level — IMP-040 moved the ratchet to
+    # 0.25R and this test is about formatting, not about which geometry is live.
+    assert LIVE.label().startswith(f"be={LIVE.breakeven_trigger_r}R")
+    assert "trail@" in LIVE.label()
     assert ExitGeometry(0.5, 1.0, 1.0, 0.1,
                         trailing_enabled=False).label().startswith("no-ratchet")
 
@@ -420,9 +433,14 @@ def test_imp030_live_geometry_still_reproduces_the_recorded_exit():
 
     IMP-029's trail fires at 10:53 in reality; bars after it are unreachable, so
     the extra ~5 hours are inert here and the sim still lands on the live exit.
+
+    Pinned to PRE_IMP040: this reproduces the RECORDED 2026-08-10 exit, which
+    the 0.5R ratchet produced. Under IMP-040's 0.25R ratchet MSFT #240 would
+    have been taken out earlier — a different (and deliberate) answer, covered
+    in tests/test_imp040_ratchet_scaling.py.
     """
     trades = [_msft_trade()]
-    out = replay_geometry(trades, {240: MSFT_BARS_FULL_SESSION}, LIVE,
+    out = replay_geometry(trades, {240: MSFT_BARS_FULL_SESSION}, PRE_IMP040,
                           {240: MSFT_SESSION_CLOSE})
     row = out["rows"][0]
 

@@ -4,8 +4,11 @@ The 06-08..07-07 audit (123 closed trades): STOP exits -$3,266 (56 trades,
 1 winner), TAKE_PROFIT +$1,577 (only 20 trades ever reached the 1.5R target),
 EOD_FLATTEN +$206 with 23/47 green at the close but most open profit given
 back intraday. Realized payoff ratio 1.08 vs the ~1.8 a 36% win rate needs.
-Fix: once a trade is +0.5R move the stop to entry (break-even); once +1R trail
-it 1R below the live price. The stop lives BROKER-SIDE (bracket leg replace),
+Fix: once a trade is +0.25R move the stop to entry (break-even) and trail 0.25R
+below the live price. (Shipped at 0.5R/1R/1R; IMP-029 brought the trail to 0.5R
+and IMP-040 slid the whole ratchet to 0.25R once the breakout leg went dormant
+and every entry became a mean-reverting MA cross whose excursions die below
+0.5R.) The stop lives BROKER-SIDE (bracket leg replace),
 so it survives the nightly restart; the DB stop_price stays the ORIGINAL plan
 stop because it is the risk anchor that defines 1R.
 
@@ -24,34 +27,39 @@ from bot import config, data, engine, execution, exits, logbook
 
 
 # --- 1. compute_trailed_stop --------------------------------------------------
-# Defaults: BREAKEVEN_TRIGGER_R=0.5, TRAIL_TRIGGER_R=1.0, TRAIL_DISTANCE_R=1.0,
-# STOP_RATCHET_MIN_PCT=0.10. Base case: entry 100, initial stop 98.5 (risk 1.5).
+# Current: BREAKEVEN_TRIGGER_R=0.25, TRAIL_TRIGGER_R=0.25, TRAIL_DISTANCE_R=0.25
+# (IMP-040 slid the whole ratchet down from 0.5R/0.5R; IMP-029 had brought the
+# trail in from 1.0R/1.0R). STOP_RATCHET_MIN_PCT=0.10.
+# Base case: entry 100, initial stop 98.5 (risk 1.5) -> 0.25R = 0.375, so the
+# trigger sits at 100.375.
 
 def test_no_move_below_breakeven_trigger():
-    # +0.4R (100.60) — not yet at the +0.5R trigger.
-    assert exits.compute_trailed_stop(100.0, 98.5, 98.5, 100.60) is None
+    # +0.2R (100.30) — not yet at the +0.25R trigger.
+    assert exits.compute_trailed_stop(100.0, 98.5, 98.5, 100.30) is None
 
 
-def test_breakeven_at_half_r():
-    # +0.5R (100.75) — stop moves to entry.
-    assert exits.compute_trailed_stop(100.0, 98.5, 98.5, 100.75) == 100.0
+def test_breakeven_at_the_trigger():
+    # Exactly +0.25R (100.375): both stages arm and their candidates coincide at
+    # the entry price (the trail's is 100.375 - 0.375 = 100.00), so the stop
+    # moves to entry. Under the pre-IMP-040 ratchet nothing armed until 100.75.
+    assert exits.compute_trailed_stop(100.0, 98.5, 98.5, 100.375) == 100.0
 
 
 def test_trail_tracks_price_minus_trail_distance():
-    # +2R (103.00) — stop trails TRAIL_DISTANCE_R (0.5R = 0.75) below live: 102.25.
-    # Was 101.50 under the pre-IMP-029 1.0R distance.
-    assert exits.compute_trailed_stop(100.0, 98.5, 100.0, 103.00) == 102.25
+    # +2R (103.00) — stop trails TRAIL_DISTANCE_R (0.25R = 0.375) below live:
+    # 102.62. Was 102.25 under IMP-029's 0.5R distance, 101.50 before that.
+    assert exits.compute_trailed_stop(100.0, 98.5, 100.0, 103.00) == 102.62
 
 
 def test_trail_arms_at_the_breakeven_trigger_no_dead_band():
-    """IMP-029: at +0.5R..+1R the stop must ratchet, not sit pinned at entry.
+    """IMP-029/IMP-040: past the trigger the stop ratchets, not sits at entry.
 
-    Pre-IMP-029 the trail armed only at +1R and its candidate there was exactly
-    the entry price, so this whole band captured nothing. +0.8R (101.20) now
-    trails to 101.20 - 0.75 = 100.45, above the entry-level stop of 100.00.
+    The trail arms at the same point break-even does, so there is no band in
+    which the stop stays pinned to entry while price runs. +0.8R (101.20)
+    trails to 101.20 - 0.375 = 100.83, above the entry-level stop of 100.00.
     """
     moved = exits.compute_trailed_stop(100.0, 98.5, 100.0, 101.20)
-    assert moved == 100.45
+    assert moved == 100.83
     assert moved > 100.0
 
 
@@ -61,10 +69,13 @@ def test_ratchet_never_lowers_stop():
 
 
 def test_ratchet_ignores_tiny_improvements():
-    # Candidate (102.21 = 102.96 - 0.5R) beats the current stop by 5 cents on a
-    # $100 stock — below the 0.10% (=$0.10) minimum step, so no replace spam on
-    # every 60s tick.
-    assert exits.compute_trailed_stop(100.0, 98.5, 102.16, 102.96) is None
+    # Candidate (102.585 = 102.96 - 0.25R) beats the current stop by 7.5 cents
+    # on a $100 stock — below the 0.10% (=$0.10) minimum step, so no replace
+    # spam on every 60s tick. (The tighter IMP-040 trail sits closer to price,
+    # so the current stop that makes this case had to move up with it.)
+    assert exits.compute_trailed_stop(100.0, 98.5, 102.51, 102.96) is None
+    # ...but a candidate that clears the minimum step still moves.
+    assert exits.compute_trailed_stop(100.0, 98.5, 102.45, 102.96) == 102.58
 
 
 def test_guards_zero_risk_and_missing_price():
@@ -85,27 +96,37 @@ def test_disabled_via_config(monkeypatch):
 
 NFLX_ENTRY = 76.19          # broker fill, 09:39:23 ET
 NFLX_STOP = 74.84           # original plan stop -> 1R = 1.35
-NFLX_BE_TRIGGER = 76.865    # entry + 0.5R
+NFLX_BE_TRIGGER = 76.5275   # entry + 0.25R (IMP-040; was 76.865 at 0.5R)
 NFLX_PRINTED_HIGH = 76.89   # the 09:56 1-min bar's high — the only bar to reach it
 NFLX_TICK_PRICE = 76.815    # that bar's close, i.e. what a poll plausibly saw
+NFLX_TRAILED = 76.48        # 76.815 - 0.25R, the level IMP-040 ratchets to
 
 
 def test_imp031_breakeven_arms_on_a_high_the_tick_price_missed():
-    """The regression: NFLX #244 must reach break-even instead of a full -1R.
+    """NFLX #244 must be rescued from the full -1R it actually took.
 
-    The tape printed 76.89 against a 76.865 trigger; every 1-min CLOSE in the
-    trade stayed below it, so the polled price never armed anything and the
-    trade ran to its original stop for -$44.55 (85% of the day's net loss).
-    With the printed high the stop moves to entry and the loss becomes a scratch.
+    History: the tape printed 76.89 against the then-current 76.865 trigger;
+    every 1-min CLOSE stayed below it, so the polled price armed nothing and the
+    trade rode to its original stop for -$44.55 (85% of that day's net loss).
+
+    IMP-040 subsumes this case rather than replacing it. With the trigger at
+    +0.25R (76.5275) the SAMPLED price 76.815 now clears it on its own, so the
+    stop ratchets to 76.48 — above entry, i.e. a small gain rather than the
+    scratch IMP-031 alone could manage. The high-water-mark path still matters
+    for excursions that die entirely between two polls; it is exercised by
+    ``test_imp031_high_water_mark_only_moves_the_stop_up`` below.
     """
-    # What the bot did: the sampled price alone never triggers.
+    # The trigger is now BELOW the sampled price, which is the whole point.
+    assert NFLX_TICK_PRICE > NFLX_BE_TRIGGER
+    # The sampled price alone now arms the ratchet.
     assert exits.compute_trailed_stop(
-        NFLX_ENTRY, NFLX_STOP, NFLX_STOP, NFLX_TICK_PRICE) is None
-    # What it does now: the printed high arms break-even at the entry price.
+        NFLX_ENTRY, NFLX_STOP, NFLX_STOP, NFLX_TICK_PRICE) == NFLX_TRAILED
+    # The printed high does not make it worse, and never moves the stop down.
     assert exits.compute_trailed_stop(
         NFLX_ENTRY, NFLX_STOP, NFLX_STOP, NFLX_TICK_PRICE,
-        NFLX_PRINTED_HIGH) == NFLX_ENTRY
-    assert NFLX_PRINTED_HIGH >= NFLX_BE_TRIGGER > NFLX_TICK_PRICE
+        NFLX_PRINTED_HIGH) == NFLX_TRAILED
+    # Either way the trade is now protected ABOVE its entry, not at -1R.
+    assert NFLX_TRAILED > NFLX_ENTRY > NFLX_STOP
 
 
 def test_imp031_high_water_mark_only_moves_the_stop_up():
@@ -115,14 +136,15 @@ def test_imp031_high_water_mark_only_moves_the_stop_up():
     worst this stage can do is scratch a trade — it can never place the stop
     below where it already sits, and it can never move a trail down.
     """
-    # A huge high cannot push the break-even stop above entry...
+    # A huge high cannot push the break-even stop above entry — the stop that
+    # comes back is the LIVE-price trail (76.48), never 999-derived.
     assert exits.compute_trailed_stop(
-        NFLX_ENTRY, NFLX_STOP, NFLX_STOP, NFLX_TICK_PRICE, 999.0) == NFLX_ENTRY
+        NFLX_ENTRY, NFLX_STOP, NFLX_STOP, NFLX_TICK_PRICE, 999.0) == NFLX_TRAILED
     # ...and cannot pull an already-higher stop back down.
     assert exits.compute_trailed_stop(
         NFLX_ENTRY, NFLX_STOP, 76.50, NFLX_TICK_PRICE, NFLX_PRINTED_HIGH) is None
     # A high BELOW the live price is ignored (max of the two is used).
-    assert exits.compute_trailed_stop(100.0, 98.5, 98.5, 100.75, 99.0) == 100.0
+    assert exits.compute_trailed_stop(100.0, 98.5, 98.5, 100.75, 99.0) == 100.38
 
 
 def test_imp031_trail_still_follows_the_live_price_not_the_high():
@@ -133,11 +155,11 @@ def test_imp031_trail_still_follows_the_live_price_not_the_high():
     book it also cut two winners (AMD #179 -$48.06, BAC #189 -$9.23), so the
     trail deliberately still tracks the live price.
     """
-    # Live at +0.5R (trail candidate == entry) with the high far above: the stop
-    # is the entry price, NOT high - 0.5R (which would be 101.75).
-    assert exits.compute_trailed_stop(100.0, 98.5, 98.5, 100.75, 103.0) == 100.0
-    # Live at +2R trails off live (102.25), unaffected by an even higher print.
-    assert exits.compute_trailed_stop(100.0, 98.5, 100.0, 103.0, 110.0) == 102.25
+    # Live at +0.5R with the high far above: the stop trails off LIVE (100.38),
+    # NOT off the high (which would be 103.0 - 0.375 = 102.62).
+    assert exits.compute_trailed_stop(100.0, 98.5, 98.5, 100.75, 103.0) == 100.38
+    # Live at +2R trails off live (102.62), unaffected by an even higher print.
+    assert exits.compute_trailed_stop(100.0, 98.5, 100.0, 103.0, 110.0) == 102.62
 
 
 def test_imp031_defaults_and_guards_are_unchanged():
@@ -292,7 +314,7 @@ def test_manage_stops_replaces_at_one_r(monkeypatch):
     replaced = _wire(monkeypatch, [_open_trade()], {"parent-1": parent},
                      {"NVDA": 103.0})
     actions = engine.Engine(dry_run=False).manage_stops()
-    assert replaced == [("leg-stop", 102.25)]
+    assert replaced == [("leg-stop", 102.62)]
     assert actions and actions[0]["action"] == "stop_raised"
 
 
@@ -339,15 +361,18 @@ def test_manage_stops_one_failure_does_not_stop_the_rest(monkeypatch):
                         lambda oid, px: (replaced.append((oid, px)),
                                          {"ok": True, "order_id": "n", "error": None})[1])
     engine.Engine(dry_run=False).manage_stops()
-    assert replaced == [("leg-stop", 102.25)]
+    assert replaced == [("leg-stop", 102.62)]
 
 
 def test_manage_stops_arms_breakeven_off_the_session_high(monkeypatch):
     """IMP-031 wiring: the batched 1-min pull feeds the break-even stage.
 
-    Replays NFLX #244 (2026-08-11) through the engine: the polled price is the
-    09:56 bar CLOSE, which never reached the +0.5R trigger, while that bar's
-    HIGH did. The stop must be replaced at the entry price.
+    Replays NFLX #244 (2026-08-11) through the engine. Historically the polled
+    price (the 09:56 bar CLOSE) never reached the then-current +0.5R trigger
+    while that bar's HIGH did. Post-IMP-040 the trigger is +0.25R, which the
+    polled price clears on its own, so the engine ratchets to the live-price
+    trail (76.48) whether or not the bars arrive — the wiring assertion is that
+    manage_stops replaces at that level and reports it.
     """
     from datetime import datetime
     entry_time = datetime(2026, 8, 11, 9, 39, 23)
@@ -363,15 +388,17 @@ def test_manage_stops_arms_breakeven_off_the_session_high(monkeypatch):
     replaced = _wire(monkeypatch, [trade], {"parent-1": parent},
                      {"NFLX": NFLX_TICK_PRICE}, bars=bars)
     actions = engine.Engine(dry_run=False).manage_stops()
-    assert replaced == [("leg-stop", NFLX_ENTRY)]
-    assert actions and actions[0]["to"] == NFLX_ENTRY
+    assert replaced == [("leg-stop", NFLX_TRAILED)]
+    assert actions and actions[0]["to"] == NFLX_TRAILED
 
-    # Same tick with no bars available (the fail-open path) = what the bot did
-    # before IMP-031: nothing arms and the trade keeps riding to the full stop.
+    # Same tick with no bars available (the fail-open path). Before IMP-040 this
+    # armed nothing and the trade rode to the full stop; now the sampled price
+    # alone clears the 0.25R trigger, so the ratchet still protects the trade.
+    # The bar pull is therefore an enhancement, never a dependency.
     replaced = _wire(monkeypatch, [trade], {"parent-1": parent},
                      {"NFLX": NFLX_TICK_PRICE})
-    assert engine.Engine(dry_run=False).manage_stops() == []
-    assert replaced == []
+    assert engine.Engine(dry_run=False).manage_stops() != []
+    assert replaced == [("leg-stop", NFLX_TRAILED)]
 
 
 def test_manage_stops_survives_a_bar_fetch_failure(monkeypatch):
@@ -384,7 +411,7 @@ def test_manage_stops_survives_a_bar_fetch_failure(monkeypatch):
         raise RuntimeError("data feed down")
     monkeypatch.setattr(data, "get_bars_for_symbols", _boom)
     actions = engine.Engine(dry_run=False).manage_stops()
-    assert replaced == [("leg-stop", 102.25)]      # trail still ran off live
+    assert replaced == [("leg-stop", 102.62)]      # trail still ran off live
     assert actions and actions[0]["action"] == "stop_raised"
 
 

@@ -209,8 +209,9 @@ def compute_trailed_stop(
         candidate = live_price - config.TRAIL_DISTANCE_R * risk
     if (peak - entry_price) / risk >= config.BREAKEVEN_TRIGGER_R:
         # A ratchet takes the best of the two stages; with TRAIL_DISTANCE_R <=
-        # TRAIL_TRIGGER_R (the shipped 0.5R/0.5R) the trail candidate is already
-        # >= entry, so this max() is a no-op today and a guard if either moves.
+        # TRAIL_TRIGGER_R (the shipped 0.25R/0.25R, IMP-040) the trail candidate
+        # is already >= entry, so this max() is a no-op today and a guard if
+        # either moves.
         candidate = entry_price if candidate is None else max(candidate, entry_price)
     if candidate is None:
         return None

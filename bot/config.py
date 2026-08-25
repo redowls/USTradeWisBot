@@ -83,10 +83,39 @@ MAX_ENTRY_SLIPPAGE_PCT = 1.0    # skip an entry if the LIVE price has moved more
 # progress is. The moved stop lives BROKER-SIDE (bracket-leg replace), so it
 # survives the nightly service restart; trades.stop_price in the DB keeps the
 # ORIGINAL plan stop because that distance defines 1R.
+# IMP-040 (2026-08-24): the whole ratchet moved 0.5R -> 0.25R. The three
+# constants below are ONE geometric decision and are kept equal on purpose —
+# IMP-029 made break-even and the trail arm at the same point so they form a
+# single continuous ratchet, and IMP-040 slides that ratchet down without
+# changing its shape. Why: the breakout leg has been dormant since 2026-07-24,
+# so every entry is now an MA cross, and MA crosses mean-revert rather than
+# follow through. Their excursions die well below 0.5R, so a ratchet sited at
+# 0.5R sat ABOVE most of this book's MFE distribution and simply never armed:
+# of the post-gate STOP exits, the ones that reached +0.5R cost almost nothing
+# while the ones that never reached it carried essentially the entire stop loss.
+# Measured over the 62-trade post-gate book (scripts/exit_geometry.py), replayed
+# in two independent halves and judged against each half's own noise budget:
+#   whole book  -$247.66 -> +$18.27  (+$265.93, noise $178.39, wins 28 -> 37)
+#   in-sample   -$120.31 -> -$17.53  (+$102.78, inside its $139.58 budget)
+#   held-out    -$127.35 -> +$35.80  (+$163.15, noise $38.81 — clears 4.2x)
+# 0.25R is best-or-tied-best in all three windows and sits inside a broad
+# plateau (every value 0.35R..0.15R is strongly positive out-of-sample), so the
+# choice is not knife-edge. It is deliberately NOT the grid optimum (0.10R):
+# tight geometries are exactly what sparse IEX 1-min bars bias optimistic, the
+# same discount IMP-029 applied when it declined its own optimum.
+# HONEST COST: this caps upside. It converts the book from a few large winners
+# into many small ones, and on 2026-08-24 itself it would have cut MSFT
+# +$17.34 -> +$4.44 while rescuing AAPL -$10.45 -> +$0.12. It does NOT make the
+# strategy profitable — the post-gate book still only replays to roughly flat.
+# RISK DIRECTION: a ratchet can only move a stop UP. The original 1R plan stop
+# is untouched, so max loss per trade is unchanged; this is strictly tighter
+# protection at every price level, never wider.
 TRAILING_STOP_ENABLED = True
-BREAKEVEN_TRIGGER_R = 0.5       # at +0.5R unrealized, raise the stop to entry —
-                                # a trade that showed profit can no longer close red.
-TRAIL_TRIGGER_R = 0.5           # IMP-029 (weekly): was 1.0. With TRAIL_DISTANCE_R
+BREAKEVEN_TRIGGER_R = 0.25      # IMP-040: was 0.5. At +0.25R unrealized, raise
+                                # the stop to entry — a trade that showed profit
+                                # can no longer close red.
+TRAIL_TRIGGER_R = 0.25          # IMP-040: was 0.5. IMP-029 (weekly): was 1.0.
+                                # With TRAIL_DISTANCE_R
                                 # also 1.0 the trail candidate at the trigger was
                                 # live - 1R == ENTRY — exactly the level break-even
                                 # had already set — so STOP_RATCHET_MIN_PCT blocked
@@ -96,8 +125,9 @@ TRAIL_TRIGGER_R = 0.5           # IMP-029 (weekly): was 1.0. With TRAIL_DISTANCE
                                 # Now the trail arms at the SAME point break-even
                                 # does, so the two stages are one continuous ratchet
                                 # with no dead band between them.
-TRAIL_DISTANCE_R = 0.5          # trail this many R below the live price (ratchet:
-                                # the stop only ever moves UP). Must stay < 1.0 or
+TRAIL_DISTANCE_R = 0.25         # IMP-040: was 0.5. Trail this many R below the
+                                # live price (ratchet: the stop only ever moves
+                                # UP). Must stay < 1.0 and <= TRAIL_TRIGGER_R or
                                 # the dead band returns; see tests/test_exit_sim.py
                                 # ::test_trail_is_not_inert_at_the_trigger.
 STOP_RATCHET_MIN_PCT = 0.10     # skip replaces that improve the stop by less than
