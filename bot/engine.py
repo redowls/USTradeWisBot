@@ -292,22 +292,24 @@ class Engine:
                 break
             if conf < config.MIN_CONFIDENCE or not ev.get("signal_type"):
                 continue
-            # --- VWAP entry-quality gate (IMP-022) ---
-            # Skip fills stretched more than VWAP_MAX_DIST_PCT above the symbol's
-            # session VWAP: entry-vs-session-VWAP is the one clean separator of the
-            # open-fade leak (recorded-trade holdout IMP-019/020 + a from-scratch
-            # 30-day backtest both agree). Fills at/below VWAP hold; stretched-above
-            # fills fade to the stop. Fail-open when VWAP is undefined.
-            vwap_dist = sizing.vwap_distance_pct(ev.get("close"), ev.get("session_vwap"))
-            if vwap_dist is not None and vwap_dist > config.VWAP_MAX_DIST_PCT:
-                actions.append({"symbol": ev["symbol"], "confidence": conf,
-                                "action": "skip",
-                                "detail": f"above_vwap_+{vwap_dist:.2f}%"})
-                self._log(f"ENTRY SKIPPED {ev['symbol']}: entry {ev['close']:.2f} is "
-                          f"+{vwap_dist:.2f}% above session VWAP "
-                          f"{ev['session_vwap']:.2f} (>{config.VWAP_MAX_DIST_PCT}% — "
-                          f"stretched fill, fades)")
-                continue
+            # --- Eligibility BEFORE quality (IMP-042) ---
+            # The held-skip, the daily cap and the cooldown answer "could this
+            # candidate be bought at all?"; the VWAP gate answers "is this a good
+            # price?". Asking the second question first is outcome-identical (both
+            # branches `continue`) but it MIS-ATTRIBUTES the refusal: an ineligible
+            # symbol that happens to be stretched is logged and recorded as a VWAP
+            # refusal, and IMP-033's refused-candidate replay in
+            # scripts/gate_monitor.py then prices a counterfactual entry the engine
+            # could never have taken. 2026-08-26: TSM was in the book from 09:36 to
+            # the 15:55 flatten, and the gate still logged 9 `ENTRY SKIPPED TSM`
+            # lines (13:57-14:25) — 29% of the session's 31 refusals — with the
+            # 13:57 one becoming that day's `_first_blocked` TSM candidate. Over the
+            # 8 sessions of retained logs, 4 of 45 first-blocked candidates (8.9%)
+            # and 37 of 389 raw refusal lines (9.5%) were symbols the bot already
+            # held. Eligibility first makes the gate's workload and its measured
+            # opportunity cost mean what every review has been reading them as.
+            # Strictly a measurement fix: no entry is gained or lost by it, so
+            # IMP-040's open ratchet window is untouched.
             # Underlying-equivalence guard (#3): share classes count as one
             # stock for the held-skip, the daily cap and the cooldown.
             equiv = config.equivalent_symbols(ev["symbol"])
@@ -334,6 +336,22 @@ class Engine:
                         actions.append({"symbol": ev["symbol"], "confidence": conf,
                                         "action": "skip", "detail": f"cooldown_{wait}m"})
                         continue
+            # --- VWAP entry-quality gate (IMP-022) ---
+            # Skip fills stretched more than VWAP_MAX_DIST_PCT above the symbol's
+            # session VWAP: entry-vs-session-VWAP is the one clean separator of the
+            # open-fade leak (recorded-trade holdout IMP-019/020 + a from-scratch
+            # 30-day backtest both agree). Fills at/below VWAP hold; stretched-above
+            # fills fade to the stop. Fail-open when VWAP is undefined.
+            vwap_dist = sizing.vwap_distance_pct(ev.get("close"), ev.get("session_vwap"))
+            if vwap_dist is not None and vwap_dist > config.VWAP_MAX_DIST_PCT:
+                actions.append({"symbol": ev["symbol"], "confidence": conf,
+                                "action": "skip",
+                                "detail": f"above_vwap_+{vwap_dist:.2f}%"})
+                self._log(f"ENTRY SKIPPED {ev['symbol']}: entry {ev['close']:.2f} is "
+                          f"+{vwap_dist:.2f}% above session VWAP "
+                          f"{ev['session_vwap']:.2f} (>{config.VWAP_MAX_DIST_PCT}% — "
+                          f"stretched fill, fades)")
+                continue
             plan = sizing.plan_position(
                 ev["symbol"], conf, ev["close"] or 0.0, ev["atr"] or 0.0,
                 equity, buying_power, held_symbols=held, open_positions_count=open_count,
