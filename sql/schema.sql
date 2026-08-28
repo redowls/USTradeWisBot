@@ -42,6 +42,23 @@ BEGIN
     CREATE INDEX IX_trades_symbol ON dbo.trades(symbol);
 END;
 
+-- trades: ratchet ground truth (IMP-043).
+-- `stop_price` above is the ORIGINAL 1R plan stop and stays pinned there by
+-- design (IMP-013) because it is the anchor that defines R. That left NOTHING
+-- in the schema recording where the stop actually WAS when it fired, so a
+-- scratch (ratchet stop) and a full -1R loss both land in exit_reason='STOP'.
+-- The only record of the arming events was the `STOP RAISED` lines in
+-- /var/log/ustradewisbot/bot.log, which rotates daily and keeps 14 days —
+-- i.e. IMP-040's evidence expires at about the moment its verdict is due.
+-- These two columns make the ratchet durable and queryable:
+--   stop_raises      how many times the ratchet successfully moved the stop UP
+--   final_stop_price the last stop the bot set (NULL while stop_raises = 0)
+IF COL_LENGTH('dbo.trades', 'stop_raises') IS NULL
+    ALTER TABLE dbo.trades ADD stop_raises INT NOT NULL
+        CONSTRAINT DF_trades_stop_raises DEFAULT 0 WITH VALUES;
+IF COL_LENGTH('dbo.trades', 'final_stop_price') IS NULL
+    ALTER TABLE dbo.trades ADD final_stop_price DECIMAL(12,4) NULL;
+
 -- signals — WHY each trade was taken (explainability)
 IF OBJECT_ID('dbo.signals', 'U') IS NULL
 BEGIN

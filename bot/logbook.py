@@ -134,6 +134,35 @@ def update_trade_exit(
     )
 
 
+def record_stop_raise(trade_id: int, new_stop: float) -> bool:
+    """Persist one successful ratchet raise. Returns True if the row was written.
+
+    Called by Engine.manage_stops AFTER the broker has accepted the replacement,
+    so the row records what is actually working at the broker, never an intent.
+
+    ``trades.stop_price`` is the original 1R plan stop and is deliberately never
+    updated (IMP-013 — it is the anchor that defines R), so these two columns are
+    the only durable record of where the stop ended up. Without them the exit mix
+    cannot distinguish a ratchet scratch from a full -1R loss except by grepping
+    a log that rotates after 14 days (IMP-043).
+
+    NEVER raises: a database hiccup must not break the ratchet loop or be
+    mistaken for a failed stop raise. The stop is already safe at the broker by
+    the time this runs; the worst case here is a lost measurement.
+    """
+    try:
+        return db.execute(
+            """
+            UPDATE trades
+            SET stop_raises = stop_raises + 1, final_stop_price = ?
+            WHERE trade_id = ?
+            """,
+            [round(float(new_stop), 4), trade_id],
+        ) > 0
+    except Exception:  # noqa: BLE001 - measurement must never break trading
+        return False
+
+
 def record_exit(exit_record: dict) -> int | None:
     """Close the OPEN trade matching the exit's entry order id. Returns trade_id."""
     row = db.query_one(

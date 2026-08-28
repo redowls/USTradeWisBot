@@ -132,7 +132,8 @@ RATCHET_STOP = "RATCHET_STOP"
 def load_trades(since: str) -> list[dict]:
     return db.query(
         "SELECT trade_id, symbol, qty, entry_price, entry_time, stop_price, "
-        "take_profit_price, exit_price, exit_time, realized_pl, exit_reason "
+        "take_profit_price, exit_price, exit_time, realized_pl, exit_reason, "
+        "stop_raises, final_stop_price "
         "FROM trades WHERE status = 'CLOSED' AND exit_time IS NOT NULL "
         "AND entry_time >= ? ORDER BY entry_time",
         since,
@@ -232,16 +233,39 @@ def noratchet_outcome(entry_price: float, plan_stop: float, qty: float,
     return round((close - entry_price) * qty, 4), "EOD_FLATTEN"
 
 
-def classify_exit(trade: dict) -> str:
-    """PLAN_STOP / RATCHET_STOP / the recorded reason, from the broker's fill.
+def has_recorded_arming(trade: dict) -> bool:
+    """True when this row carries a POSITIVE IMP-043 arming count.
 
-    Deliberately decided by the FILL, not by the replay: the fill price is
-    Alpaca's, and a stop-out cannot fill materially above the stop that fired
-    it. The replay's own opinion is kept separate and reported as fidelity.
+    ``stop_raises`` is ``NOT NULL DEFAULT 0``, so a zero is ambiguous: it means
+    either "the ratchet genuinely never armed" or "this trade predates IMP-043
+    and its log evidence had already rotated away when the backfill ran". Only a
+    positive count is self-evidently ground truth — a raise is written solely
+    after the broker accepts the replacement, so it cannot be a false positive.
+    """
+    raises = trade.get("stop_raises")
+    return raises is not None and int(raises) > 0
+
+
+def classify_exit(trade: dict) -> str:
+    """PLAN_STOP / RATCHET_STOP / the recorded reason.
+
+    Preferred source is IMP-043's ``stop_raises`` — the bot's own count of the
+    times it successfully moved the stop UP, written as each replacement was
+    accepted by the broker. Where that count is positive it settles the question
+    outright and no inference is needed.
+
+    A zero is NOT read as "never armed" (see :func:`has_recorded_arming`), so it
+    falls through to the original heuristic: decide by the FILL, because the fill
+    price is Alpaca's and a stop-out cannot fill materially above the stop that
+    fired it. This can only add certainty, never remove it — a trade the
+    heuristic already called RATCHET_STOP still does. The replay's own opinion is
+    never used here; it is reported separately as fidelity.
     """
     reason = trade["exit_reason"]
     if reason != "STOP":
         return reason
+    if has_recorded_arming(trade):
+        return RATCHET_STOP
     entry = float(trade["entry_price"])
     plan_stop = float(trade["stop_price"])
     exit_price = float(trade["exit_price"])
@@ -273,6 +297,13 @@ def audit(trades: list[dict], bars: dict) -> list[dict]:
             "mfe_r": path["mfe_r"], "mae_r": path["mae_r"],
             "armed": path["armed"], "raises": path["raises"],
             "noratchet_pl": None, "ratchet_delta": None,
+            # IMP-043 ground truth: what the bot RECORDED doing, as opposed to
+            # `raises`/`armed` just above, which are what the replay MODELS.
+            "exit_reason": t["exit_reason"],
+            "recorded_raises": (int(t["stop_raises"])
+                                if t.get("stop_raises") is not None else None),
+            "recorded_final_stop": (float(t["final_stop_price"])
+                                    if t.get("final_stop_price") is not None else None),
             # The replay says the stop moved but the fill says it did not (or
             # the reverse). Counted, never silently corrected.
             "fidelity_gap": path["armed"] != (exit_class == RATCHET_STOP)
@@ -354,6 +385,25 @@ def _print_report(rows: list[dict], since: str, split: str, detail: bool) -> Non
     for name, m in mix.items():
         if name not in (PLAN_STOP, RATCHET_STOP, "TAKE_PROFIT", "EOD_FLATTEN"):
             print(f"  {name:14s} n={m['n']:3d} net ${m['pl']:9.2f}")
+
+    # IMP-043 provenance. `stop_raises` is the bot's own count of accepted stop
+    # replacements, so where it is positive the class is a recorded fact rather
+    # than an inference off the fill price. Print the split so a later run can
+    # see how much of the mix is ground truth, and how many raises per trade the
+    # ratchet is actually making — IMP-040's pass criterion (b), which until now
+    # could only be grepped out of a log that rotates after 14 days.
+    recorded = [r for r in rows if (r["recorded_raises"] or 0) > 0]
+    stop_rows = [r for r in rows if r["exit_reason"] == "STOP"]
+    from_record = sum(1 for r in stop_rows if (r["recorded_raises"] or 0) > 0)
+    if stop_rows:
+        print(f"\n  provenance: {from_record}/{len(stop_rows)} STOP exits classified "
+              f"from the recorded arming count (IMP-043); the rest inferred from "
+              f"the fill")
+    if recorded:
+        total_raises = sum(r["recorded_raises"] for r in recorded)
+        print(f"  recorded: {len(recorded)}/{len(rows)} trades armed, "
+              f"{total_raises} stop raises "
+              f"({total_raises / len(recorded):.1f} per armed trade)")
 
     ledger = ratchet_ledger(rows)
     print("\nRATCHET LEDGER — RATCHET_STOP exits vs the same trade, ratchet OFF")

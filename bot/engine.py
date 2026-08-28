@@ -156,6 +156,18 @@ class Engine:
                     continue
                 res = execution.replace_stop_order(str(stop_leg.id), new_stop)
                 if res["ok"]:
+                    # Persist the arming event before logging it. The log line is
+                    # the only other record and it rotates after 14 days, which
+                    # is shorter than the window IMP-040's verdict is judged over
+                    # (IMP-043). record_stop_raise never raises; a False here is
+                    # a lost measurement, NOT an unprotected position — the stop
+                    # is already working at the broker.
+                    if t.get("trade_id") is not None and not logbook.record_stop_raise(
+                        int(t["trade_id"]), new_stop,
+                    ):
+                        self._log(f"STOP RAISE NOT RECORDED {t['symbol']} "
+                                  f"trade_id={t.get('trade_id')} (stop is live at "
+                                  f"{new_stop:.2f}; measurement only)")
                     actions.append({"symbol": t["symbol"], "action": "stop_raised",
                                     "from": current_stop, "to": new_stop,
                                     "order_id": res["order_id"]})
