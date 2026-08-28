@@ -292,6 +292,9 @@ def _open_trade(symbol="NVDA", stop=98.5, oid="parent-1", entry_time=None):
 
 def _wire(monkeypatch, trades, parents, live, replace_results=None, bars=None):
     replaced: list[tuple[str, float]] = []
+    # These fixtures carry REAL trade ids, so the IMP-043 arming write would land
+    # on live rows. Captured here instead (tests/conftest.py blocks it anyway).
+    monkeypatch.setattr(logbook, "record_stop_raise", lambda _tid, _stop: True)
     monkeypatch.setattr(logbook, "get_open_trades", lambda: list(trades))
     monkeypatch.setattr(execution, "get_order", lambda oid: parents[oid])
     monkeypatch.setattr(data, "latest_trade_price", lambda sym: live.get(sym))
@@ -352,6 +355,8 @@ def test_manage_stops_one_failure_does_not_stop_the_rest(monkeypatch):
         if oid == "parent-bad":
             raise RuntimeError("api down")
         return good
+    # Real trade id in the fixture — keep the IMP-043 write off the live table.
+    monkeypatch.setattr(logbook, "record_stop_raise", lambda _tid, _stop: True)
     monkeypatch.setattr(logbook, "get_open_trades", lambda: trades)
     monkeypatch.setattr(execution, "get_order", _get_order)
     monkeypatch.setattr(data, "latest_trade_price", lambda sym: 103.0)

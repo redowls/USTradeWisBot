@@ -132,6 +132,9 @@ def wired(monkeypatch):
     state = {"closed": [], "canceled": [], "alerts": [], "held": set(),
              "live": {}, "trades": [], "parents": {}, "positions_raise": None}
 
+    # These fixtures carry REAL trade ids, so the IMP-043 arming write would land
+    # on live rows. Stubbed here instead (tests/conftest.py blocks it anyway).
+    monkeypatch.setattr(logbook, "record_stop_raise", lambda _tid, _stop: True)
     monkeypatch.setattr(logbook, "get_open_trades", lambda: list(state["trades"]))
     monkeypatch.setattr(execution, "get_order", lambda oid: state["parents"][oid])
     monkeypatch.setattr(data, "latest_trade_price",

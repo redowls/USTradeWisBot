@@ -330,3 +330,42 @@ def test_imp043_touches_no_risk_limit_and_no_imp040_geometry():
                                            ("FLATTEN_ET", "15:55")])
 def test_imp043_leaves_the_no_overnight_rules_alone(attr, expected):
     assert getattr(config, attr) == expected
+
+
+# --- the guard that stops this measurement corrupting itself -----------------
+
+def test_the_suite_cannot_write_to_the_live_database():
+    """IMP-043's own near-miss, pinned.
+
+    Adding one record_stop_raise() call to manage_stops silently turned three
+    pre-existing test files into writers, because they drive the ratchet with
+    fixtures carrying REAL trade ids (1, 149, 244, 273, 274, 275). A suite run
+    incremented stop_raises on live rows #149/#244/#274 and invented arming
+    events for two trades whose logs had rotated away months earlier —
+    corrupting the exact column this change exists to make trustworthy.
+    """
+    from bot import db
+
+    # Resolved off the raised object rather than imported, so `tests` does not
+    # have to become a package (adding tests/__init__.py changes pytest's import
+    # mode for the whole suite).
+    with pytest.raises(BaseException) as excinfo:  # noqa: B017 - that is the point
+        db.execute("UPDATE trades SET stop_raises = 999", [])
+
+    err = excinfo.value
+    assert type(err).__name__ == "LiveDatabaseWriteBlocked"
+    assert not isinstance(err, Exception), (
+        "must not be an Exception: record_stop_raise and manage_stops both "
+        "catch Exception on purpose and would swallow the guard"
+    )
+
+
+def test_record_stop_raise_would_swallow_an_ordinary_guard(monkeypatch):
+    """Why the guard is a BaseException — shown, not asserted in a comment."""
+    def ordinary(_sql, _params):
+        raise AssertionError("a normal test guard")
+
+    monkeypatch.setattr(logbook.db, "execute", ordinary)
+    assert logbook.record_stop_raise(298, 92.02) is False, (
+        "an Exception-derived guard is absorbed and the test passes silently"
+    )
