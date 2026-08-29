@@ -10,6 +10,8 @@ import pandas as pd
 import pytest
 
 from bot.exit_sim import ExitGeometry, simulate_exit
+from bot import config
+from scripts import exit_geometry
 from scripts.exit_geometry import BREAKEVEN_SWEEP, breakeven_candidates
 
 LIVE = ExitGeometry(breakeven_trigger_r=0.5, trail_trigger_r=0.5,
@@ -118,3 +120,176 @@ def test_lowering_the_trigger_does_not_scratch_wmt_247(trigger):
     assert res.exit_price == pytest.approx(WMT["fallback"])
     assert res.final_stop > WMT["entry"]     # trail carried it above entry
     assert res.armed_breakeven is True
+
+
+# --- IMP-044: candidates are scored against the LIVE geometry, not the book ---
+#
+# The what-if grid used to score every candidate against the ACTUAL book. The
+# simulator does not reproduce the book exactly, so that handed every row the
+# same bias: the live geometry's own "delta" is pure reproduction error, and the
+# candidates inherited it before being compared against the noise budget.
+#
+# The numbers below are the real 2026-08-28 reading of the IMP-040 era
+# (`scripts/exit_geometry --since 2026-08-25`, 17 trades). They are the recorded
+# scenario that motivated the change: a candidate whose true effect is +$55.00
+# was reported as +$14.36 and dismissed as "within noise" against a $75.34
+# budget, while the geometry the bot was actually running scored -$40.64
+# against itself.
+
+ERA_ACTUAL = 83.35        # book P&L, 17 trades since 2026-08-25
+ERA_SIM_LIVE = 42.71      # the LIVE 0.25R/0.25R geometry, replayed
+ERA_REPRO_ERR = -40.64    # ERA_SIM_LIVE - ERA_ACTUAL: the simulator's own miss
+ERA_SIM_HALF = 97.71      # the 0.5R-trigger / 0.25R-trail candidate, replayed
+ERA_BUDGET = 75.34        # sum |sim - actual| under the live geometry
+
+
+def _run_dict(sim_pl: float, per_trade: list[tuple[int, float]],
+              actual: float = ERA_ACTUAL, geometry: str = "cand") -> dict:
+    """The subset of a replay_geometry() result that the scorecard reads."""
+    return {
+        "geometry": geometry,
+        "sim_pl": sim_pl,
+        "actual_pl": actual,
+        "delta": round(sim_pl - actual, 2),
+        "trades": len(per_trade),
+        "sim_wins": sum(1 for _, pl in per_trade if pl > 0),
+        "captured_pct": 21.4,
+        "rows": [{"trade_id": tid, "sim_pl": pl} for tid, pl in per_trade],
+    }
+
+
+def _spread(total: float, n: int = 17) -> list[tuple[int, float]]:
+    """n trades summing to ``total``, ids 300.. — the shape rows() has."""
+    each = round(total / n, 4)
+    return [(300 + i, each) for i in range(n)]
+
+
+def test_the_live_geometry_scores_exactly_zero_against_itself():
+    """The self-check. A geometry cannot outperform or trail itself.
+
+    This is the single assertion that would have caught the bug: before IMP-044
+    the live row scored -$40.64 against the book and that number was silently
+    read as a property of the geometry.
+    """
+    live = _run_dict(ERA_SIM_LIVE, _spread(ERA_SIM_LIVE))
+    assert exit_geometry.paired_delta(live, live) == (0.0, 0)
+    assert live["delta"] == pytest.approx(ERA_REPRO_ERR, abs=0.01)  # the old score
+
+
+def test_paired_delta_strips_the_reproduction_error_from_a_candidate():
+    """The recorded 2026-08-28 case: +$14.36 reported, +$55.00 real."""
+    live = _run_dict(ERA_SIM_LIVE, _spread(ERA_SIM_LIVE))
+    cand = _run_dict(ERA_SIM_HALF, _spread(ERA_SIM_HALF))
+    delta, _ = exit_geometry.paired_delta(cand, live)
+    assert delta == pytest.approx(55.00, abs=0.01)
+    assert cand["delta"] == pytest.approx(14.36, abs=0.01)      # what it used to say
+    assert delta - cand["delta"] == pytest.approx(-ERA_REPRO_ERR, abs=0.01)
+
+
+@pytest.mark.parametrize("sim", [25.78, 62.57, 80.21, 112.81, 130.56, 141.46])
+def test_the_bias_removed_is_the_same_constant_in_every_row(sim):
+    """Why scoring against the book was wrong for the whole grid, not one cell.
+
+    Every candidate carried the identical -$40.64, so the grid's ORDERING was
+    right and its SCALE was wrong — which is exactly what makes a noise-budget
+    verdict on it wrong, since the budget is an absolute dollar bar.
+    """
+    live = _run_dict(ERA_SIM_LIVE, _spread(ERA_SIM_LIVE))
+    cand = _run_dict(sim, _spread(sim))
+    delta, _ = exit_geometry.paired_delta(cand, live)
+    assert delta - cand["delta"] == pytest.approx(-ERA_REPRO_ERR, abs=0.01)
+
+
+def test_a_candidate_that_changes_nothing_scores_zero_however_bad_the_simulator():
+    """Debiasing must not depend on the simulator being any good.
+
+    Same per-trade exits under both geometries -> zero effect and zero support,
+    even when the simulator is missing the book by $500.
+    """
+    rows = _spread(42.71)
+    live = _run_dict(42.71, rows, actual=542.71)
+    cand = _run_dict(42.71, rows, actual=542.71)
+    assert live["delta"] == pytest.approx(-500.0, abs=0.01)
+    assert exit_geometry.paired_delta(cand, live) == (0.0, 0)
+
+
+def test_support_count_is_the_number_of_trades_whose_exit_moved():
+    """A $55 delta from one trade and from twelve are different evidence."""
+    live = _run_dict(42.71, [(301, 10.0), (302, 10.0), (303, 22.71)])
+    one = _run_dict(97.71, [(301, 10.0), (302, 10.0), (303, 77.71)])
+    many = _run_dict(97.71, [(301, 28.0), (302, 30.0), (303, 39.71)])
+    assert exit_geometry.paired_delta(one, live) == (55.0, 1)
+    assert exit_geometry.paired_delta(many, live) == (55.0, 3)
+
+
+def test_sub_cent_wobble_is_not_counted_as_a_changed_trade():
+    """Float noise in a rounded sim price must not inflate the support count."""
+    live = _run_dict(42.71, [(301, 21.355), (302, 21.355)])
+    cand = _run_dict(42.71, [(301, 21.3551), (302, 21.3549)])
+    assert exit_geometry.paired_delta(cand, live)[1] == 0
+
+
+def test_the_noise_verdict_now_answers_the_question_it_claims_to(capsys):
+    """The end-to-end consequence, on the recorded numbers.
+
+    The 0.5R/0.25R cell was printed as '+$14.36 within noise'. Its real effect
+    against the running geometry is +$55.00 — still inside a $75.34 budget, so
+    the verdict does NOT flip here and this change is not a licence to declare
+    significance. What changes is that the number being compared is the
+    geometry's effect rather than the geometry's effect minus a simulator bug.
+    """
+    live = _run_dict(ERA_SIM_LIVE, _spread(ERA_SIM_LIVE), geometry="live")
+    cand = _run_dict(ERA_SIM_HALF, _spread(ERA_SIM_HALF), geometry="half")
+    exit_geometry._print_run(cand, ERA_BUDGET, live)
+    out = capsys.readouterr().out
+    assert "vs live $  +55.00" in out
+    assert "within noise" in out
+    assert "[17/17 differ]" in out
+
+
+def test_a_cell_whose_true_effect_clears_the_budget_is_no_longer_hidden(capsys):
+    """The 1R-trail rows: +$98.75 real vs +$58.11 as reported before.
+
+    Under the old scoring this sat below the $75.34 budget and was printed
+    'within noise'; debiased it clears. That is the verdict the ~2026-09-08
+    IMP-040 decision is scheduled to be read off.
+    """
+    live = _run_dict(ERA_SIM_LIVE, _spread(ERA_SIM_LIVE), geometry="live")
+    cand = _run_dict(141.46, _spread(141.46), geometry="trail@1R-0.25R")
+    assert cand["delta"] == pytest.approx(58.11, abs=0.01)
+    assert abs(cand["delta"]) < ERA_BUDGET          # the old, wrong verdict
+    exit_geometry._print_run(cand, ERA_BUDGET, live)
+    out = capsys.readouterr().out
+    assert "vs live $  +98.75" in out
+    assert "clears noise" in out
+
+
+def test_fidelity_rows_are_still_scored_against_the_book(capsys):
+    """The two rows that exist to measure the SIMULATOR keep measuring it.
+
+    Passing no baseline must still print the raw sim-vs-book delta: that is the
+    reproduction error, and hiding it would remove the evidence that the
+    debiasing is needed at all.
+    """
+    live = _run_dict(ERA_SIM_LIVE, _spread(ERA_SIM_LIVE), geometry="live")
+    exit_geometry._print_run(live, None)
+    out = capsys.readouterr().out
+    assert "vs book $  -40.64" in out
+    assert "vs live" not in out
+    assert "differ]" not in out
+
+
+def test_imp040_geometry_is_untouched_by_this_run():
+    """IMP-044 is measurement only: the live ratchet constants must not move.
+
+    IMP-040's window is open until ~2026-09-08 and this change exists to make
+    that verdict computable, not to pre-empt it.
+    """
+    assert config.BREAKEVEN_TRIGGER_R == 0.25
+    assert config.TRAIL_TRIGGER_R == 0.25
+    assert config.TRAIL_DISTANCE_R == 0.25
+    assert config.MIN_STOP_PCT == 1.5
+    assert config.ATR_STOP_MULT == 3.0
+    assert config.MAX_RISK_PCT <= 2.0
+    assert config.DAILY_LOSS_HALT_PCT == 8.0
+    assert config.MAX_CONCURRENT_POSITIONS <= 3

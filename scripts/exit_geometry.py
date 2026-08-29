@@ -13,6 +13,13 @@ geometry to it would be fitting to a dead strategy (2026-08-01 weekly review).
 Read the caveats in bot/exit_sim.py before acting on the output. The baseline
 row's |error| is the simulation noise budget — a what-if delta has to clear it
 to be signal rather than bar-resolution artefact.
+
+Candidate rows are scored against the LIVE geometry replayed by the SAME
+simulator, not against the actual book (IMP-044). The simulator does not
+reproduce the book exactly, and that miss is a property of the simulator, not of
+any geometry — scoring candidates against the book hands every one of them the
+same bias. The self-check is the live row: it must score exactly $0.00 against
+itself.
 """
 
 from __future__ import annotations
@@ -118,16 +125,56 @@ def _mislabelled(result: dict) -> int:
     return sum(1 for r in result["rows"] if r["sim_reason"] != r["actual_reason"])
 
 
-def _print_run(result: dict, budget: float | None) -> None:
-    delta = result["delta"]
+def paired_delta(result: dict, baseline: dict) -> tuple[float, int]:
+    """A candidate's effect vs the LIVE geometry, both under the SAME simulator.
+
+    ``result["delta"]`` scores a candidate against the ACTUAL book, so it carries
+    the simulator's own reproduction error — the amount by which the live
+    geometry, replayed, misses what the bot really banked. That error is a
+    property of the simulator (bar resolution, SIP-vs-IEX), not of any geometry,
+    and it is IDENTICAL in every row: the live geometry's own ``delta`` is pure
+    error, and every candidate inherits it. Worked example, the IMP-040 era on
+    2026-08-28: actual book $83.35, live geometry sims $42.71, so every row was
+    docked $40.64 before it was compared against a $75.34 noise budget. The
+    0.5R-trigger/0.25R-trail cell read ``+$14.36`` — "within noise" — when its
+    effect against the geometry actually running is ``+$55.00``.
+
+    Differencing two runs of the same simulator over the same bars cancels that
+    common term, so the live row scores exactly $0.00 against itself. Returns
+    (delta_vs_live, n_trades_whose_simulated_exit_moved): a delta carried by one
+    trade is fragile in a way a delta carried by twelve is not, and the total
+    alone cannot tell them apart.
+    """
+    by_id = {r["trade_id"]: r["sim_pl"] for r in baseline["rows"]}
+    changed = sum(1 for r in result["rows"]
+                  if abs(r["sim_pl"] - by_id.get(r["trade_id"], r["sim_pl"])) >= 0.005)
+    return round(result["sim_pl"] - baseline["sim_pl"], 2), changed
+
+
+def _print_run(result: dict, budget: float | None,
+               baseline: dict | None = None) -> None:
+    """One scorecard line.
+
+    ``baseline`` is the live geometry replayed by the same simulator. Given it,
+    the row is scored against that (paired, debiased — see ``paired_delta``);
+    without it the row is scored against the actual book, which is only
+    meaningful for the two fidelity rows that exist to measure the simulator.
+    """
+    support = ""
+    if baseline is None:
+        score, label = result["delta"], "vs book"
+    else:
+        score, changed = paired_delta(result, baseline)
+        label = "vs live"
+        support = f"  [{changed}/{result['trades']} differ]"
     verdict = ""
     if budget is not None:
-        verdict = "  ✅ clears noise" if abs(delta) > budget else "  ⚠️ within noise"
+        verdict = "  ✅ clears noise" if abs(score) > budget else "  ⚠️ within noise"
     captured = result["captured_pct"]
     print(f"  {result['geometry']:44s} sim ${result['sim_pl']:8.2f}  "
-          f"delta ${delta:+8.2f}  wins {result['sim_wins']:2d}/{result['trades']:2d}  "
+          f"{label} ${score:+8.2f}  wins {result['sim_wins']:2d}/{result['trades']:2d}  "
           f"captured {captured if captured is not None else float('nan'):5.1f}%"
-          f"{verdict}")
+          f"{verdict}{support}")
 
 
 def main(argv: list[str]) -> int:
@@ -164,6 +211,11 @@ def main(argv: list[str]) -> int:
     _print_run(baseline, None)
     print(f"    exits mislabelled vs recorded: {_mislabelled(baseline)}"
           f"/{baseline['trades']}")
+    print(f"    reproduction error ${baseline['delta']:+.2f}: the simulator's own miss "
+          "on the\n    geometry the bot IS running — a property of the SIMULATOR, not "
+          "of that\n    geometry. Every candidate below is scored against this run "
+          "instead of\n    against the book (IMP-044), so the live geometry scores "
+          "exactly $0.00\n    against itself and no row is docked this amount twice.")
 
     static = ExitGeometry(live.breakeven_trigger_r, live.trail_trigger_r,
                           live.trail_distance_r, live.ratchet_min_pct,
@@ -193,7 +245,7 @@ def main(argv: list[str]) -> int:
     prior = ExitGeometry(live.breakeven_trigger_r, PRE_IMP029_TRAIL_R,
                          PRE_IMP029_TRAIL_R, live.ratchet_min_pct)
     print("\nReverted geometry — what the book would have done WITHOUT IMP-029:")
-    _print_run(replay_geometry(trades, windows, prior, fallbacks), budget)
+    _print_run(replay_geometry(trades, windows, prior, fallbacks), budget, baseline)
     print("    only computable since IMP-030 widened the window past the live exit;"
           "\n    a looser trail holds longer, so truncated bars used to hide it.")
 
@@ -208,13 +260,14 @@ def main(argv: list[str]) -> int:
                 trail_distance_r=dist,
                 ratchet_min_pct=live.ratchet_min_pct,
             )
-            _print_run(replay_geometry(trades, windows, cand, fallbacks), budget)
+            _print_run(replay_geometry(trades, windows, cand, fallbacks),
+                       budget, baseline)
 
     print("\nBreak-even trigger sweep (trail held at the live "
           f"{live.trail_trigger_r:g}R/{live.trail_distance_r:g}R):")
     for cand in breakeven_candidates(live, list(args.breakeven) or BREAKEVEN_SWEEP):
         run = replay_geometry(trades, windows, cand, fallbacks)
-        _print_run(run, budget)
+        _print_run(run, budget, baseline)
         print(f"    armed break-even {run['armed_breakeven']:2d}/{run['trades']}"
               f"   trail-above-entry {run['armed_trail']:2d}/{run['trades']}")
     print("    Lowering the trigger arms the stop on SMALLER excursions: it rescues"
@@ -224,8 +277,11 @@ def main(argv: list[str]) -> int:
           "upper bound only.")
 
     print("\nRead: 'captured %' is realized P&L as a share of total peak open "
-          "profit.\nA delta inside the noise budget is bar-resolution artefact, "
-          "not evidence.")
+          "profit.\n'vs live' is the effect against the geometry the bot is "
+          "running, both replayed\nby the same simulator; '[n/N differ]' is how "
+          "many trades carry it. A delta\ninside the noise budget is "
+          "bar-resolution artefact, not evidence — and one\nthat clears it on a "
+          "single trade is one trade, not a finding.")
     return 0
 
 
