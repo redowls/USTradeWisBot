@@ -279,6 +279,36 @@
 
 Ordered by expected impact; each item needs replay validation before code.
 
+⏳ **LEADING IMP-046 CANDIDATE (filed 2026-08-31 by IMP-045) — give the gate
+   counterfactual a running series.** Every `scripts/gate_monitor` gate-cost
+   report ends *"one session is noise — judge it on the running series, not
+   tonight"*, but the `--since` window path skips `_gate_cost` entirely, so the
+   running series **cannot actually be computed**. Eight sessions of daily
+   reviews have therefore quoted single-day verdicts about the filter that now
+   refuses ~26 candidates a week against ~15 taken. Deliberately not bundled into
+   IMP-045 (one traceable change per run), and **more valuable now that IMP-045
+   has de-biased the per-session number the series would accumulate**.
+   Analysis-only; cannot confound the 09-08 IMP-040 verdict. Note the honest
+   limit: `bot.log` rotations keep 14 days, so the series is bounded by
+   logrotate unless the blocked candidates are persisted (cf. IMP-043).
+
+⏳ **PRE-REGISTERED, BLOCKED UNTIL 2026-09-08 — no-progress exit for the
+   never-armed cohort.** IMP-040-era trades that never reach +0.25R (`stop_raises`
+   = 0) are **9 trades, −$82.89, 11.1% win**, against **15 armed trades, +$184.11,
+   86.7% win** (COST 2026-08-31 is the archetype: held 4h03m, MFE +0.03R,
+   flattened −$10.20). **Must NOT ship before 09-08**: it moves trades out of
+   `EOD_FLATTEN`, which is pre-registered criterion (a) of the IMP-040 verdict.
+   Test to run on 09-08: *if `stop_raises` = 0 at N minutes held predicts a loss
+   at >70% across ≥20 trades, exit at N.*
+
+⏳ **BLOCKED UNTIL 2026-09-08 (third consecutive escalation) — anchor the plan
+   stop to the FILL, not the signal.** `MIN_STOP_PCT` is applied to the signal
+   price, so a slipped entry widens the real 1R: WMT 2026-08-31 planned 1.500%,
+   got **1.649%** (+10.0%). Because every ratchet trigger is R-denominated, an
+   inflated R silently raises the break-even and trail thresholds on exactly the
+   trades that slipped. One-line change; **it changes R, and R is what the 09-08
+   verdict is testing**, so it waits.
+
 🚩🚩 **HUMAN DECISION REQUIRED (2026-08-17) — the routine has now shipped LIVE,
    UNVERSIONED code TWICE, and the failure is silent.** IMP-031 (written 08-11,
    discovered 08-12) and IMP-034 (written 08-14, live from the 08-15 restart,

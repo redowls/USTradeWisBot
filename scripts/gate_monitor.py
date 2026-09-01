@@ -151,13 +151,16 @@ def _first_blocked(lines, date_str: str) -> list[dict]:
 
 
 def _replay_geometry() -> tuple[float, float]:
-    """Bracket the blocked candidates would have been given, as (stop%, target%).
+    """PLAN bracket the blocked candidates would have been given, as (stop%, target%).
+
+    This is the 1R anchor and the take-profit only — the ratchet that rides on
+    top of it is applied by :func:`_replay_blocked`, which reads the live
+    ``exits.compute_trailed_stop`` rather than re-deriving the geometry here.
 
     Uses the MIN_STOP_PCT floor rather than 3xATR because ATR is not recoverable
     from the log. That is deliberately conservative *in favour of the gate*: real
     stops are >= the floor, so a floor-width stop gets hit at least as often as
     the real one, which can only make the blocked set look worse than it was.
-    A verdict of "the gate cost money" computed this way is therefore a lower bound.
     """
     return -float(config.MIN_STOP_PCT), float(config.MIN_STOP_PCT) * float(config.RR_RATIO)
 
@@ -168,26 +171,54 @@ def _replay_blocked(candidates: list[dict], bars_by_symbol: dict, stop_pct: floa
 
     ``bars_by_symbol`` maps symbol -> [{"time": "HH:MM:SS", "high", "low", "close"}]
     for the session, oldest first. Walks each candidate forward from its skip
-    timestamp under the real exit structure (stop / target / 15:55 flatten).
-    When a bar spans both the stop and the target the STOP is taken — pessimistic,
-    matching the same bias as :func:`_replay_geometry`.
+    timestamp under the exit structure the bot ACTUALLY runs: the plan bracket
+    (stop / target / 15:55 flatten) **plus the IMP-013/029/040 ratchet**, taken
+    straight from ``exits.compute_trailed_stop`` so the counterfactual and the
+    live bot can never disagree about the geometry (and so the 09-08 ratchet
+    verdict, whichever way it lands, propagates here for free).
+
+    IMP-045. Before this, the replay used a STATIC bracket and so priced blocked
+    candidates under geometry the bot abandoned on 2026-08-24. The omission is
+    not neutral — it is one-directional *in favour of the gate*, and it inverts
+    verdicts. A candidate that runs past +BREAKEVEN_TRIGGER_R and then reverses
+    exits at/above break-even in reality, but drifts to a red 15:55 close in a
+    static replay, so every such candidate was scored as a loss the gate had
+    "saved" us from. Real case, CRM 2026-08-31 (blocked 11:23:49 @ 260.41): the
+    static replay booked EOD **-0.89%**, the ratchet exits at 12:33 for
+    **+0.13%** — a 1.02pp swing on one name that moved the session verdict from
+    "gate PAID -0.27%/trade" to a -0.06%/trade coin flip.
+
+    Ordering inside a bar is deliberately pessimistic, preserving the "lower
+    bound" property the verdict language claims:
+      * the stop in force is the one raised by *earlier* bars only — a raise
+        computed from this bar's own high can never protect this bar's low;
+      * a bar spanning both legs is taken as the STOP, not the target.
+    ``STOP`` is reported only for a true plan-stop (-1R); a ratchet stop that
+    fired above the plan stop is reported as ``TRAIL``, because conflating the
+    two is exactly what IMP-041 had to unpick in the live book.
     """
+    from bot import exits  # local import: keeps the DB-only path free of broker deps
+
     results = []
     for c in candidates:
         rows = [b for b in (bars_by_symbol.get(c["symbol"]) or []) if b["time"] >= c["time"]]
         if not rows:
             results.append({**c, "outcome": "NO_DATA", "ret_pct": None,
-                            "exit_time": None, "mfe_pct": None, "mae_pct": None})
+                            "exit_time": None, "mfe_pct": None, "mae_pct": None,
+                            "stop_raises": 0, "final_stop": None})
             continue
         entry = c["price"]
-        stop, target = entry * (1 + stop_pct / 100.0), entry * (1 + tp_pct / 100.0)
+        plan_stop = entry * (1 + stop_pct / 100.0)
+        target = entry * (1 + tp_pct / 100.0)
+        stop, peak, raises = plan_stop, entry, 0
         outcome, exit_px, exit_time = "EOD", rows[-1]["close"], rows[-1]["time"]
         mfe = mae = 0.0
         for b in rows:
             mfe = max(mfe, (b["high"] - entry) / entry * 100.0)
             mae = min(mae, (b["low"] - entry) / entry * 100.0)
             if b["low"] <= stop:
-                outcome, exit_px, exit_time = "STOP", stop, b["time"]
+                outcome = "TRAIL" if stop > plan_stop else "STOP"
+                exit_px, exit_time = stop, b["time"]
                 break
             if b["high"] >= target:
                 outcome, exit_px, exit_time = "TP", target, b["time"]
@@ -195,9 +226,18 @@ def _replay_blocked(candidates: list[dict], bars_by_symbol: dict, stop_pct: floa
             if b["time"] >= flatten:
                 outcome, exit_px, exit_time = "EOD", b["close"], b["time"]
                 break
+            # Ratchet LAST: this bar has already resolved, so the raise it
+            # implies only guards the bars that come after it.
+            peak = max(peak, b["high"])
+            raised = exits.compute_trailed_stop(
+                entry, plan_stop, stop, live_price=b["close"], high_price=peak)
+            if raised is not None:
+                stop, raises = raised, raises + 1
         results.append({**c, "outcome": outcome, "exit_time": exit_time,
                         "ret_pct": round((exit_px - entry) / entry * 100.0, 3),
-                        "mfe_pct": round(mfe, 2), "mae_pct": round(mae, 2)})
+                        "mfe_pct": round(mfe, 2), "mae_pct": round(mae, 2),
+                        "stop_raises": raises,
+                        "final_stop": round(stop, 2) if raises else None})
 
     scored = [r for r in results if r["ret_pct"] is not None]
     wins = sum(1 for r in scored if r["ret_pct"] > 0)
@@ -261,8 +301,9 @@ def format_gate_cost(g: dict) -> list[str]:
     if not g.get("candidates"):
         return ["", "IMP-022 opportunity cost: no candidates were blocked this session."]
     lines = ["", f"IMP-022 opportunity cost — replay of the {g['candidates']} blocked "
-                 f"candidate(s) under the real bracket "
-                 f"({g.get('stop_pct', 0):.2f}% stop / +{g.get('tp_pct', 0):.2f}% target):"]
+                 f"candidate(s) under the live geometry "
+                 f"({g.get('stop_pct', 0):.2f}% plan stop / +{g.get('tp_pct', 0):.2f}% target "
+                 f"+ the {config.BREAKEVEN_TRIGGER_R:g}R/{config.TRAIL_DISTANCE_R:g}R ratchet):"]
     if not g["replayed"]:
         lines.append("  (no bars available to replay)")
         return lines
@@ -270,6 +311,11 @@ def format_gate_cost(g: dict) -> list[str]:
     lines.append(f"  if taken: {g['wins']}W/{g['losses']}L   avg {avg:+.2f}% per trade   "
                  f"sum {g['sum_ret_pct']:+.2f}%")
     lines.append("  outcomes: " + ", ".join(f"{k} {v}" for k, v in g["by_outcome"].items()))
+    armed = [r for r in g["results"] if r.get("stop_raises")]
+    if armed:
+        lines.append(f"  ratchet armed on {len(armed)}/{g['replayed']} replayed "
+                     f"({sum(r['stop_raises'] for r in armed)} raises) — "
+                     "a static-bracket replay would score these as losses (IMP-045)")
     lines.append(f"  verdict: {'✅ gate PAID' if g['gate_paid'] else '⚠️ gate COST'} "
                  f"— blocked set would have {'lost' if g['gate_paid'] else 'made'} money "
                  f"({avg:+.2f}%/trade; floor-stop replay, so this is a lower bound)")

@@ -348,6 +348,110 @@ def test_replay_blocked_marks_symbols_without_bars_as_no_data():
     assert g["avg_ret_pct"] is None
 
 
+# ---------------------------------------------------------------------------
+# IMP-045 — the counterfactual must price blocked candidates under the RATCHET
+# the bot actually runs, not the static bracket it abandoned on 2026-08-24.
+#
+# Fixture is the REAL CRM path of 2026-08-31 (1-minute SIP bars, verbatim).
+# CRM was VWAP-blocked at 11:23:49 @ 260.41 and ran to 262.19 (+0.68%, well past
+# the +0.25R = +0.375% break-even trigger) before reversing to close at 257.635.
+#   static bracket : never touches -1.5% or +2.25%  -> EOD  -0.89%
+#   live ratchet   : break-even at 11:54, trail to 260.75 at 12:01, hit 12:33
+#                    -> TRAIL +0.13%
+# A 1.02pp swing on ONE name, and it moved the session verdict from
+# "gate PAID -0.27%/trade" to a -0.06%/trade coin flip.
+# ---------------------------------------------------------------------------
+
+CRM_20260831 = _bars(
+    ("11:24:00", 260.74, 260.4, 260.405),
+    ("11:54:00", 261.705, 260.84, 261.16),    # peak 261.705 >= +0.25R -> stop to entry
+    ("12:01:00", 261.8, 261.56, 261.73),      # close 261.73 -> trail to 260.75
+    ("12:33:00", 260.82, 260.675, 260.82),    # low 260.675 takes the ratchet stop
+    ("15:55:00", 258.48, 258.03, 258.085),    # where the static replay would have exited
+    ("15:59:00", 258.07, 257.47, 257.635),
+)
+CRM_BLOCKED = [{"symbol": "CRM", "time": "11:23:49", "price": 260.41,
+                "stretch_pct": 0.39, "vwap": 259.40}]
+
+
+def test_replay_blocked_banks_crm_20260831_on_the_ratchet_not_the_eod_close():
+    g = gm._replay_blocked(CRM_BLOCKED, {"CRM": CRM_20260831}, -1.5, 2.25)
+    r = g["results"][0]
+    assert r["outcome"] == "TRAIL"          # NOT the plan stop, and NOT EOD
+    assert r["exit_time"] == "12:33:00"
+    assert r["ret_pct"] == pytest.approx(0.131, abs=0.005)
+    assert r["stop_raises"] == 2
+    assert r["final_stop"] == pytest.approx(260.75, abs=0.01)
+    # the excursion that armed it is real (+0.53% by the exit bar, past +0.375%)
+    assert r["mfe_pct"] == pytest.approx(0.53, abs=0.02)
+    assert g["gate_paid"] is False           # blocked set made money -> gate COST
+
+
+def test_replay_blocked_static_bracket_would_have_scored_crm_as_a_loss():
+    """The bug this fixes: with the ratchet off, CRM drifts to a red 15:55 close."""
+    import bot.config as cfg
+    prev = cfg.TRAILING_STOP_ENABLED
+    cfg.TRAILING_STOP_ENABLED = False        # exits.compute_trailed_stop -> None
+    try:
+        g = gm._replay_blocked(CRM_BLOCKED, {"CRM": CRM_20260831}, -1.5, 2.25)
+    finally:
+        cfg.TRAILING_STOP_ENABLED = prev
+    r = g["results"][0]
+    assert r["outcome"] == "EOD"
+    assert r["ret_pct"] == pytest.approx(-0.893, abs=0.005)
+    assert r["stop_raises"] == 0 and r["final_stop"] is None
+    assert g["gate_paid"] is True            # the inverted verdict, verbatim
+
+
+def test_replay_blocked_labels_plan_stop_and_ratchet_stop_apart():
+    """IMP-041's lesson: a -1R plan stop and a break-even scratch are not one bucket."""
+    plan = gm._replay_blocked(
+        [{"symbol": "P", "time": "10:00:00", "price": 100.0, "stretch_pct": 1.0, "vwap": 99.0}],
+        {"P": _bars(("10:01:00", 100.1, 98.4, 98.5))}, -1.5, 2.25)
+    assert plan["results"][0]["outcome"] == "STOP"
+    assert plan["results"][0]["ret_pct"] == pytest.approx(-1.5)
+    assert plan["results"][0]["stop_raises"] == 0
+    assert plan["by_outcome"] == {"STOP": 1}
+
+
+def test_replay_blocked_raise_cannot_protect_the_bar_that_produced_it():
+    """No look-ahead: a bar that spikes past the trigger AND collapses is a plan stop.
+
+    Entry 100 (1R = 1.5). The bar prints 101.0 (+0.67R, past the 0.25R trigger)
+    and 98.4 in the same minute. Order within a bar is unknowable, so the stop in
+    force stays the plan stop -1.5% and the exit is a full -1R, never a scratch.
+    """
+    g = gm._replay_blocked(
+        [{"symbol": "Q", "time": "10:00:00", "price": 100.0, "stretch_pct": 1.0, "vwap": 99.0}],
+        {"Q": _bars(("10:01:00", 101.0, 98.4, 98.6))}, -1.5, 2.25)
+    assert g["results"][0]["outcome"] == "STOP"
+    assert g["results"][0]["ret_pct"] == pytest.approx(-1.5)
+
+
+def test_replay_blocked_tracks_the_live_ratchet_config():
+    """Parity guard: the replay reads exits.compute_trailed_stop, so a ratchet
+    config change (e.g. whatever the 09-08 IMP-040 verdict decides) propagates
+    here automatically instead of silently leaving the audit on stale geometry."""
+    import bot.config as cfg
+    prev = (cfg.BREAKEVEN_TRIGGER_R, cfg.TRAIL_TRIGGER_R)
+    # 0.9R = +1.35%; CRM's +0.53% excursion cannot arm either stage
+    cfg.BREAKEVEN_TRIGGER_R = cfg.TRAIL_TRIGGER_R = 0.9
+    try:
+        g = gm._replay_blocked(CRM_BLOCKED, {"CRM": CRM_20260831}, -1.5, 2.25)
+    finally:
+        cfg.BREAKEVEN_TRIGGER_R, cfg.TRAIL_TRIGGER_R = prev
+    assert g["results"][0]["outcome"] == "EOD"
+    assert g["results"][0]["stop_raises"] == 0
+
+
+def test_format_gate_cost_reports_the_ratchet_and_keeps_the_lower_bound_claim():
+    txt = "\n".join(gm.format_gate_cost(
+        gm._replay_blocked(CRM_BLOCKED, {"CRM": CRM_20260831}, -1.5, 2.25)))
+    assert "ratchet" in txt                  # header names the real geometry
+    assert "ratchet armed on 1/1 replayed (2 raises)" in txt
+    assert "lower bound" in txt              # now actually true (IMP-045)
+
+
 def test_format_gate_cost_renders_verdict_and_degrades_cleanly():
     cands = gm._first_blocked(REAL_LOG_20260803, "2026-08-03")
     bars = {"NVDA": _bars(("10:02:00", 207.50, 202.20, 207.20))}
