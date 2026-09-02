@@ -15,7 +15,38 @@ from __future__ import annotations
 
 import sys
 
-from bot import analytics
+from bot import analytics, doctrine
+
+
+def _print_doctrine(rows) -> None:
+    """The stop-exit doctrine block — true win rate beside the headline one.
+
+    Printed directly under the headline metrics because it is meant to be read
+    *against* them: when ``win_rate`` and ``true win rate`` diverge, the true one
+    governs the verdict. See bot/doctrine.py for the bucket definitions and the
+    standing user directive they implement.
+    """
+    d = doctrine.summarize(rows)
+    if d["trades"] == 0:
+        return
+    k = d["fail_kinds"]
+    print("\nStop-exit doctrine (a stop is a failed trade, whatever the P&L sign):")
+    print(f"  Stop rate     : {d['stops']}/{d['trades']} ({d['stop_rate']}%)")
+    print(f"  WIN / SCRATCH / FAIL : {d['win']} / {d['scratch']} / {d['fail']}"
+          f"   (FAIL: full-1R {k['full-1R']} · break-even {k['break-even']}"
+          f" · faded {k['faded']})")
+    print(f"  True win rate : {d['true_win_rate']}%   (headline "
+          f"{d['headline_win_rate']}%)")
+    avg_r = "n/a" if d["avg_r"] is None else f"{d['avg_r']:+.3f}R"
+    print(f"  FAIL+SCRATCH  : {d['fail_scratch_share']}%   avg banked {avg_r}")
+
+    esc = doctrine.escalation_verdict(rows)
+    if esc["escalated"]:
+        print(f"  ⚠️  ESCALATED — FAIL+SCRATCH {esc['fail_scratch_share']}% >= "
+              f"{esc['threshold']}% across the last 3 sessions with trades "
+              f"({', '.join(esc['sessions'])}).")
+        print("      Stop shipping parameter tweaks; the signal itself is the "
+              "suspect. Hand it to the weekly review with these numbers.")
 
 
 def _print_report(since=None) -> int:
@@ -43,6 +74,8 @@ def _print_report(since=None) -> int:
     print(f"Profit factor : {m['profit_factor']}")
     print(f"False-breakout: {m['false_breakout_rate']}%  (breakouts that stopped out)")
     print(f"Exit reasons  : {m['exit_reasons']}")
+
+    _print_doctrine(rows)
 
     def _pf(s):
         return "  n/a" if s["profit_factor"] is None else f"{s['profit_factor']:5.2f}"
