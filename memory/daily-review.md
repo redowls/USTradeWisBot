@@ -18,6 +18,13 @@ Entry template:
 (trades, wins/losses, net P&L $, win rate, avg win vs avg loss, profit factor,
 account equity; "no trades today" + why is a valid entry)
 
+### Stop-exit accounting
+(**a stop is a failed trade whatever the P&L sign** — the stop-exit doctrine in the
+routine prompt. Report: stop rate = stop-driven exits / closed trades; the
+WIN / SCRATCH / FAIL split with FAIL broken into full-stop vs break-even-or-scratched
+trail; true win rate vs headline win rate; the trailing-10-session stop rate; and the
+dominant failure cause — entry quality / stop geometry / profit capture)
+
 ### Trade-by-trade review
 (per trade: symbol, entry/exit time & price, confidence score, exit reason
 (stop/trail/target/time-flatten), P&L, and the root cause — false breakout,
@@ -2531,5 +2538,97 @@ Auditing the instrument that justifies it found a real defect, fixed tonight as 
 - **Regime note for tomorrow:** 2026-09-01 is a **normal trading session** (US markets are open; Labor Day 2026 falls on **Mon 2026-09-07**, not 09-01 — the 08-29 weekly review stated this incorrectly and the error should not be carried forward into position sizing). **Fri 09-05 is Nonfarm Payrolls.**
 - ⚠️ **Pre-existing uncommitted work left exactly as found for a SEVENTH run** — `bot/analytics.py`, `bot/exit_sim.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py`, plus untracked `backtest_result.json` / `gate_monitor_result.json`. **Nothing staged, nothing reverted. IMP-045 imports none of them** — it edits `scripts/gate_monitor.py` and reuses `bot/exits.compute_trailed_stop`, both committed. The 08-29 weekly's item (b) asked for this to be committed "first action Monday, no exceptions"; **the routine's standing rule forbids me staging files I did not touch, so the conflict is escalated, not resolved.** This is a human decision: adopt or discard.
 - Equity **$7,529.50 (−24.70%)** — fourth consecutive close above $7,500. ⚠️ **Still does not close the −25% escalation**, an open human decision point in its nineteenth session, nor the 08-22 weekly's retire-or-rebuild call. **Posture unchanged: no adds, no widened risk, no discretionary re-enables, no manufactured activity.**
+
+---
+
+## 2026-09-01 — Daily Review
+
+### Stats
+- **1 trade, 1W / 0L (headline 100%), net +$15.33 (+0.204%).** Equity **$7,529.34 → $7,544.67**. **Fifth consecutive close above the $7,500 / −25% line**; drawdown from $10,000 narrows −24.71% → **−24.55%**, the shallowest since 08-13. The single quietest session of the incubation by trade count.
+- One trade means avg win **+$15.33**, no losers, **profit factor undefined**, expectancy **+$15.33/trade**. **None of those three numbers means anything at n=1** and none is carried forward.
+- Exit mix: **STOP 1 (ratcheted, +$15.33)**. Zero `EOD_FLATTEN`, zero `TAKE_PROFIT`, zero plan stops. **The bot held nothing into the 15:55 flatten for the first time since 08-13.**
+- Intraday equity (broker portfolio-history, 15-min): open **$7,529.34**, **peak $7,553.84 (+$24.50) at 11:00**, banked at **$7,544.67** on the 11:10 stop fill, then a flat line for the remaining 4h50m. **Max intraday drawdown $9.17 (−0.121%)** — the open position gave back **37% of its mark-to-market peak** between 11:00 and the fill. The −8.0% halt was never remotely near.
+- **Broker reconciles to $0.00.** Alpaca `equity` **$7,544.67** = DB `equity_close` exactly; `last_equity` **$7,529.34** = `equity_open` exactly; `cash` = `equity` (flat); **0 positions, `long_market_value` $0, 0 open orders**, ACTIVE, `trading_blocked` false. The whole day is one bracket chain (entry `987d6c21`, TP leg `6c42fec9` cancelled 15:10:15Z when the stop filled, stop leg `fe41ff32` filled 106.126522). **No orphans, no qty drift, no overnight carry — flat for the 47th consecutive night.** ⚠️ **Zero fee drag today** (the $0.16 item is closed and was not re-opened).
+- Signal: **1/1 `signal_type = MA`, `breakout_score` 0.0000, `broke_level` NULL, confidence 60.21.** **The breakout leg has now been dormant for 28 trading sessions** (last breakout-scored fill 2026-07-24). `momentum_score` 1.00, `ma_score` 1.00, `value_score` 0.76.
+- **Sizing matched the plan.** 23 shares, 1R = $1.52/share = **$34.96 = 0.464% of equity** — the conf-60 rung of IMP-035's flattened ladder, nowhere near `MAX_RISK_PCT` 2.0. IMP-037 did not need to fire.
+- **`ATR_STOP_MULT = 3.0` did not bind: the stop was the `MIN_STOP_PCT` floor** — 1.4974% below the **signal** price 105.52.
+- **★ The signal-anchored stop defect ran in the bot's FAVOUR today, which is the cleanest possible proof it is a defect.** The fill came in at **105.46, six cents BETTER than the 105.52 signal** (−0.057%, the first favourable entry slippage since 08-25), so the real 1R was **1.441% of the fill instead of the intended 1.500% — R came in 4% NARROW.** On 08-31 the same mechanism made WMT's R **10% WIDE**. **The stop is anchored to a price the bot does not trade at, and the error is a coin flip in sign.** Fourth consecutive week recorded, still owned by the weekly, still frozen until 09-08.
+- Reliability: **zero `ERROR` / `Traceback` / `CRITICAL` / `UNPROTECTED` / `SOFT STOP` / `FLATTEN REJECTED` lines in the entire session.** No flatten was needed. **`NRestarts=0`.**
+- ⚠️ **One unplanned restart at 23:17:54 UTC — cause identified and benign, and it is the SAME recurring host event as 08-31.** `apt-daily-upgrade.service` (unattended-upgrades) cycled units at 23:17:30; `ustradewisbot` stopped cleanly and started clean. **3h18m after the close, market shut, account flat, zero trading impact.** Third occurrence logged across the two bots (USTradeBot 08-26, this bot 08-31 and 09-01). **Host-level, not a bot fault — but it resets restart-forensics reasoning and can mask a real crash, so it keeps getting logged.**
+
+### Stop-exit accounting
+- **Stop rate: 1/1 (100%).** Every exit today was a stop being touched.
+- **WIN 0 · SCRATCH 1 · FAIL 0.** FAIL split: full-1R **0** / break-even **0**. `EOD_FLATTEN` faded/drifted-up split: **0 / 0** (no flattens).
+- **True win rate 0.0% — against a headline win rate of 100.0%.** ★ **This is the single widest divergence the doctrine has produced on this bot, and it happened on a green, clean, well-executed day.** WMT #314 banked **+0.438R** against a **+1.0R** bar. It is a SCRATCH.
+- **Trailing 10 sessions (2026-08-19 → 2026-09-01, 36 trades): stop rate 47.2% (17/36). WIN 3 · SCRATCH 18 · FAIL 15** (full-1R **3**, break-even **7**, faded **5**). **True win rate 8.3% vs headline 55.6%.** Net +$139.57, **avg banked +0.106R**.
+- ⚠️ **ESCALATION CLAUSE TRIGGERED. FAIL+SCRATCH = 100.0% across the last three sessions with trades (08-28, 08-31, 09-01), and 91.7% across the trailing ten.** Under the standing directive this stops parameter tweaks and hands a structural finding to the weekly. **It is handed over below, with numbers.**
+- **Dominant failure cause: STOP GEOMETRY — specifically the R denominator. It is NOT profit capture, and today's evidence overturns the standing 08-31 reading that "MFE retention is the honest problem".**
+
+### ★★ The structural finding — 92% of trades never offer +1R, so no exit rule can bank one
+Measured over the trailing 10 sessions (36 trades, 1-min bars, MFE taken from entry to the actual exit; method reproducible from `scripts.ratchet_audit.bars_by_trade`):
+
+| MFE reached | trades | share |
+|---|---|---|
+| ≥ 0.25R | 24/36 | 67% |
+| ≥ 0.50R | 15/36 | 42% |
+| ≥ 0.75R | 6/36 | 17% |
+| **≥ 1.00R** | **3/36** | **8%** |
+
+- **All three trades that printed +1R were banked as WINs** (AAPL #267 and CRM #268 on 08-19, INTC #298 on 08-27 — all three `TAKE_PROFIT`). **The exit machinery's conversion rate on trades that reach the WIN bar is 3/3 = 100%.**
+- **The other 33 trades could not have become WINs under any exit rule whatsoever**, because the price never went there. A trail cannot bank +1R out of a move that peaks at +0.4R.
+- **The arithmetic behind it: median R = 1.535% of entry** (22 of 36 sit exactly on the `MIN_STOP_PCT` 1.5% floor), **while median MFE = 0.571% of entry = 0.37R.** **The risk unit is ~4× the median favourable excursion.** A +1R win therefore requires a 1.54% intraday move *after entry*, on a board whose median name has a 2.0% daily ATR.
+- **Consequence for the standing narrative: the 19.3% mean MFE retention quoted since 08-24 is arithmetically inevitable, not a defect.** A 0.25R trail sitting under a 0.37R peak *must* give back most of it. **Retention was never the disease; it is a symptom of R being too wide for the moves this signal finds.**
+- **The `trailed` band is now proven to be the blend the doctrine warned about:** over these 10 sessions it holds **10 trades, 100% headline win rate, +$115.10 — and 0 true WINs.** Every one is a SCRATCH. This is exactly why IMP-046 shipped tonight.
+
+**Structural proposal, handed to the weekly review, NOT shipped:** halve the stop-width floor (`MIN_STOP_PCT` 1.5 → ~0.75) so R matches the excursion the signal actually produces. **This does not widen risk** — sizing is risk-based, so a narrower stop buys more shares and **1R stays the same dollar amount**; `MAX_RISK_PCT` 2.0 is untouched. Bar-ordered screen over the same 36 trades (conservative: when a bar touches both, the stop wins):
+
+| outcome under a half-width stop | trades | share |
+|---|---|---|
+| reached +1R′ **before** being stopped (WIN-eligible) | **14** | **39%** |
+| stopped at −1R′ first | 7 | 19% |
+| neither, still open at the real exit | 15 | 42% |
+
+- **WIN-eligible trades go 3 → 14.** The cost is concentrated and must not be hidden: **INTC #298 (+$60.84, the window's best trade) had MAE −0.77R and would have been stopped out**, and three trades that are small losers today (NFLX −$14.23, AMZN −$15.31, TSM −$8.55) would become full −1R losses. **First-order cost ≈ −$160; the gain depends on how many of the 11 new WIN-eligible trades the ratchet actually converts, which a screen cannot answer.**
+- ⚠️ **This was tried once and failed: the 2026-06-10 session tripped the −3% halt with 7/8 stops under 0.8%, which is exactly why the floor was widened to 1.5%.** The honest counterargument is that 06-10 had **no VWAP gate, no IMP-013 break-even, and no IMP-040 ratchet** — the three mechanisms that now decide most exits. **That is an argument for re-testing it, not for assuming it works.** The weekly owns the full replay.
+- ⚠️ **It must NOT ship before 09-08.** Changing `MIN_STOP_PCT` changes R, R denominates every ratchet trigger, and the ratchet is the dependent variable of the IMP-040 verdict. Same freeze, same reason, as the stop-anchoring fix and the no-progress exit.
+
+### Trade-by-trade review
+**1. WMT #314 — 23 sh @ 105.46 (09:42:44) → 106.1265 (11:10:16), STOP (ratcheted), +$15.33 (+0.632%), conf 60.21, held 1h27m.**
+1R = $1.52 (1.441% of the fill). **MFE +1.11% (+0.77R); captured +0.438R — 57% MFE retention, the best of the trailing 10 sessions against a 19.3% mean.** MAE only −0.11R; it was never in trouble. Five `STOP RAISED` events: 103.94 → **105.48 at 10:14** (the first raise skipped the break-even stage and went straight to the 0.25R trail, live 105.86 = +0.263R) → 105.72 → 105.88 → 106.00 → **106.15 at 10:54** (live 106.53, peak 106.47). Filled at 106.1265, **2.35¢ through the stop (−$0.54 slippage)**.
+- **Root cause of the result: the entry was right, the tape was right, and the exit was close to optimal.** WMT's post-entry high was **106.63** and — verified on the full-session bars — **it never traded above that for the remaining 4h50m.** The ratchet exited **$0.50 below the day's high on a name that then went nowhere.** There is no exit rule available that would have banked materially more from this trade.
+- **Root cause of it being a SCRATCH rather than a WIN: amplitude, i.e. stop geometry.** The move was **0.77R**. A +1R win needed WMT to travel **1.54%** after entry; it travelled **1.11%** and stopped. **Nothing in the entry logic, the stop logic or the exit logic failed. The R denominator is simply larger than the opportunity.** This single trade is the whole structural finding in miniature, which is why it is the anchor regression case in `tests/test_doctrine.py`.
+- **Sector read:** WMT is a defensive, and 09-01 was a risk-off session with defensives and energy the only green pockets — **the third session in four in which sector alignment did more work than the signal did.**
+
+### Market context
+Perplexity `sonar` answered; regime read usable, **name-level coverage blind on all 8 tickers asked (WMT, META, BAC, NVDA, XOM, TSLA, QQQ, AAPL) — the EIGHTH consecutive run.** It returned "no specific same-day catalyst identified" for six of eight and sector prose for the rest. **The standing three-clause rule holds unamended: regime lead only — never names, never its mover list, never the macro calendar.**
+**2026-09-01 was a risk-off, non-trending session driven by an oil shock and a bond sell-off: S&P 500 and Nasdaq both finished lower** (sonar's own close prints disagree across sources by ~0.7pp, which is itself a reason not to lean on it), **with high-multiple tech/growth sold on the yield backup and energy the supported sector.** This is exactly the tape the pre-market research predicted from the Kharg Island escalation, Brent +4.46%, and a 66.4% priced probability of a September Fed **hike**.
+**The bot took one trade, in a defensive, and finished +0.204% on a day both indices closed red.** For a long-only intraday breakout bot facing a two-way headline-driven hawkish tape, **one selective trade is the correct behaviour, not underperformance** — and the 40 gate refusals below are why.
+
+### Gate activity
+**40 VWAP refusals across 8 symbols against 1 taken: META×19, BAC×7, WMT×6, NVDA×3, XOM×2, TSLA×1, QQQ×1, AAPL×1.** Deduped to first-attempt that is **8 blocked candidates against 1 fill — the gate decided 89% of the session.**
+- **META is the standout: 19 refusals, every one at +1.09% to +1.33% above VWAP.** Structurally unbuyable under a 0.25% gate all afternoon, the same shape TSLA showed on 08-31.
+- **WMT's 6 refusals (13:27–13:39 ET) came AFTER its 09:42 fill and are re-entry attempts** — the gate correctly declined to re-buy a name that had already stopped out for a profit, at 106.31–106.37 against a 106.03 VWAP. **The stock's post-entry high was 106.63 and it closed below that: every one of the six refusals was correct.**
+- **No gate counterfactual is quoted for today.** IMP-045 (last night) de-biased `_replay_blocked`, but the running series it enables **still cannot be computed** — `--since` skips `_gate_cost` entirely. That gap is the leading IMP-047 candidate and is now the fifth consecutive review to say so.
+
+### What worked / what didn't
+- **Worked:** Everything mechanical. The entry filled 6¢ better than signal, the ratchet raised five times and exited within $0.50 of the name's high, the broker reconciled to $0.00, the account was flat overnight for the 47th night, max drawdown was −0.121%, and there were zero errors. **The gate blocked 8 candidates on a risk-off tape and admitted the one that worked.** The bot finished green against two red indices.
+- **Didn't:** **Nothing failed — and the day still produced 0 true wins.** That is the finding. **A perfectly executed session cannot clear the +1R bar because the bar sits at 1.54% of price and the signal's median excursion is 0.57%.** Secondary: the breakout leg is dormant for a 28th session (this is an MA-only bot in practice), and the signal-anchored stop mis-set R for the fourth straight week — this time in our favour.
+
+### Lessons & improvement candidates
+1. **★ SHIPPED as IMP-046 — `bot/doctrine.py`, the WIN/SCRATCH/FAIL classifier, wired into `scripts.report`.** Chosen because the escalation clause **forbids** parameter tweaks tonight and the 09-08 freeze **forbids** any change to R, the ratchet, or the trade population — while the one thing every downstream reader now needs is a single shared, tested definition of a win. **It touches no live path** (the engine does not import it), so it cannot confound the 09-08 verdict. 504 tests pass. Detail in `memory/improvement-log.md`.
+2. **★★★ THE STRUCTURAL FINDING IS THE REAL OUTPUT OF TONIGHT, and it is handed to the 09-08 weekly:** *92% of trades never print +1R; the exit machinery converts 3/3 of the ones that do; R is ~4× the median favourable excursion.* **The weekly must run the full replay of `MIN_STOP_PCT` 1.5 → 0.75 (sizing held risk-based, `MAX_RISK_PCT` unchanged) and judge it on expectancy and payoff, not on stop rate — which will RISE, and is allowed to.** All numbers, the counter-case (INTC #298 dies), and the 06-10 precedent are recorded above.
+3. **★★ Do NOT read "0 true wins" as "the machinery is broken".** Today's trade was managed about as well as it could be. **The failure is upstream of every exit rule.** The next run that is tempted to tighten the trail, add a no-progress exit, or re-tune the ratchet in response to a low true win rate should re-read the MFE table first — those levers cannot manufacture a +1R move.
+4. **Pre-registered and still withheld (unchanged): the no-progress exit** for the never-armed cohort. **Zero never-armed trades today** (WMT armed at 10:14), so the cohort stays at **9 trades, −$82.89, 11.1% win**. Do not ship before 09-08.
+5. **Do NOT touch the ratchet.** Today is 1 for 1 with 57% MFE retention and an exit $0.50 off the high. **Verdict 09-08; if it fails, widen toward 0.35R, never tighten.**
+
+### Notes for pre-market research
+- **META — the day's most-refused name (19 attempts), and the TSLA-of-08-31 question all over again.** It sat +1.09% to +1.33% above VWAP for the whole afternoon and was structurally unbuyable. **Not a removal case on this log's own precedent (a refusal costs nothing, and a park needs a fill) — but worth asking whether it is in a persistent extension regime like CRM.**
+- **WMT — the day's only fill, and a good one (+$15.33, 5 stop raises, 57% MFE retention, exited $0.50 off its high).** ⚠️ **Its registered park trigger (next full-1R STOP parks it, until it closes back above the 50MA) did NOT fire — today's exit was a ratcheted stop for a profit, and it is now 2W/4 +$19.88 over the last ten sessions.** Thirteenth session live and un-fired. Chart was already repairing on 08-31.
+- **BAC — 7 refusals and no fill; first appearance near the top of the refusal list.** No action, but note it is signalling again after no fill since 08-12.
+- **NVDA (3), XOM (2), TSLA (1), QQQ (1), AAPL (1) — all refused, all correct, none took a fill.** XOM signalled into the energy bid but was stretched; TSLA's single refusal is consistent with its registered **DO-NOT-PARK** status.
+- **No trade reached the take-profit and none was flattened** — so **no registered trigger on the board can have fired today** (every one requires a full-1R stop, and there were none). AMZN's and UNH's triggers remain live and un-fired.
+- **Regime note for tomorrow:** ⚠️ **AVGO reports Wed 09-02 AMC** — its date leg opens the morning AFTER the print, so 09-03 maturing is still not by itself a re-enable. **August NFP is Fri 09-04 08:30 ET, pre-open (there is NO 09-05 session); Labor Day is Mon 09-07.** The 08-31 review's "Fri 09-05 is NFP" was wrong and was corrected by the 09-01 pre-market run — **do not carry it forward again.**
+- ⚠️ **Pre-existing uncommitted work left exactly as found for a NINTH run** — `bot/analytics.py`, `bot/exit_sim.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py`, plus untracked `backtest_result.json` / `gate_monitor_result.json`. **Nothing staged, nothing reverted.** ⚠️ **IMP-046 was deliberately built as a NEW module rather than as extra bands inside `bot/analytics.py` partly for this reason** — editing analytics.py would have forced me either to stage someone else's uncommitted momentum work or to leave the repo in a worse state. **`bot/exit_sim.py` remains a direct input to the 09-08 IMP-040 verdict and is still not in version control; a `git checkout` would silently revert it.** The routine forbids staging files it did not touch. **Escalated for the fourth review running — this is a human decision: adopt or discard.**
+- Equity **$7,544.67 (−24.55%)** — fifth consecutive close above $7,500 and the shallowest drawdown since 08-13. ⚠️ **Still does not close the −25% escalation**, an open human decision point in its twenty-first session, nor the 08-22 weekly's retire-or-rebuild call. ⚠️ **And it must now be read against a true win rate of 8.3% over ten sessions.** **Posture unchanged: no adds, no widened risk, no discretionary re-enables, no manufactured activity.**
 
 ---

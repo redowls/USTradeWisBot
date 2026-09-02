@@ -19,6 +19,11 @@ Entry template:
 ### Stats
 (trades, win rate, net P&L $, profit factor, equity start → end, best/worst trade)
 
+### Stop-exit accounting (week)
+(stop rate and true win rate vs the headline win rate, this week AND the prior 4-6
+weeks so the trend is visible; WIN / SCRATCH / FAIL split; whether the win column was
+padded by break-even stops; whether this week's IMPs moved the FAIL+SCRATCH share)
+
 ### Grade rationale
 (why this grade — results AND process)
 
