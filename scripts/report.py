@@ -37,6 +37,11 @@ def _print_doctrine(rows) -> None:
           f" · faded {k['faded']})")
     print(f"  True win rate : {d['true_win_rate']}%   (headline "
           f"{d['headline_win_rate']}%)")
+    bar = doctrine.breakeven_true_win_rate(rows)
+    if bar is not None:
+        gap = "clears" if d["true_win_rate"] >= bar else "BELOW"
+        print(f"  Break-even bar: {bar}% true wins needed at this book's own "
+              f"payoff — {gap}")
     avg_r = "n/a" if d["avg_r"] is None else f"{d['avg_r']:+.3f}R"
     print(f"  FAIL+SCRATCH  : {d['fail_scratch_share']}%   avg banked {avg_r}")
 

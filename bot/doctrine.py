@@ -181,6 +181,40 @@ def summarize(rows: list[dict]) -> dict:
     }
 
 
+def breakeven_true_win_rate(rows: list[dict]) -> float | None:
+    """The true win rate this book must clear to break even at its OWN payoff.
+
+    Expectancy in R is ``p * avgR(WIN) + (1 - p) * avgR(non-WIN)``; setting it to
+    zero and solving for ``p`` gives the share of WINs the strategy needs at the
+    payoff it actually realises. Returned as a percentage, or None when it cannot
+    be computed — no usable R, an empty WIN or non-WIN cohort, or a non-WIN cohort
+    that is not losing money (nothing to break even against).
+
+    This is a *derived* bar, not a tuned one: it is expectancy re-expressed, so it
+    cannot be passed by widening a stop or loosening a filter — those move
+    ``avgR(non-WIN)`` and drag the bar up with it. That is exactly the property
+    the doctrine's anti-gaming rules ask for, and it is why this belongs beside
+    the buckets rather than as a hand-set constant. Re-derive it; never hand-tune
+    it to make a verdict read better.
+
+    Pure — no DB, no network.
+    """
+    wins: list[float] = []
+    rest: list[float] = []
+    for row in rows:
+        r = profit_r(row)
+        if r is None:
+            continue
+        (wins if classify(row) == WIN else rest).append(r)
+    if not wins or not rest:
+        return None
+    avg_win = sum(wins) / len(wins)
+    avg_rest = sum(rest) / len(rest)
+    if avg_rest >= 0 or avg_win <= avg_rest:
+        return None
+    return round(100.0 * -avg_rest / (avg_win - avg_rest), 1)
+
+
 def by_session(rows: list[dict]) -> dict:
     """{exit date -> summarize(rows of that session)}, sessions with trades only.
 

@@ -91,6 +91,24 @@ def _bucket(pls: list[float]) -> dict:
     }
 
 
+def _entry_date(row: dict) -> date | None:
+    """Calendar date of a trade's entry fill, or None when missing/unparseable.
+
+    Used to split a cohort into pre- and post-veto eras (IMP-047). Pure.
+    """
+    et = row.get("entry_time")
+    if isinstance(et, str):
+        try:
+            et = datetime.fromisoformat(et)
+        except ValueError:
+            return None
+    if isinstance(et, datetime):
+        return et.date()
+    if isinstance(et, date):
+        return et
+    return None
+
+
 def _extension_pct(row: dict) -> float | None:
     """How far above the broken level a breakout filled, as a % of the level.
 
@@ -496,9 +514,32 @@ def compute_metrics(rows: list[dict]) -> dict:
     by_tod = by_time_of_day(closed)
 
     # False-breakout rate: of breakout-driven trades, the share that stopped out.
+    #
+    # ERA-SPLIT (IMP-047, 2026-09-03). IMP-021's BREAKOUT_FADE_CEILING (0.5) sits
+    # BELOW the analytic floor of signals.breakout_score: a level carrying the
+    # MIN_LEVEL_TOUCHES touches levels.py clusters for scores at least
+    # 0.45 + 0.20*(2/3) = 0.583, and the lowest of the 74 breakout-bearing signals
+    # ever recorded was 0.5611. The veto therefore removes 100% of breakouts, not
+    # the worst of them — IMP-021's own 2026-08-01 note said so and told the next
+    # run to re-scope the report verdict around the MA/VWAP system that actually
+    # trades. The last breakout-bearing signal was 2026-07-24, so this cohort is
+    # frozen: the rate can never move again, and gating the verdict on it made
+    # "NEEDS WORK" unfalsifiable regardless of live performance. Keep the all-time
+    # figure (it is real history, and the evidence the veto rests on) but publish
+    # whether the leg can still trade, so incubation_verdict only judges on it
+    # while it is live.
     bo = [r for r in closed if (r.get("signal_type") in ("BREAKOUT", "BOTH"))]
     fb_rate = (round(100 * sum(1 for r in bo if r.get("exit_reason") == "STOP") / len(bo), 1)
                if bo else None)
+    bo_live = [r for r in bo
+               if (ed := _entry_date(r)) is not None
+               and ed >= config.BREAKOUT_VETO_LIVE_FROM]
+
+    # Stop-exit doctrine numbers, so the verdict can be judged on the true win
+    # rate the standing directive says governs it. Imported here rather than at
+    # module scope because bot.doctrine imports from bot.analytics.
+    from . import doctrine  # noqa: PLC0415 — deliberate, breaks the import cycle
+    dsum = doctrine.summarize(closed)
 
     return {
         "trades": n,
@@ -519,6 +560,9 @@ def compute_metrics(rows: list[dict]) -> dict:
         "by_time_of_day": by_tod,
         "by_entry_extension": by_extension,
         "false_breakout_rate": fb_rate,
+        "breakout_leg_active": bool(bo_live),
+        "true_win_rate": dsum["true_win_rate"] if dsum["trades"] else None,
+        "breakeven_true_win_rate": doctrine.breakeven_true_win_rate(closed),
         "exit_reasons": dict(Counter(r.get("exit_reason") for r in closed)),
     }
 
@@ -528,15 +572,36 @@ def incubation_verdict(metrics: dict) -> str:
     n = metrics.get("trades", 0)
     if n < MIN_SAMPLE:
         return f"INSUFFICIENT DATA — {n}/{MIN_SAMPLE}+ closed trades needed"
-    issues = []
+    issues: list[str] = []
+    notes: list[str] = []
     if metrics.get("expectancy", 0) <= 0:
         issues.append("expectancy not positive")
+
+    # IMP-047: only judge the breakout leg while it can still trade. Under
+    # IMP-021's total veto this cohort is frozen history, so citing it as a live
+    # red flag pinned the verdict to "NEEDS WORK" on evidence that can never
+    # change — say so in a note instead of scoring it.
     fb = metrics.get("false_breakout_rate")
-    if fb is not None and fb >= FALSE_BREAKOUT_LIMIT:
-        issues.append(f"false-breakout rate {fb}% >= {FALSE_BREAKOUT_LIMIT}%")
-    if not issues:
-        return "PROMISING — review by-signal-type before any live decision"
-    return "NEEDS WORK — " + "; ".join(issues)
+    if metrics.get("breakout_leg_active"):
+        if fb is not None and fb >= FALSE_BREAKOUT_LIMIT:
+            issues.append(f"false-breakout rate {fb}% >= {FALSE_BREAKOUT_LIMIT}%")
+    elif fb is not None:
+        notes.append(f"breakout leg vetoed since {config.BREAKOUT_VETO_LIVE_FROM}"
+                     f" — false-breakout {fb}% is frozen history, not a live gate")
+
+    # ...and in its place, the gate that does describe the system that trades: the
+    # doctrine's true win rate against the break-even bar this book's own payoff
+    # implies. A stop is a failed trade whatever its P&L sign, so a headline win
+    # rate cannot carry this check (standing directive, 2026-09-01).
+    twr = metrics.get("true_win_rate")
+    bar = metrics.get("breakeven_true_win_rate")
+    if twr is not None and bar is not None and twr < bar:
+        issues.append(f"true win rate {twr}% < {bar}% needed to break even "
+                      f"at its own payoff")
+
+    verdict = ("PROMISING — review by-signal-type before any live decision"
+               if not issues else "NEEDS WORK — " + "; ".join(issues))
+    return verdict if not notes else f"{verdict}  [{'; '.join(notes)}]"
 
 
 def since_days(days: int) -> date:
