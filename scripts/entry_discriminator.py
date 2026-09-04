@@ -44,7 +44,7 @@ from alpaca.data.enums import DataFeed
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 
-from bot import analytics, discriminator as D
+from bot import analytics, discriminator as D, doctrine
 from bot.data import data_client
 from bot.discriminator import Sample
 
@@ -54,6 +54,20 @@ DEFAULT_TOD_THRESHOLDS = [15.0, 30.0, 45.0, 60.0, 90.0, 120.0]
 
 # Daily-bar history to pull before the first trade, so an ATR(14) exists for it.
 WARMUP_DAYS = 60
+
+
+def _sample(row: dict, day: str, value: float) -> Sample:
+    """One `Sample`, carrying the stop-exit doctrine's view of the trade (IMP-048).
+
+    `bot.discriminator` is pure by contract and must not import `bot.doctrine`
+    (which reaches the DB through `bot.analytics`), so the classification is
+    done HERE and handed in. Every sample builder goes through this function so
+    no statistic can quietly lose its doctrine columns and fall back to being
+    judged on `realized_pl > 0` alone.
+    """
+    return Sample(symbol=row["symbol"], day=day, pl=_f(row["realized_pl"]),
+                  value=value, profit_r=doctrine.profit_r(row),
+                  doctrine=doctrine.classify(row))
 
 
 def _f(value, default=0.0) -> float:
@@ -129,8 +143,7 @@ def _atr_samples(rows: list[dict], feed: str) -> tuple[list[Sample], list[str]]:
         if atr is None:
             skipped += 1
             continue
-        samples.append(Sample(symbol=r["symbol"], day=day,
-                              pl=_f(r["realized_pl"]), value=atr / one_r))
+        samples.append(_sample(r, day, atr / one_r))
     notes = [f"feed={feed}, daily bars to {end}, ATR({ATR_PERIOD}) from prior days only"]
     if skipped:
         notes.append(f"{skipped} trade(s) skipped — no {ATR_PERIOD}-day history before entry")
@@ -147,16 +160,22 @@ def _time_of_day_samples(rows: list[dict]) -> tuple[list[Sample], list[str]]:
         if et is None:
             continue
         minutes = (et.hour * 60 + et.minute) - (9 * 60 + 30)
-        samples.append(Sample(symbol=r["symbol"],
-                              day=(r.get("exit_time") or et).strftime("%Y-%m-%d"),
-                              pl=_f(r["realized_pl"]), value=float(minutes)))
+        samples.append(_sample(r, (r.get("exit_time") or et).strftime("%Y-%m-%d"),
+                               float(minutes)))
     return samples, ["entry_time is naive ET, as the bot writes it"]
 
 
-def _fmt(stats: dict) -> str:
+def _fmt(stats: dict, doc: dict | None = None) -> str:
     pf = stats["profit_factor"]
-    return (f"n={stats['trades']:4d} net={stats['net']:9.2f} avg={stats['avg']:7.2f} "
-            f"win={stats['win_rate']:5.1f}% PF={'  n/a' if pf is None else f'{pf:5.2f}'}")
+    out = (f"n={stats['trades']:4d} net={stats['net']:9.2f} avg={stats['avg']:7.2f} "
+           f"win={stats['win_rate']:5.1f}% PF={'  n/a' if pf is None else f'{pf:5.2f}'}")
+    if doc:
+        # Printed right beside the headline win rate on purpose: when the two
+        # disagree the true one governs, and the reader has to see both to know
+        # that they did. IMP-048.
+        avg_r = "  n/a" if doc["avg_r"] is None else f"{doc['avg_r']:+.3f}"
+        out += f"  | TRUE={doc['true_win_rate']:5.1f}% W={doc['wins']:3d} avgR={avg_r}"
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -206,9 +225,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\n>>> refuse entries with {args.stat} >= {row['threshold']}  "
               f"[{row['verdict']}]")
         for name, split in row["splits"].items():
-            print(f"      {name:15} ABOVE {_fmt(split['above'])}")
-            print(f"      {'':15} BELOW {_fmt(split['below'])}   "
-                  f"edge={split['edge'] if split['edge'] is not None else 'n/a'}")
+            print(f"      {name:15} ABOVE {_fmt(split['above'], split['above_doctrine'])}")
+            print(f"      {'':15} BELOW {_fmt(split['below'], split['below_doctrine'])}")
+            r_edge = split["r_edge"]
+            print(f"      {'':15}   edge="
+                  f"{split['edge'] if split['edge'] is not None else 'n/a'}"
+                  f"  R-edge={'n/a' if r_edge is None else f'{r_edge:+.3f}'}")
+        if row.get("win_collateral_fraction") is not None:
+            print(f"      doctrine WINs inside the refused cohort: "
+                  f"{row['win_collateral_fraction']:.0%}")
         if row["era_concentration"] is not None:
             print(f"      pre-gate era share of the refused cohort's P&L: "
                   f"{row['era_concentration']:.0%}")

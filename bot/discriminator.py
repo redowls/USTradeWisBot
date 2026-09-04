@@ -62,10 +62,23 @@ MIN_ERA_CONTROLLED_N = 20
 # throwing away symbols that work (the TSLA case above: 44%).
 MAX_COLLATERAL_FRACTION = 0.25
 
+# Doctrine WINs inside the refused cohort, as a fraction of every WIN the
+# cohort contains (IMP-048). The dollar collateral guard above counts symbols
+# by P&L; this one counts the trades that actually paid the thesis. They are
+# not the same measurement and they can disagree, because a doctrine WIN is
+# `profit_R >= +1.0`, not `realized_pl > 0`.
+MAX_WIN_COLLATERAL_FRACTION = 0.25
+
 SUPPORTED = "SUPPORTED"
 REFUTED = "REFUTED"
 ERA_ARTEFACT = "ERA_ARTEFACT"
 INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
+
+# The doctrine label this module protects. Duplicated as a plain string rather
+# than imported from `bot.doctrine` on purpose — see Sample's docstring for why
+# this module must not import it. `bot.doctrine.WIN` is the definition; this is
+# a literal that must match it, and a test pins the two together.
+WIN_LABEL = "WIN"
 
 
 @dataclass(frozen=True)
@@ -77,12 +90,29 @@ class Sample:
     statistic measured AT ENTRY — a statistic that is not knowable at entry
     time cannot become a live gate, however well it separates (the 2026-08-13
     session-range refutation turned on exactly that point).
+
+    `profit_r` and `doctrine` (IMP-048) carry the standing stop-exit doctrine's
+    view of the same trade: R banked against the ORIGINAL 1R stop, and the
+    WIN/SCRATCH/FAIL label. Both are OPTIONAL and default to None, so every
+    caller written before IMP-048 keeps working and simply gets no doctrine
+    columns. They are passed IN rather than computed here because this module
+    is pure by contract — `bot.doctrine` imports `bot.analytics`, which imports
+    `bot.db`, and importing it would put a database dependency behind every
+    discriminator test. `scripts/entry_discriminator.py` does the classifying.
+
+    Note on ORIENTATION: `split_at` always refuses `value >= threshold`, i.e.
+    the HIGH side. To test a filter that refuses the LOW side of a statistic,
+    negate it — pass `value=-x` and sweep negative thresholds. That is a real
+    orientation and not a hack: the 1R/ATR feasibility candidate was refuted in
+    BOTH directions on 2026-09-03 that way.
     """
 
     symbol: str
     day: str
     pl: float
     value: float
+    profit_r: float | None = None
+    doctrine: str | None = None
 
 
 def bucket_stats(pls: list[float]) -> dict:
@@ -100,6 +130,51 @@ def bucket_stats(pls: list[float]) -> dict:
         "win_rate": round(100 * len(wins) / n, 1),
         "profit_factor": round(sum(wins) / gross_loss, 2) if gross_loss else None,
     }
+
+
+def doctrine_stats(samples: list[Sample]) -> dict | None:
+    """Doctrine view of one slice: WIN count, TRUE win rate, average banked R.
+
+    Returns None when no sample in the slice carries doctrine data, which is
+    how every pre-IMP-048 caller keeps its old behaviour: absent data means
+    absent columns and no doctrine gate, never a silent zero.
+
+    `true_win_rate` counts `doctrine == "WIN"` — NOT `pl > 0`. The two
+    disagree by design and the gap is the whole reason this exists: on the
+    2026-09-03 run of the 1R/ATR candidate the module's own `win_rate` column
+    said the KEPT cohort was better (50.4% vs 33.9%) while the doctrine said it
+    was far worse (6.2% vs 16.1%). A filter chosen on the first number would
+    have been chosen on the metric the standing directive exists to distrust.
+    """
+    labelled = [s for s in samples if s.doctrine is not None]
+    if not labelled:
+        return None
+    rs = [s.profit_r for s in labelled if s.profit_r is not None]
+    wins = sum(1 for s in labelled if s.doctrine == WIN_LABEL)
+    return {
+        "trades": len(labelled),
+        "wins": wins,
+        "true_win_rate": round(100 * wins / len(labelled), 1),
+        "avg_r": round(sum(rs) / len(rs), 3) if rs else None,
+    }
+
+
+def win_collateral_fraction(samples: list[Sample], threshold: float) -> float | None:
+    """Share of the cohort's doctrine WINs that sit inside the REFUSED side.
+
+    The dollar `collateral_fraction` asks "does this filter throw away symbols
+    that make money"; this asks "does it throw away the trades that actually
+    paid the thesis". Returns None when the cohort carries no doctrine data or
+    contains no WINs at all — with nothing to protect there is nothing to
+    measure, and a zero would read as a pass.
+    """
+    labelled = [s for s in samples if s.doctrine is not None]
+    total_wins = sum(1 for s in labelled if s.doctrine == WIN_LABEL)
+    if not labelled or total_wins == 0:
+        return None
+    refused = sum(1 for s in labelled
+                  if s.value >= threshold and s.doctrine == WIN_LABEL)
+    return round(refused / total_wins, 4)
 
 
 def cohorts(
@@ -127,6 +202,11 @@ def split_at(samples: list[Sample], threshold: float) -> dict:
     `edge` is below-avg minus above-avg: the per-trade improvement a filter
     that REFUSED the above side would have produced, holding everything else
     equal. Positive edge is the only direction that could justify a filter.
+
+    `r_edge` (IMP-048) is the same comparison in R instead of dollars, and it
+    is the one the doctrine asks for: dollar edge can be carried by a single
+    large position on a book whose sizes vary with confidence and price, while
+    R is scale-free. It is None whenever either side lacks doctrine data.
     """
     above = [s for s in samples if s.value >= threshold]
     below = [s for s in samples if s.value < threshold]
@@ -134,7 +214,12 @@ def split_at(samples: list[Sample], threshold: float) -> dict:
     edge = None
     if above and below:
         edge = round(b["avg"] - a["avg"], 2)
-    return {"threshold": threshold, "above": a, "below": b, "edge": edge}
+    da, db = doctrine_stats(above), doctrine_stats(below)
+    r_edge = None
+    if da and db and da["avg_r"] is not None and db["avg_r"] is not None:
+        r_edge = round(db["avg_r"] - da["avg_r"], 3)
+    return {"threshold": threshold, "above": a, "below": b, "edge": edge,
+            "above_doctrine": da, "below_doctrine": db, "r_edge": r_edge}
 
 
 def era_concentration(
@@ -189,6 +274,7 @@ def verdict(
     max_collateral_fraction: float = MAX_COLLATERAL_FRACTION,
     pre_gate_era_end: str = PRE_GATE_ERA_END,
     post_gate_start: str = POST_GATE_START,
+    max_win_collateral_fraction: float = MAX_WIN_COLLATERAL_FRACTION,
 ) -> dict:
     """Judge one threshold of one discriminator. SUPPORTED is deliberately hard.
 
@@ -197,12 +283,31 @@ def verdict(
     working symbols. Anything that passes only on the raw book is
     ERA_ARTEFACT, which is a distinct outcome from REFUTED and the one this
     module was built to be able to say out loud.
+
+    IMP-048 adds two DOCTRINE gates that apply only when the samples carry
+    doctrine data, so behaviour on pre-IMP-048 callers is bit-for-bit
+    unchanged. Both can only ever turn a SUPPORTED into a REFUTED — they never
+    rescue a candidate the dollar checks rejected:
+
+      * WIN collateral. A filter that discards more than
+        `max_win_collateral_fraction` of the cohort's doctrine WINs is refused
+        however good its dollar aggregate looks. The trades that print +1R are
+        the only ones that pay the thesis and there are very few of them.
+      * R edge. The era-controlled cohort's `r_edge` must be positive. A filter
+        that improves dollars while flattening per-trade R is trading scale for
+        edge, which the doctrine's "expectancy and payoff first" rule forbids.
+
+    These are anti-gaming by construction: neither can be passed by widening a
+    stop, because R is anchored to the ORIGINAL 1R stop and widening it
+    re-denominates BOTH sides of the split at once.
     """
     groups = cohorts(samples, pre_gate_era_end, post_gate_start)
     splits = {name: split_at(rows, threshold) for name, rows in groups.items()}
     era_frac = era_concentration(samples, threshold, pre_gate_era_end)
     collateral = collateral_symbols(samples, threshold)
     coll_frac = collateral_fraction(samples, threshold)
+    win_coll = win_collateral_fraction(samples, threshold)
+    era_r_edge = splits["era-controlled"]["r_edge"]
 
     all_edge = splits["all-time"]["edge"]
     era_split = splits["era-controlled"]
@@ -251,6 +356,18 @@ def verdict(
                 f"cap is {max_collateral_fraction:.0%}"
             )
             result = REFUTED
+        elif win_coll is not None and win_coll > max_win_collateral_fraction:
+            reasons.append(
+                f"refuses {win_coll:.0%} of the book's doctrine WINs — "
+                f"cap is {max_win_collateral_fraction:.0%}"
+            )
+            result = REFUTED
+        elif era_r_edge is not None and era_r_edge <= 0:
+            reasons.append(
+                f"era-controlled R edge is {era_r_edge:+.3f}R — the filter improves "
+                f"dollars without improving per-trade R"
+            )
+            result = REFUTED
         else:
             reasons.append("positive edge in all three cohorts, era-controlled and "
                            "not carried by collateral damage to working symbols")
@@ -264,6 +381,8 @@ def verdict(
         "era_concentration": era_frac,
         "collateral": collateral,
         "collateral_fraction": coll_frac,
+        "win_collateral_fraction": win_coll,
+        "era_r_edge": era_r_edge,
     }
 
 
