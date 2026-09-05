@@ -593,3 +593,70 @@ Five IMPs, **all committed and pushed** (`origin/main..HEAD` empty). Judged as a
 **No code shipped tonight.** This run launched at ~21:00 UTC — again past the routine's 20:40 UTC cutoff for beginning a code change — so it is analysis-only by rule. **Nothing was lost by that, and in this specific week the rule was actively correct:** the strongest evidence of the week is a pre-registered hypothesis mid-flight with a 09-08 verdict date, and the right action for a good week is to leave it alone rather than to ship something to look productive.
 
 ---
+
+## Week ending 2026-09-04 (Mon 08-31 → Fri 09-04, 5 sessions) — Grade: **C**
+
+### Results
+| Metric | This week | Prior week |
+|---|---|---|
+| Closed trades | 17 | 21 |
+| Net P&L | **+$118.51** | +$96.92 |
+| Profit factor | **2.77** | 2.30 |
+| Headline win rate (sign of P&L) | **52.9%** (9/17) | 57.1% |
+| **True win rate (doctrine)** | **11.8%** (2/17) | 4.8% |
+| **Stop rate** | **52.9%** (9/17) | 52.4% |
+| WIN / SCRATCH / FAIL | **2 / 8 / 7** | 1 / 11 / 9 |
+| **FAIL+SCRATCH share** | **88.2%** | 95.2% |
+| Equity | **$7,525.20 → $7,642.76** (+1.56%) | — |
+
+Equity path: +4.14, +15.25, +54.92, +83.73, **−40.48** (Fri/NFP). No intra-week drawdown below the Monday open — the only red session was Friday.
+
+**Stop-rate / true-win-rate trend (6 weeks):**
+| Week ending | Stop rate | True WR | Headline WR | F+S |
+|---|---|---|---|---|
+| 07-31 | 45.0% | 0.0% | 30.0% | 100.0% |
+| 08-07 | 26.3% | 5.3% | 31.6% | 94.7% |
+| 08-14 | 29.4% | 11.8% | 47.1% | 88.2% |
+| 08-21 | 52.4% | 4.8% | 57.1% | 95.2% |
+| **08-28→09-04** | **52.9%** | **11.8%** | **52.9%** | **88.2%** |
+
+The stop rate has **doubled** off its 08-07 low (26.3% → 52.9%) and has not fallen for three weeks. F+S has been ≥ 60% for **five consecutive weeks** — far past the two-week escalation threshold.
+
+### The win column is padded, and by how much
+Of the 9 sign-positive trades, **only 2 are WINs**; the other **7 are ratchet give-backs**:
+- Real: **META +$34.23 (+1.07R, TAKE_PROFIT)**, **WMT +$56.74 (+1.60R, TAKE_PROFIT)** — $90.97, i.e. **77% of the week's entire net P&L came from 2 of 17 trades.**
+- Padding: XOM +$3.00 (+0.08R), XOM +$3.30 (+0.09R) — break-even stop touches scored as FAIL; WMT +$11.50 (+0.29R), WMT +$15.33 (+0.44R), NVDA +$19.03 (+0.52R), BAC +$27.72 (+0.73R), QQQ +$14.58 (+0.45R flatten) — SCRATCH, capital preserved, thesis unpaid.
+- Worst trade: **WMT −$38.18 (−0.99R, full stop, 09-04)** — the one trade that paid the full 1R, on NFP day.
+- Per-symbol: WMT +$45.39 (4 trades), META +$34.23, BAC +$27.72, NVDA +$19.03, QQQ +$12.40, XOM +$6.30; losers COST −$10.20, GOOG −$9.23, UNH −$2.86, CRM −$2.79, SPY −$1.48.
+- Exit mix: STOP 9 / EOD_FLATTEN 6 / TAKE_PROFIT 2.
+
+### Market context (Perplexity `sonar` fallback)
+S&P 500 −0.38% to 7,718.60, Nasdaq −0.29% to 26,506.99. **A fade / mean-reverting tape, not a follow-through tape** — both indices closed off their highs, Friday sold off from the 7,750 open to 7,706. Weakness concentrated in mega-cap consumer/communications (AAPL −2.55%, GOOG −2.10%, DIS −1.77%, MCD −1.47%) with index-level resilience. Catalysts: Aug NFP Thu/Fri 09-03/04.
+
+**This matters for the grade in both directions.** A breakout system *should* struggle in a fade tape, and this one made money — but it made it the way the doctrine predicts a non-edge makes money: the **exit ratchet harvested noise** while the entry produced two payers out of seventeen. The bot was profitable *despite* the entry, not because of it. GOOG was one of the week's two flatten losers, consistent with the tape.
+
+### Process audit
+- **Risk: clean.** `MAX_RISK_PCT` 2.0, `DAILY_LOSS_HALT_PCT` 8.0, `MAX_CONCURRENT_POSITIONS` 3, entry cutoff 15:30 ET, flatten 15:55 ET, paper endpoint — all unchanged. Circuit breaker never tripped. No overnight holds. No risk limit touched or proposed.
+- **Reliability: clean.** `ustradewisbot.service` active since 2026-09-05 01:47:23 UTC, **NRestarts=0**, **zero** error/fail/traceback lines in 7 days of journal.
+- **Five IMPs shipped (045, 046, 047, 048, 049) — and every one of them is a measurement change.** 045 scores blocked candidates on the live ratchet; 046 scores trades on the doctrine; 047 points the verdict at the strategy that actually trades; 048 judges entry filters on the doctrine; 049 fixes the VWAP-gate counterfactual's exit geometry. **Not one altered what the bot does in the market.** Judged as a set they *compound* — they are five pieces of one coherent project (make every evaluation surface speak the doctrine) and they cancel nothing. But their **observed effect on the stop rate is zero by construction**, and a fifth straight week with no change to entry, exit, or sizing is motion in the instrumentation, not progress in the strategy. That this was deliberate — the 09-08 IMP-040 verdict is pre-registered and must not be confounded — is the reason this is a C and not lower.
+- **Last week's directives:** (a) HOLD IMP-040 — **honored**, ratchet untouched. (b) *"Commit the housekeeping set — first action Monday, no exceptions, sixth week of asking"* — **FAILED for a seventh week.** `bot/analytics.py`, `bot/exit_sim.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py` remain uncommitted. **`bot/exit_sim.py` is a direct input to the IMP-040 verdict due Monday 09-08 and it is still not in version control.** Per this routine's ground rules I may stage only the memory files, so I cannot fix it; it is now the single largest process risk on this bot. (c) retire-or-rebuild — still not put to the human. (d) TSM — no TSM trades this week; moot. (e) *"Retry `sonar-deep-research` FIRST"* — **could not**, see below. (f) Labor Day was misdated: it is **Mon 09-07 (next week)**, not 09-01; this was a full 5-session week.
+- **Root cause of three consecutive analysis-only weeks: the run keeps starting ~60 minutes late.** The routine is scheduled 20:00 UTC with a 21:10 hard kill; it launched at **~21:00 UTC** again this week (third in a row), leaving ~10 minutes — no budget for a 600s `sonar-deep-research` call and none for a code change under the 20:40 cutoff. This is now a scheduling defect, not bad luck, and it is capping the weekly review's usefulness. **Escalated to the human in `todo.md`.**
+
+### Grade rationale — **C**
+Third consecutive profitable week, best PF (2.77) and best net (+$118.51) of the run, spotless risk, zero service errors, and five well-reasoned IMPs that genuinely compound. That is B-shaped work on everything except the thing that matters. But the doctrine sets the ceiling: **the win column is padded — 7 of 9 "winners" are break-even/scratch stops, and 77% of the net came from 2 trades — so a net-positive week like this is a C at best.** True win rate 11.8% against a 52.9% headline; F+S 88.2% for the fifth straight week over the escalation line. Held at C rather than C− because the profit is real and repeatable-looking, the ratchet is doing exactly its job, and nothing was gamed. Held below C+ because the top-priority directive failed a **seventh** consecutive week with un-versioned code feeding Monday's verdict, and because five IMPs in a week that moved the stop rate by construction zero is not, at this stage, enough.
+
+### ⚖️ Strategy verdict — **NO DEMONSTRATED EDGE (fifth consecutive week)**
+Nothing this week contradicts the escalation; the profit *supports* it. A system with an entry edge does not pay on 2 of 17 trades. What is working is IMP-013/040's exit ratchet, which converts a directionless entry into a positive expectancy by refusing to give back open profit — a real and valuable piece of engineering that is **not a source of edge, it is a source of loss-avoidance**. The entry remains an unfiltered MA crossover wearing breakout geometry (breakout leg dormant since 2026-07-24). The correct next move remains structural, and the retire-or-rebuild question belongs to the human — it has now been open for three weeks.
+
+### 🔧 Shipped tonight — **none, analysis only**
+Run launched ~21:00 UTC, past the routine's 20:40 UTC cutoff for beginning a code change. Correct by rule: a timeout mid-edit leaves the repo dirty, and this repo already has five uncommitted files.
+
+### Focus for next week
+- **(a) The 09-08 IMP-040 two-week verdict is the week's whole job.** Decide it on the persisted columns and IMP-044's debiased grid, with IMP-049's corrected counterfactual. If it fails, the pre-registered response stands: **widen toward 0.35R, never tighten.**
+- **(b) Commit the five un-versioned files before anything else — seventh week of asking, and `bot/exit_sim.py` feeds Monday's verdict.** If Monday's daily review does not do it, it must be escalated as a blocking defect.
+- **(c) Put retire-or-rebuild to the human explicitly.** Five weeks of "no demonstrated edge" with a working exit and a dead entry is a decision, not an analysis.
+- **(d) Fix the 60-minute-late start** (see `todo.md`) — it has cost three consecutive weeks of deep research and code-change budget.
+- **(e) Calendar:** Mon **09-07 Labor Day, market closed**; PPI 09-10, **CPI 09-11**, **FOMC 09-15/16**. A 4-session week with two inflation prints — expect fade tape around the data, which is where this bot's ratchet earns and its entry does not.
+- **(f) No risk relaxation.** All limits verified unchanged tonight; a third profitable week is the most dangerous moment to touch one.
+
+---

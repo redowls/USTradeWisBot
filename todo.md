@@ -824,3 +824,9 @@ Ordered by expected impact; each item needs replay validation before code.
   count as one stock for held-skip, re-entry cooldown and daily entry cap
   (`config.EQUIVALENT_UNDERLYINGS`, engine gate, 6 regression tests). Fixes
   the 06-12 GOOGL top-tick re-entry (−$128.79) and 06-10 dual-class exposure.
+
+## ESCALATION (weekly review 2026-09-05) — human decisions required
+
+1. **`uswisbot-weekly-review` starts ~60 min late (third consecutive week).** Scheduled 20:00 UTC with a 21:10 hard kill, actually launching ~21:00 UTC. Effect: no budget for the mandated `sonar-deep-research` call (600s) and none for a code change (20:40 cutoff), so three consecutive weekly reviews have been analysis-only. Please move the schedule earlier or raise the kill time.
+2. **Retire-or-rebuild the entry — open three weeks.** Five consecutive weeks of "no demonstrated edge". The exit ratchet (IMP-013/040) works; the entry is an unfiltered MA crossover (breakout leg dormant since 2026-07-24) paying 2 of 17 trades. Options: (A) retire the strategy, (B) fund an entry rebuild, (C) keep running as a ratchet study. This is a capital-allocation call, not a parameter tweak.
+3. **Five files uncommitted for seven weeks** (`bot/analytics.py`, `bot/exit_sim.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py`). `bot/exit_sim.py` feeds the 09-08 IMP-040 verdict and is not in version control. The weekly routine may stage only memory files, so it cannot fix this.
