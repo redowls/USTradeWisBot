@@ -36,7 +36,7 @@ import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 
-from bot import config, db, notify
+from bot import config, db, doctrine, notify
 
 SERVICE = "ustradewisbot.service"
 LOG_DIR = "/var/log/ustradewisbot"
@@ -165,6 +165,50 @@ def _replay_geometry() -> tuple[float, float]:
     return -float(config.MIN_STOP_PCT), float(config.MIN_STOP_PCT) * float(config.RR_RATIO)
 
 
+# Replay outcome -> the ``trades.exit_reason`` vocabulary ``bot.doctrine`` reads.
+# TRAIL and STOP both map to STOP because a ratcheted stop is still a stop being
+# touched, which is what the doctrine scores; they stay apart in ``by_outcome``
+# because conflating them is what IMP-041 had to unpick in the live book.
+_OUTCOME_TO_EXIT_REASON = {"TP": "TAKE_PROFIT", "TRAIL": "STOP",
+                           "STOP": "STOP", "EOD": "EOD_FLATTEN"}
+
+
+def _doctrine_rows(results: list[dict], stop_pct: float) -> list[dict]:
+    """Pure: replay results -> rows ``bot.doctrine`` can bucket WIN/SCRATCH/FAIL.
+
+    IMP-049. The counterfactual scored its blocked set on ``ret_pct > 0`` — the
+    one metric the standing directive exists to distrust — so it reported the
+    2026-09-04 set as **4W/1L (80% win)** when the doctrine calls it **WIN 1 /
+    SCRATCH 2 / FAIL 2, true win rate 20%**: three of those four "wins" were a
+    ratcheted stop or a flatten banking between -0.11R and +0.24R. That is the
+    same 60-point inflation IMP-046 found in the live book and IMP-048 fixed in
+    ``bot.discriminator``, still live in the *other* instrument that judges which
+    entries should be admitted — and it is the instrument the weekly reads.
+
+    Rebuilding the row rather than re-implementing the thresholds is the point:
+    the counterfactual and the live book must never be able to disagree about
+    what a win is. ``realized_pl`` carries the **percentage** return, not
+    dollars — the doctrine reads only its sign (headline win rate), and a
+    percentage keeps the row free of position size, which the replay never had.
+    Rows the replay could not price (``NO_DATA``) are dropped, exactly as
+    ``summarize`` drops rows with no realized P&L.
+    """
+    rows = []
+    for r in results:
+        if r.get("ret_pct") is None:
+            continue
+        entry = float(r["price"])
+        rows.append({
+            "symbol": r["symbol"],
+            "entry_price": entry,
+            "stop_price": entry * (1.0 + stop_pct / 100.0),
+            "exit_price": entry * (1.0 + float(r["ret_pct"]) / 100.0),
+            "exit_reason": _OUTCOME_TO_EXIT_REASON.get(r["outcome"], "EOD_FLATTEN"),
+            "realized_pl": float(r["ret_pct"]),
+        })
+    return rows
+
+
 def _replay_blocked(candidates: list[dict], bars_by_symbol: dict, stop_pct: float,
                     tp_pct: float, flatten: str = "15:55") -> dict:
     """Pure: what the VWAP-blocked candidates WOULD have done if they'd been taken.
@@ -246,13 +290,21 @@ def _replay_blocked(candidates: list[dict], bars_by_symbol: dict, stop_pct: floa
         by_outcome[r["outcome"]] = by_outcome.get(r["outcome"], 0) + 1
     total = round(sum(r["ret_pct"] for r in scored), 2)
     avg = round(total / len(scored), 3) if scored else None
+    split = doctrine.summarize(_doctrine_rows(results, stop_pct))
     return {
         "available": True, "candidates": len(results), "replayed": len(scored),
         "no_data": len(results) - len(scored),
+        # `wins`/`losses` are the HEADLINE (sign-of-return) count. They are kept
+        # for continuity and must never be quoted on their own — `doctrine`
+        # below is the claim that governs (IMP-049).
         "wins": wins, "losses": len(scored) - wins,
         "by_outcome": dict(sorted(by_outcome.items())),
         "sum_ret_pct": total, "avg_ret_pct": avg,
+        "doctrine": split, "avg_r": split["avg_r"],
         # Sign convention: the gate PAID when the set it blocked would have lost.
+        # Expectancy sets this verdict, per the doctrine's "expectancy and payoff
+        # first, stop rate second" — and since avg_r is avg_ret_pct scaled by the
+        # constant 1R width, the R and % readings can never disagree on the sign.
         "gate_paid": None if avg is None else avg <= 0,
         "stop_pct": stop_pct, "tp_pct": round(tp_pct, 3),
         "results": results,
@@ -282,7 +334,8 @@ def _gate_cost(date_str: str, log_dir: str = LOG_DIR) -> dict:
         if not candidates:
             return {"available": True, "candidates": 0, "replayed": 0, "no_data": 0,
                     "wins": 0, "losses": 0, "by_outcome": {}, "sum_ret_pct": 0.0,
-                    "avg_ret_pct": None, "gate_paid": None, "results": []}
+                    "avg_ret_pct": None, "doctrine": doctrine.summarize([]),
+                    "avg_r": None, "gate_paid": None, "results": []}
         from bot import data as bot_data  # local import: keeps the DB-only path light
         frames = bot_data.get_bars_for_symbols(
             [c["symbol"] for c in candidates], n_bars=390, timeframe="1Min")
@@ -295,7 +348,13 @@ def _gate_cost(date_str: str, log_dir: str = LOG_DIR) -> dict:
 
 
 def format_gate_cost(g: dict) -> list[str]:
-    """Render the blocked-candidate counterfactual as report lines."""
+    """Render the blocked-candidate counterfactual as report lines.
+
+    Prints the headline (sign-of-return) count and the doctrine split side by
+    side, exactly as the daily review reports true win rate beside headline
+    (IMP-049): the sign-based line was the only one here until 2026-09-04, and
+    on that session it claimed 4W/1L for a set the doctrine scores 1 WIN.
+    """
     if not g.get("available"):
         return ["", f"IMP-022 opportunity cost: (unavailable: {g.get('error')})"]
     if not g.get("candidates"):
@@ -308,9 +367,19 @@ def format_gate_cost(g: dict) -> list[str]:
         lines.append("  (no bars available to replay)")
         return lines
     avg = g["avg_ret_pct"]
-    lines.append(f"  if taken: {g['wins']}W/{g['losses']}L   avg {avg:+.2f}% per trade   "
+    lines.append(f"  if taken: headline {g['wins']}W/{g['losses']}L   avg {avg:+.2f}% per trade   "
                  f"sum {g['sum_ret_pct']:+.2f}%")
     lines.append("  outcomes: " + ", ".join(f"{k} {v}" for k, v in g["by_outcome"].items()))
+    d = g.get("doctrine") or {}
+    if d.get("trades"):
+        kinds = d["fail_kinds"]
+        lines.append(f"  doctrine: WIN {d['win']} / SCRATCH {d['scratch']} / FAIL {d['fail']} "
+                     f"(full-1R {kinds['full-1R']} / BE {kinds['break-even']} "
+                     f"/ faded {kinds['faded']})   stop rate {d['stop_rate']:.0f}%")
+        avg_r = d["avg_r"]
+        lines.append(f"  true win rate {d['true_win_rate']:.1f}% "
+                     f"(headline {d['headline_win_rate']:.1f}%)"
+                     + (f"   avg {avg_r:+.2f}R" if avg_r is not None else ""))
     armed = [r for r in g["results"] if r.get("stop_raises")]
     if armed:
         lines.append(f"  ratchet armed on {len(armed)}/{g['replayed']} replayed "
@@ -326,6 +395,8 @@ def format_gate_cost(g: dict) -> list[str]:
         lines.append(f"  best blocked: {best['symbol']} {best['ret_pct']:+.2f}% ({best['outcome']})"
                      f"   worst blocked: {worst[0]['symbol']} {worst[0]['ret_pct']:+.2f}% "
                      f"({worst[0]['outcome']})")
+    lines.append("  Read: expectancy sets the verdict, the doctrine split sets the CLAIM — "
+                 "a blocked set of scratches is not a blocked set of winners (IMP-049).")
     lines.append("  Read: one session is noise — the gate is tape-dependent by design. "
                  "Judge it on the running series, not tonight.")
     return lines

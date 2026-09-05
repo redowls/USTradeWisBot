@@ -493,3 +493,112 @@ def test_first_blocked_survives_newest_first_rotation_order():
     assert c[0]["price"] == 556.60
     # and the same answer regardless of which chunk is streamed first
     assert gm._first_blocked(older_chunk + newest_chunk, "2026-08-03") == c
+
+
+# --- IMP-049: the counterfactual speaks the doctrine ------------------------
+# The REAL 2026-09-04 blocked set, verbatim from
+# `python -m scripts.gate_monitor --date 2026-09-04 --replay-skips`.
+# Five candidates the VWAP gate refused while it admitted two trades that lost
+# -$40.36 between them. The sign-based count calls this set 4W/1L (80% win);
+# the doctrine calls it WIN 1 / SCRATCH 2 / FAIL 2 (true win rate 20%), because
+# three of the four "wins" banked between -0.11R and +0.24R.
+REPLAYED_20260904 = [
+    {"symbol": "TSM", "time": "09:30:10", "price": 417.01, "outcome": "TRAIL",
+     "ret_pct": 1.712, "stop_raises": 4},
+    {"symbol": "AMD", "time": "12:18:53", "price": 473.22, "outcome": "TRAIL",
+     "ret_pct": 0.366, "stop_raises": 3},
+    {"symbol": "INTC", "time": "10:20:14", "price": 94.53, "outcome": "TRAIL",
+     "ret_pct": 0.360, "stop_raises": 2},
+    {"symbol": "AMZN", "time": "15:07:26", "price": 257.95, "outcome": "EOD",
+     "ret_pct": 0.299, "stop_raises": 1},
+    {"symbol": "BAC", "time": "14:21:36", "price": 62.78, "outcome": "EOD",
+     "ret_pct": -0.159, "stop_raises": 0},
+]
+
+
+def test_doctrine_rows_score_the_real_20260904_blocked_set():
+    """The regression: 4 of 5 blocked candidates were scratches, not winners."""
+    from bot import doctrine
+
+    rows = gm._doctrine_rows(REPLAYED_20260904, -1.5)
+    labels = {r["symbol"]: doctrine.classify(r) for r in rows}
+    assert labels == {"TSM": "WIN",        # +1.14R — the only paid thesis
+                      "AMD": "FAIL",       # ratcheted stop banking +0.24R
+                      "INTC": "FAIL",      # ratcheted stop banking +0.24R
+                      "AMZN": "SCRATCH",   # flatten at +0.20R
+                      "BAC": "SCRATCH"}    # flatten at -0.11R
+    d = doctrine.summarize(rows)
+    assert (d["win"], d["scratch"], d["fail"]) == (1, 2, 2)
+    assert d["fail_kinds"] == {"full-1R": 0, "break-even": 2, "faded": 0}
+    assert d["true_win_rate"] == 20.0
+    assert d["headline_win_rate"] == 80.0   # the number the tool used to print alone
+    assert d["stop_rate"] == 60.0
+    assert d["avg_r"] == pytest.approx(0.344, abs=0.002)
+
+
+def test_doctrine_rows_drop_unpriced_candidates_and_are_empty_safe():
+    rows = gm._doctrine_rows(
+        [{"symbol": "XYZ", "price": 100.0, "outcome": "NO_DATA", "ret_pct": None}], -1.5)
+    assert rows == []
+    assert gm._doctrine_rows([], -1.5) == []
+
+
+def test_replay_blocked_reports_the_doctrine_beside_the_headline():
+    """A trailed stop that banks a fraction of 1R is headline-green, doctrine-FAIL."""
+    cands = [{"symbol": "XYZ", "time": "10:00:00", "price": 100.0,
+              "stretch_pct": 1.0, "vwap": 99.0}]
+    # runs just past the +0.25R trigger (1R = 1.5), arms the ratchet, then gives
+    # the whole excursion back to the raised stop — the live book's commonest shape
+    bars = _bars(("10:01:00", 100.5, 99.9, 100.40),
+                 ("10:02:00", 100.4, 99.0, 99.10))
+    g = gm._replay_blocked(cands, {"XYZ": bars}, -1.5, 2.25)
+    assert g["results"][0]["outcome"] == "TRAIL"
+    assert g["results"][0]["ret_pct"] > 0          # headline: a "win"
+    assert g["wins"] == 1
+    assert g["doctrine"]["win"] == 0               # doctrine: not a win
+    assert g["doctrine"]["fail"] == 1
+    assert g["doctrine"]["true_win_rate"] == 0.0
+    assert g["doctrine"]["headline_win_rate"] == 100.0
+    assert g["avg_r"] == g["doctrine"]["avg_r"]
+
+
+def test_replay_blocked_doctrine_calls_a_plan_stop_a_full_1r_fail():
+    cands = [{"symbol": "XYZ", "time": "10:00:00", "price": 100.0,
+              "stretch_pct": 2.0, "vwap": 98.0}]
+    g = gm._replay_blocked(cands, {"XYZ": _bars(("10:01:00", 100.2, 98.4, 98.5))},
+                           -1.5, 2.25)
+    assert g["results"][0]["outcome"] == "STOP"
+    assert g["doctrine"]["fail_kinds"]["full-1R"] == 1
+    assert g["doctrine"]["true_win_rate"] == 0.0
+    assert g["gate_paid"] is True                  # expectancy still sets the verdict
+
+
+def test_replay_blocked_doctrine_awards_the_target_a_win():
+    cands = gm._first_blocked(REAL_LOG_20260803, "2026-08-03")
+    cands = [c for c in cands if c["symbol"] == "NVDA"]
+    g = gm._replay_blocked(cands, {"NVDA": _bars(("10:02:00", 207.5, 202.2, 207.2))},
+                           -1.5, 2.25)
+    assert g["results"][0]["outcome"] == "TP"
+    assert g["doctrine"]["win"] == 1
+    assert g["doctrine"]["true_win_rate"] == 100.0
+
+
+def test_replay_blocked_empty_and_unpriced_sets_still_carry_a_doctrine_block():
+    empty = gm._replay_blocked([], {}, -1.5, 2.25)
+    assert empty["doctrine"]["trades"] == 0
+    assert empty["avg_r"] is None
+    nodata = gm._replay_blocked(
+        [{"symbol": "XYZ", "time": "10:00:00", "price": 100.0,
+          "stretch_pct": 1.0, "vwap": 99.0}], {}, -1.5, 2.25)
+    assert nodata["results"][0]["outcome"] == "NO_DATA"
+    assert nodata["doctrine"]["trades"] == 0
+
+
+def test_format_gate_cost_prints_true_win_rate_beside_headline():
+    txt = "\n".join(gm.format_gate_cost(
+        gm._replay_blocked(CRM_BLOCKED, {"CRM": CRM_20260831}, -1.5, 2.25)))
+    assert "if taken: headline" in txt        # the sign-based count is now LABELLED
+    assert "doctrine: WIN" in txt
+    assert "true win rate" in txt and "headline" in txt
+    assert "R" in txt
+    assert "a blocked set of scratches is not a blocked set of winners" in txt
