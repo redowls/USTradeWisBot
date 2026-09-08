@@ -2911,3 +2911,89 @@ Grouped by root cause: **2 entry-quality losses (−$40.36, 100% of the day's lo
 - Equity **$7,642.88 (−23.57%)** — ninth consecutive close above $7,500, week +$114.21. ⚠️ **This does not close the −25% escalation (twenty-fifth session) nor the 08-22 weekly's retire-or-rebuild call**, and it must be read against a trailing-10-session true win rate of **7.9%** and FAIL+SCRATCH of **92.1%**. **Posture unchanged: no adds, no widened risk, no discretionary re-enables, no manufactured activity.**
 
 ---
+## 2026-09-07 — Daily Review
+
+### Stats
+- **NO SESSION. 2026-09-07 was Labor Day and US equity markets were CLOSED.** Zero trades, zero signals, zero orders, zero P&L. There is no `daily_summary` row for 09-07 — the table's last row remains **09-04**.
+- **Verified three independent ways, not taken on the pre-market log's word:** (1) Alpaca's `/v2/calendar` omits 09-07 (09-03, 09-04, **09-08**, 09-09…); (2) the broker's own `balance_asof` reads **2026-09-04**; (3) `GET /v2/orders?status=all&after=2026-09-06` returns **[]** — not one order was submitted, cancelled or filled.
+- Equity **$7,642.76**, `equity` = `last_equity` = `cash` = `portfolio_value`, `long_market_value` **$0**, **0 positions**, ACTIVE, `trading_blocked` false. Unchanged from Friday's close, as a closed day requires.
+- ⚠️ **One reconciliation nit worth recording:** `daily_summary` stores 09-04 equity as **$7,642.88**, the broker says **$7,642.76** — a **$0.12** overstatement in the DB's own snapshot. Immaterial to every verdict here, but it is a real DB-vs-broker drift and the first one in ~40 sessions; if it recurs or grows, the equity-snapshot write is the place to look.
+- Service **active**, NRestarts=0, started **11:53:34 UTC** by the pre-market routine (the watchlist changed, so a restart was required). The whole 09-07 journal is **5 lines** — a stop, a start, and nothing else. **Zero ERROR / Traceback / CRITICAL lines.** The bot logged `market closed — sleeping ~92183s until next open`, which resolves to **Tue 09-08 09:30 ET** — the bot independently agreed the market was shut.
+- Market context (WebSearch-verified this morning; `sonar` was not reachable from this run — permission-blocked, and the routine forbids blocking on it): Friday 09-04 closed red on a hot payrolls print — **S&P 500 −0.38% to 7,718.60, Nasdaq −0.29% to 26,506.99, Dow −0.51%**. August NFP **162k against a 53k consensus**, unemployment **4.1%**, June/July revised **up**, 2-year yield the highest since January 2025, fed-funds futures at **58% odds of a HIKE**. FOMC 09-15/16, with **PPI Thu 09-10** and **CPI Fri 09-11**, both pre-open.
+
+### Stop-exit accounting
+**No trades closed on 09-07, so the day contributes nothing to any bucket.** The doctrine is therefore reported on the **trailing 10 sessions that had trades (2026-08-24 → 2026-09-04, n=38)** — unchanged from the 09-04 entry because no session has intervened:
+
+- **Stop rate 20/38 = 52.6%.**
+- **WIN 3 (7.9%) · SCRATCH 19 (50.0%) · FAIL 16 (42.1%) → FAIL+SCRATCH 92.1%.**
+- FAIL split: **full-1R 2 · break-even 9 · faded (EOD_FLATTEN below −0.25R) 5.**
+- **True win rate 7.9% against a headline win rate of 55.3%.** The gap is 47 points and it is the whole story of this bot.
+- Mean **profit_R +0.164**, median **+0.037**. Net **+$215.43**, expectancy **+$5.67/trade**, PF **2.52**, payoff **2.04**.
+- ⚠️ **The escalation trigger is LIVE and has been re-checked, not assumed:** over the last 3 sessions with trades (09-02, 09-03, 09-04) **FAIL+SCRATCH is 84.6%** against a 60% threshold — 13 trades, 2 WIN, 6 SCRATCH, 5 FAIL. `doctrine.escalation_verdict` returns `escalated: True`.
+- **Dominant failure cause: PROFIT CAPTURE, and it is now precisely located** (see the IMP-040 verdict below). The SCRATCH bucket is **50% of all trades** and it is *not* a leak — it is **+$158.57 of the era's +$201.86**. The bot is not losing money on those trades; it is **banking +0.25R-to-+0.73R on theses it called correctly and never letting one pay +1R.** Only **4 of 34** post-IMP-040 trades ever *printed* +1.0R, and **3 of those 4 were the only doctrine WINs** — all three were `TAKE_PROFIT` fills.
+
+### The IMP-040 two-week verdict (pre-registered 2026-08-24, due this session)
+**VERDICT: PASS — all three pre-registered criteria met, and the pre-registered FAIL signature did not appear.** Judged on `scripts/ratchet_audit.py` (the instrument IMP-041 built for exactly this), split at 2026-08-25, its first live session.
+
+| metric | pre (07-27→08-24) | post (08-25→09-04) | pre-registered test |
+|---|---|---|---|
+| trades | 65 | 34 | — |
+| net P&L | **−$238.24** | **+$201.86** | — |
+| **EOD_FLATTEN share** | **63.1%** | **38.2%** | (a) must FALL ✅ |
+| RATCHET_STOP share | 15.4% | **47.1%** | (b) more arming ✅ |
+| PLAN_STOP share | **18.5%** | **5.9%** | — |
+| stop raises | — | **130 over 31 armed trades (4.2/trade)** | (b) ✅ |
+| win rate | 40.0% | **55.9%** | (c) must RISE ✅ |
+| avg win | $15.39 | **$17.50** | (c) expected to fall — it ROSE |
+| ratchet realised P&L | +$2.03 | **+$69.86** | — |
+
+- **(a) PASS**, and it is the cleanest of the three: the clock-decided population IMP-040 targeted fell by **25 percentage points**.
+- **(b) PASS**: RATCHET_STOP share tripled and the ledger of what the ratchet actually earned went **+$2.03 → +$69.86** (helped 9 for +$145.07, hurt 7 for −$75.22).
+- **(c) PASS on the win-rate leg and BETTER than pre-registered on the other**: IMP-040 predicted "higher win rate with SMALLER average wins" as the intended shape. The win rate rose **40.0% → 55.9%** and the average win **rose too**. The pre-registered FAIL signature was "EOD_FLATTEN share holds AND average win falls" — **neither leg occurred**, so the "widen back toward 0.35R" contingency is NOT triggered.
+- **The mechanism is exactly what was designed, and it is worth stating in one line: IMP-040 removed the left tail.** PLAN_STOP fell **18.5% → 5.9%** of trades; full-1R FAILs fell **14/76 → 2/34**. Expectancy **−$3.09 → +$5.94/trade**, payoff **0.94 → 2.01**, PF **0.69 → 2.55**.
+- ★★★ **THE HONEST COUNTERWEIGHT, WHICH MATTERS MORE THAN THE PASS: IMP-040 did not create a single winner.** Under the doctrine the two eras are almost indistinguishable — **WIN 6.6% → 8.8%**, **FAIL+SCRATCH 93.4% → 91.2%** — and the **stop rate ROSE, 36.8% → 52.9%**. What IMP-040 did was convert **full-1R losses into break-even scratches**. That is genuinely valuable and it is why the book is green, but it is an **exit-structure** result, not an edge. Mean profit_R moved **−0.084 → +0.173** and the +1R bar is still cleared by **8.8%** of trades.
+- ⚠️ **And the profit is concentrated to the point of fragility: the top 5 trades of 34 are 101.1% of net profit** (INTC +$60.84, WMT +$56.74, META +$34.23, BAC +$27.72, GOOG +$24.59). The other 29 trades are net negative. **A two-week PASS on 34 trades whose profit is five names is not a demonstrated edge, and this entry does not claim one.**
+
+### Trade-by-trade review
+**No trades to review.** Root-causing the absence, as the routine requires: **the cause is the calendar, not the strategy** — a federal holiday, correctly observed by the exchange, by Alpaca's calendar, and by the bot itself, which computed its own sleep to the next open. **No gate failed, no watchlist name was mispriced, no threshold was too high, and nothing needs fixing on this axis.** This is the one "no trades" root cause that is fully benign.
+
+### What worked / what didn't
+- **Worked:** the bot correctly did nothing, for the correct reason, and said so in its log. The pre-market routine's restart was clean and the ~92,183s sleep proves the market-calendar path is sound.
+- **Worked:** IMP-040's verdict was *computable* rather than hand-derived from an expiring log — which is precisely what IMP-041 was built for and pre-registered as its own success test. **IMP-041 is retro-validated by this session.** The `STOP RAISED` lines it was built to outlive have now rotated out of `/var/log`, and the verdict was still decided to the trade.
+- **Didn't work — and this is the session's second finding:** see below. A risk-path config knob has been inert for three months and no review noticed, because nothing in the repo ever checked whether it *could* bind.
+
+### ★★★ Structural finding: `ATR_STOP_MULT` is INERT — the stop is a flat 1.5%, not a volatility-adaptive 3×ATR
+This is the most consequential thing found this session and it is **not** shipped as tonight's IMP (see why below).
+
+- `bot/sizing.py` computes `stop_distance = max(atr * ATR_STOP_MULT, entry * MIN_STOP_PCT/100)`. **On 106 of the 110 post-gate closed trades (96%) the `MIN_STOP_PCT` floor is the binding term.** `ATR_STOP_MULT = 3.0` decided the stop on **4 trades**, all of them INTC/ENPH/CRM volatility bursts.
+- **The cause is a units mismatch:** `ATR_PERIOD = 14` on `BAR_TIMEFRAME = "5Min"`, so the ATR is an *intraday 5-minute* range while `MIN_STOP_PCT` is a *daily-scale* number. Measured live tonight across 10 board names: **ATR is 0.038%–0.292% of price, so 3×ATR is 0.115%–0.875% — below the 1.5% floor on every single name**, including INTC, the widest-ATR name on the board (daily ATR 4.44%, but 3×ATR(5min) = **0.875%**). **The ATR term cannot bind. It is not mis-tuned; it is unreachable.**
+- ⚠️ **This rewrites a piece of this bot's history.** The 2026-06-10 fix recorded as *"widened stops ATR_STOP_MULT 1.8→3.0, MIN_STOP_PCT 0.5→1.5"* worked **entirely through the floor**; the multiplier change did nothing then and has done nothing since. Every review that has described this bot as running an "ATR-based" or "3×ATR" stop — including several of mine — was describing a code path that does not execute.
+- ★ **It also unifies a cluster of complaints this log has carried unowned for six-plus sessions as separate items:** the SPY/QQQ "1R is 2.6×/1.6× the whole daily range" mismatch, MU's "0.26-ATR problem", and INTC's 4.44% ATR against a flat stop are **one bug, not three** — the stop is not scaled to the instrument *at all*. SPY (ADR20 **0.57%**) and INTC (ADR20 **4.21%**) get the **same 1.5% stop**. On SPY a doctrine WIN needs a 1.5% intraday move, ~2.6 average daily ranges, which is why SPY/QQQ trades can essentially only scratch or ride the clock; on INTC 1.5% is a third of a daily range, i.e. noise, which is where the full-1R stops come from.
+- **Suggestive but NOT actioned (n=4):** the 4 ATR-bound trades show **50% doctrine WIN rate and +$20.96/trade** against **5.7% and −$1.10** for the 106 floor-bound ones. **n=4 is an anecdote, not evidence**, and it is recorded here only so the weekly can size the question.
+- **Why this is NOT tonight's IMP:** fixing it properly means re-deriving *both* terms (a daily-ATR term needs a new multiplier — 3× daily ATR on INTC is ~13%, absurd), i.e. a **two-parameter refit of the single most important risk parameter**, on a book with an 8% doctrine WIN rate, **on a day with zero new trade data**. That is the definition of the overfitting this routine forbids. **Handed to the 2026-09-11 weekly with the numbers attached, as the escalation clause requires.**
+
+### Refuted tonight — the trail-decoupling candidate (saves the weekly a losing change)
+IMP-041 pre-registered **decoupling `TRAIL_DISTANCE_R` from `TRAIL_TRIGGER_R`** as "a better-motivated response than IMP-040's widen-to-0.35R". It was measured properly and **it does not survive a split sample.**
+- On the post-IMP-040 window (n=34) exactly one grid row clears its noise budget: **`be=0.25R trail@1R-0.35R`, +$118.47 vs live, captured 44.6% of peak open profit** (vs 31.7% live).
+- On the **full post-gate book (n=64)** the same row is **+$86.18 against a $364.64 noise budget — it does not clear.** By difference, the **earlier 30 trades are −$32.29**. **The candidate wins in the second half and loses in the first**, which is the same pathology that killed the 09-03 `1R ÷ same-day-range` gate and the 09-04 no-progress time exit.
+- It also **cuts the win count 40/64 → 26/64** (22 → 17 on the recent window), i.e. it pays for a few +1R winners by round-tripping the SCRATCH cohort that currently **is** the book's profit. **REFUTED at the IMP-040 shipping standard (best-or-tied-best in every window). Do not re-propose without a new mechanism.**
+
+### Lessons & improvement candidates
+1. **SHIPPED as IMP-050 — the fill-anchored stop floor** (below). The one change tonight's evidence justifies without a refit: a pure correctness + capital-protection fix, measured cost of exactly zero.
+2. **The `ATR_STOP_MULT` inertness → the 09-11 weekly.** Highest expected impact in the book, and the honest owner of the "stop geometry" doctrine cause. Needs a re-derivation, not a tweak.
+3. **Do NOT tune the ratchet.** IMP-040 just passed; its contingency is untriggered; the decoupling candidate is refuted. Leave the geometry alone.
+4. **The take-profit is the only mechanism in this bot that produces doctrine WINs** (3 of 3 post-IMP-040 WINs were `TAKE_PROFIT`). IMP-040 deferred the TP question until post-IMP-040 data existed; that precondition is now met (n=34, TP rate **8.8%**, up from 2.6%). **Next in the queue after the stop-geometry refit** — and it must be judged on WIN count, not on P&L.
+5. **Carried, unowned:** `scripts/exit_geometry.py` scores candidates on simulated dollars only and has **no doctrine lens**. Tonight that mattered — the refuted candidate reads "+$118.47" while its actual mechanism is trading SCRATCH gains for a few WINs, which the tool cannot show. A cheap, test-covered IMP whenever an instrumentation slot is appropriate; **deliberately not taken tonight** after the weekly's "five instrumentation IMPs is not progress" ruling.
+
+### Notes for pre-market research
+- **★★★ 09-08 IS THE FIRST LIVE SESSION FOR IMP-050 AND THE FIRST POST-VERDICT SESSION FOR IMP-040.** The ratchet geometry is **unchanged and must stay unchanged** — IMP-040 passed and its "widen to 0.35R" contingency did not trigger. If 09-08 looks bad, that is one session against a two-week PASS.
+- **★★ WMT IS PARKED (09-07) AND THE RULE-BASED-PARKING EXPERIMENT IS NOW RUNNING.** It left as the best trailing-10-session contributor (**+$40.98 on 5 trades, 1 TAKE_PROFIT**) and it is **the only name to produce two of the book's six all-time TAKE_PROFIT fills** (#320 +$56.74 on 09-03, and #243's cohort). **Track what it does while parked** — if it rallies through its 50MA the trigger will have cost money, and that must be recorded as plainly as the sixteen sessions when chart-based parking was wrong.
+- **★★ The floor-vs-ATR finding is a WATCHLIST-RELEVANT fact, not just an engine one, and the pre-market run should read it that way.** Every name on this board currently gets an identical **1.5%** stop regardless of its range. **SPY (ADR20 0.57%) and QQQ (0.92%) cannot realistically reach +1R in a session**; **INTC (4.21%) and TSLA (3.54%) are stopped by noise**. ⚠️ **This is NOT a reason to park anyone** — SPY and QQQ are both net positive over the trailing 10 sessions, and the `1R ÷ same-day-range` entry gate is **REFUTED** (09-03) and must not be resurrected under this heading. It is context for the weekly's stop refit.
+- **★ AAPL's iPHONE EVENT IS TODAY, WEDNESDAY 09-09 — no, it is Wednesday; 09-08's run does NOT own it, the 09-09 run does.** Precedent to apply rather than re-argue: the 09-04 run ruled TSLA's Cybercab launch was "a product launch and sentiment", **not** a park driver.
+- **★ AMZN carries a live, un-fired, now-persisted trigger and has not filled since 08-25**, against Sunday's fatal Prime Air freighter crash (third-party operator `21 Air`, no halt, no guidance change). **If it fills, review the entry quality against the headline explicitly.**
+- **★ TSM/INTC vs the VWAP gate remains a measurable experiment** — TSM was refused 35× on 09-04 while producing the only doctrine WIN in that blocked set. A third datapoint hands the ATR-scaled-gate question to the weekly with INTC's +$143.40 attached.
+- **⚠️ The five-file uncommitted set is UNCHANGED and still needs an owner** (`bot/analytics.py`, `bot/exit_sim.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py`, plus untracked `backtest_result.json` / `gate_monitor_result.json`). **Escalated for a TENTH run.** This routine is barred from committing files it did not touch and left them byte-identical. ★ **It did not block tonight's verdict** — `ratchet_audit` imports the live `exits.compute_trailed_stop`, not `exit_sim`, so the IMP-040 verdict rests on committed code. The pre-market log's warning that it was "a direct input to that verdict" was **too strong**; only the `exit_geometry` sweeps read `exit_sim`, and those were the *refuted* candidate, not the verdict.
+- **⚠️ `daily_summary` 09-04 equity is $0.12 above the broker.** First DB-vs-broker drift in ~40 sessions. Watch it; don't act on it.
+- Equity **$7,642.76 (−23.57%)**. ⚠️ **Does not close the −25% escalation (twenty-seventh session) nor the 08-22 weekly's retire-or-rebuild call, now open for four weeks**, and must be read against a trailing-10-session **true win rate of 7.9%** and **FAIL+SCRATCH of 92.1%**. **The retire-or-rebuild decision is owed by a human. Tonight's IMP-040 PASS is a green two weeks; it is not an answer to that question, and it should not be quoted as one.**
+
+---

@@ -175,16 +175,47 @@ def compute_trailed_stop(
     current_stop: float,
     live_price: float | None,
     high_price: float | None = None,
+    plan_entry: float | None = None,
 ) -> float | None:
     """New (higher) stop price for a long, or None when the stop should not move.
 
     R is anchored to the ORIGINAL plan stop (entry - initial_stop), never the
     already-moved stop — anchoring to the moved stop would shrink 1R on every
     ratchet and chase the price straight into noise.
+      * fill-anchored floor (IMP-050) -> stop to (fill - planned risk).
       * >= BREAKEVEN_TRIGGER_R printed -> stop to entry.
       * >= TRAIL_TRIGGER_R live -> stop trails TRAIL_DISTANCE_R below the live price.
     Monotonic: only returns a stop ABOVE the current one, and only when the
     improvement clears STOP_RATCHET_MIN_PCT of entry (no 60s replace churn).
+
+    ``plan_entry`` (IMP-050) is the SIGNAL-BAR CLOSE that ``bot/sizing.py``
+    anchored the bracket to, i.e. the price ``initial_stop`` is a planned risk
+    ``d = plan_entry - initial_stop`` below. ``entry_price`` is the REAL broker
+    fill. A market buy that fills ABOVE the signal close leaves the stop
+    ``fill - plan_entry`` further away than the plan chose, so the trade carries
+    ``d + slippage`` of risk per share against a stop the plan sited at ``d`` —
+    measured over the post-gate book, 44 of 110 trades (40%) filled adverse,
+    worst +0.266R (WMT #243), and 25 (23%) carried >5% more per-share risk than
+    planned. IMP-037 already clamps the SHARE COUNT for this, but it clamps
+    against the pre-submit ``live`` quote and it never moves the stop, so the
+    residual fill gap and the whole bracket geometry stay uncorrected: true
+    reward:risk came out median 1.478 against a configured RR_RATIO of 1.5, and
+    on META #315 a +0.211R adverse fill turned the take-profit into a +1.072R
+    exit — barely a doctrine WIN.
+
+    The floor is **strictly tightening and cannot widen risk**: it is applied
+    only when it sits ABOVE ``initial_stop``, which by construction happens only
+    on an adverse fill (``floor - initial_stop == fill - plan_entry``). A
+    FAVOURABLE fill leaves the plan stop exactly where it is. Replayed over the
+    99 post-gate trades with bar coverage it stops out 0 additional trades and
+    saves $34.99 on the 10 that hit the plan stop anyway.
+
+    Deliberately NOT changed: ``risk`` stays anchored to ``entry - initial_stop``
+    so every recorded R-multiple, IMP-040's calibration and the doctrine's
+    ``trades.stop_price`` anchor stay comparable across the whole book; and the
+    take-profit leg is left alone (raising it is not risk-reducing and its cost
+    side is unmeasured). Scope limit: like every stage here it runs only while
+    ``TRAILING_STOP_ENABLED``, because ``engine.manage_stops`` is the only caller.
 
     ``high_price`` (IMP-031) is the highest price the tape printed since entry.
     The engine polls ``latest_trade_price`` once per POLL_INTERVAL_SEC, so
@@ -205,8 +236,20 @@ def compute_trailed_stop(
         return None
     peak = live_price if high_price is None else max(live_price, high_price)
     candidate: float | None = None
+    # Fill-anchored floor: restore the PLANNED per-share risk when the market
+    # order filled above the price the bracket was sited from. `> initial_stop`
+    # is what makes it one-directional (an adverse fill only), and `< live_price`
+    # keeps the replace legal — a sell stop at or above the market is rejected by
+    # the broker, and a price already inside the band has spent its planned risk
+    # anyway, where the untouched original stop is still the protection.
+    if plan_entry is not None and plan_entry > 0:
+        plan_risk = plan_entry - initial_stop
+        floor = entry_price - plan_risk
+        if plan_risk > 0 and initial_stop < floor < live_price:
+            candidate = floor
     if (live_price - entry_price) / risk >= config.TRAIL_TRIGGER_R:
-        candidate = live_price - config.TRAIL_DISTANCE_R * risk
+        trailed = live_price - config.TRAIL_DISTANCE_R * risk
+        candidate = trailed if candidate is None else max(candidate, trailed)
     if (peak - entry_price) / risk >= config.BREAKEVEN_TRIGGER_R:
         # A ratchet takes the best of the two stages; with TRAIL_DISTANCE_R <=
         # TRAIL_TRIGGER_R (the shipped 0.25R/0.25R, IMP-040) the trail candidate

@@ -145,8 +145,18 @@ class Engine:
                 peak = exits.peak_high_since(
                     session_bars.get(t["symbol"]), t.get("entry_time"),
                 )
+                # `entry` is the REAL broker fill; t["entry_price"] is still the
+                # PLAN price the bracket was sited from (logbook only corrects
+                # that column to the fill when the trade CLOSES), so the pair
+                # gives compute_trailed_stop the planned per-share risk it needs
+                # for the IMP-050 fill-anchored floor. Fails OPEN: a row without
+                # the column passes None and gets exactly the pre-IMP-050
+                # ratchet, because a missing plan price must never cost a trade
+                # its stop management.
+                plan_entry = t.get("entry_price")
                 new_stop = exits.compute_trailed_stop(
                     entry, float(t["stop_price"]), current_stop, live, peak,
+                    plan_entry=float(plan_entry) if plan_entry is not None else None,
                 )
                 if new_stop is None:
                     continue
