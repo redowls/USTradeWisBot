@@ -219,13 +219,27 @@ def test_floor_is_not_applied_at_or_above_the_live_price():
     ) == pytest.approx(578.85, abs=0.01)
 
 
-def test_floor_respects_the_min_step_and_cannot_churn_the_broker():
-    """A one-cent adverse fill is not worth a replace round-trip."""
+def test_floor_cannot_churn_the_broker_because_it_fires_exactly_once():
+    """SUPERSEDED BY IMP-051, deliberately, and kept as the churn proof.
+
+    This test used to assert that a one-cent adverse fill returns None because
+    it did not clear STOP_RATCHET_MIN_PCT. That was the wrong protection: the
+    floor's size IS the slippage, which is below the 0.10% gate on 69% of
+    adverse fills, so the gate made IMP-050 inert rather than tidy (it fired on
+    0 of 3 adverse fills on its first live session). IMP-051 exempts the floor
+    and pins the churn property where it actually lives — idempotence. The floor
+    reads only values that are fixed for the life of the trade, so once the stop
+    sits there the second call returns None.
+    """
     plan_entry, plan_stop = 100.0, 98.5
-    fill = plan_entry + 0.01                # floor 98.51, min_step 0.10% = 0.10
-    assert exits.compute_trailed_stop(
+    fill = plan_entry + 0.01                        # floor 98.51, a 1-cent raise
+    first = exits.compute_trailed_stop(
         fill, plan_stop, plan_stop, live_price=fill + 0.01, plan_entry=plan_entry,
-    ) is None
+    )
+    assert first == pytest.approx(98.51, abs=0.001)  # smaller than min_step 0.10
+    assert exits.compute_trailed_stop(
+        fill, plan_stop, first, live_price=fill + 0.01, plan_entry=plan_entry,
+    ) is None, "the floor must never re-fire once the stop already sits on it"
 
 
 def test_floor_never_lowers_a_stop_the_ratchet_already_raised():

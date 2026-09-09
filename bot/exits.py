@@ -185,8 +185,12 @@ def compute_trailed_stop(
       * fill-anchored floor (IMP-050) -> stop to (fill - planned risk).
       * >= BREAKEVEN_TRIGGER_R printed -> stop to entry.
       * >= TRAIL_TRIGGER_R live -> stop trails TRAIL_DISTANCE_R below the live price.
-    Monotonic: only returns a stop ABOVE the current one, and only when the
-    improvement clears STOP_RATCHET_MIN_PCT of entry (no 60s replace churn).
+    Monotonic: only returns a stop ABOVE the current one, and — for the two
+    tape-driven stages — only when the improvement clears STOP_RATCHET_MIN_PCT of
+    entry (no 60s replace churn). The fill-anchored floor is EXEMPT from that
+    gate (IMP-051): it is a one-time correction sized by the adverse slippage,
+    which is below the gate on 69% of adverse fills, and it cannot churn because
+    every input it reads is fixed for the life of the trade.
 
     ``plan_entry`` (IMP-050) is the SIGNAL-BAR CLOSE that ``bot/sizing.py``
     anchored the bracket to, i.e. the price ``initial_stop`` is a planned risk
@@ -236,6 +240,11 @@ def compute_trailed_stop(
         return None
     peak = live_price if high_price is None else max(live_price, high_price)
     candidate: float | None = None
+    # IMP-051: True while `candidate` is the fill-anchored floor and nothing
+    # else. Only the floor is exempt from STOP_RATCHET_MIN_PCT (see below); the
+    # break-even and trail stages are not, and any stage that outbids the floor
+    # clears this flag.
+    floor_only = False
     # Fill-anchored floor: restore the PLANNED per-share risk when the market
     # order filled above the price the bracket was sited from. `> initial_stop`
     # is what makes it one-directional (an adverse fill only), and `< live_price`
@@ -247,21 +256,44 @@ def compute_trailed_stop(
         floor = entry_price - plan_risk
         if plan_risk > 0 and initial_stop < floor < live_price:
             candidate = floor
+            floor_only = True
     if (live_price - entry_price) / risk >= config.TRAIL_TRIGGER_R:
         trailed = live_price - config.TRAIL_DISTANCE_R * risk
-        candidate = trailed if candidate is None else max(candidate, trailed)
+        if candidate is None or trailed > candidate:
+            candidate, floor_only = trailed, False
     if (peak - entry_price) / risk >= config.BREAKEVEN_TRIGGER_R:
         # A ratchet takes the best of the two stages; with TRAIL_DISTANCE_R <=
         # TRAIL_TRIGGER_R (the shipped 0.25R/0.25R, IMP-040) the trail candidate
-        # is already >= entry, so this max() is a no-op today and a guard if
-        # either moves.
-        candidate = entry_price if candidate is None else max(candidate, entry_price)
+        # is already >= entry, so this is a no-op today and a guard if either
+        # moves. Either armed stage always outbids the floor (both land at or
+        # above `entry_price`), so the floor decides only while neither has.
+        if candidate is None or entry_price > candidate:
+            candidate, floor_only = entry_price, False
     if candidate is None:
         return None
-    min_step = entry_price * config.STOP_RATCHET_MIN_PCT / 100.0
+    # IMP-051: the floor is EXEMPT from the churn gate, the armed stages are not.
+    # The gate exists because the trail re-prices off a moving tape every 60s and
+    # Alpaca rotates the order id on every replace. The floor does not move: its
+    # size is by identity the adverse slippage (`floor - initial_stop == fill -
+    # plan_entry`), which is smaller than STOP_RATCHET_MIN_PCT of entry on 47 of
+    # the 68 adverse fills in the post-gate book (69%) — median adverse slip
+    # 0.044% against a 0.10% gate — so the gate silently made IMP-050 INERT. On
+    # its first live session (2026-09-08) the floor was blocked on 3 of 3 adverse
+    # fills (XOM #331 0.084%, TSM #332 0.048%, XOM #333 0.020%) and fired zero
+    # times; XOM #331 then rode to the plan stop it would have cleared by 0.136.
+    # Exempting it cannot churn: `entry_price`, `plan_entry` and `initial_stop`
+    # are all fixed for the life of the trade, so once the stop sits at the floor
+    # the candidate can never again beat `current_stop` — it fires exactly once.
+    min_step = 0.0 if floor_only else entry_price * config.STOP_RATCHET_MIN_PCT / 100.0
     if candidate <= current_stop + min_step:
         return None
-    return round(candidate, 2)
+    new_stop = round(candidate, 2)
+    # Rounding to the cent must not hand back a no-op replace: with the floor
+    # exempt from min_step the improvement can be sub-cent, and a stop "raised"
+    # to the price it already holds buys an id rotation for nothing.
+    if new_stop <= current_stop:
+        return None
+    return new_stop
 
 
 def _walk_stop_leg(entry_order, fetch, max_hops: int = 5):
