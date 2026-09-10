@@ -812,8 +812,37 @@ Ordered by expected impact; each item needs replay validation before code.
   25% cap. **Fourteenth failed discriminator.** Do not reopen on another day
   where the book froze early and the tape reversed — 08-10, 08-11 and 08-20 all
   look like that, and era-controlled that is the profitable cohort. A future
-  tooling IMP could add this encoding to `scripts/entry_discriminator.py` as a
+  tooling IMP did exactly that for a different encoding — see
+  `--stat below-session-high` below (IMP-052) — so the pattern is proven. A
+  future tooling IMP could add this encoding to `scripts/entry_discriminator.py` as a
   built-in `--stat slot-pace` so it re-runs as the book grows.
+
+- ~~**Refuse entries whose fill sits more than X% BELOW the session high already
+  printed that day ("don't buy a lower high")**~~ **[REFUTED 2026-09-09 —
+  ERA ARTEFACT + COLLATERAL].** The best-motivated entry-quality hypothesis in
+  weeks, and the only one to explain two consecutive sessions in full: 09-08 XOM
+  topped **163.01 at 09:38** and was bought at 10:12 and 15:05 (#331 never green
+  in 133 min, the day's whole loss); 09-09 TSLA topped **375.44 at 09:33** and
+  was bought at 09:42 and 10:36 (#337 green on 6 of 48 min, 107% of the day's
+  net loss). Mechanically plausible — the MA crossover is a lagging confirmation
+  — and genuinely **ex-ante**, unlike the 2026-08-13 session-range candidate.
+  Tested through `bot/discriminator.py` via the new
+  `scripts/entry_discriminator.py --stat below-session-high` (280 of 305 trades
+  scored; a fill on the opening minute has no prior high and is dropped, not
+  tagged 0.0): **NOT SUPPORTED at any threshold — REFUTED (0.25/0.50/0.60/1.00),
+  ERA_ARTEFACT (0.40/0.75).** The kill is the familiar sign flip plus collateral:
+  at **0.50%** the post-gate split reads **ABOVE n=55, -$266.63, avg -$4.85,
+  avgR -0.127 vs BELOW n=59, +$185.47, avg +$3.14, avgR +0.088** — a
+  **+$7.99/trade** edge — while **era-controlled it inverts to -$0.34**, 76% of
+  the refused cohort's P&L is the pre-gate week, and the filter discards **38%
+  worth of net-positive symbols (SE +$177.75, MSFT +$153.97, TSLA +$45.99)**
+  against the 25% cap. **The refused cohort contains TSLA — the symbol the
+  hypothesis was invented to explain.** **Fifteenth failed discriminator.** Do
+  not reopen on another session lost to a lower-high entry: 09-08 and 09-09 are
+  already inside the numbers that refuted it. Re-run
+  `--stat below-session-high` after any entry rebuild — if a rebuilt entry ever
+  makes this statistic discriminate era-controlled, the rebuild did something
+  real.
 
 ## Completed phases
 

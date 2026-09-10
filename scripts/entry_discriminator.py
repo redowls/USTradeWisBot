@@ -5,6 +5,7 @@ Usage:
   python -m scripts.entry_discriminator --stat time-of-day
   python -m scripts.entry_discriminator --thresholds 2.0 2.5 3.0
   python -m scripts.entry_discriminator --stat atr-1r --feed iex
+  python -m scripts.entry_discriminator --stat below-session-high
 
 Eleven entry/exit discriminators have been tested and refuted (todo.md
 "Refuted / closed candidates"), each by a throwaway script whose numbers cannot
@@ -22,11 +23,18 @@ Built-in statistics:
                 gives it: high values mean the stop sits inside the daily noise.
                 Needs daily bars (network).
   time-of-day   minutes after the 09:30 ET open. Pure, no network.
+  below-session-high
+                how far the fill sits BELOW the session high printed before it,
+                as a % of the fill (0.0 = the entry is itself a fresh session
+                high). High values mean the MA crossover fired as a lagging
+                confirmation of a move whose high had already printed — the bot
+                bought a lower high. Needs 1-minute bars (network). IMP-052.
 
-Both are EX-ANTE by construction. A statistic that is not knowable at entry
+All three are EX-ANTE by construction. A statistic that is not knowable at entry
 cannot become a live gate however well it separates — the 2026-08-13
 session-range refutation turned on exactly that point, and realised range is
-deliberately not offered here.
+deliberately not offered here. `below-session-high` uses only bars that CLOSED
+before the entry minute for the same reason.
 
 This is a STANDALONE analysis tool. Like scripts/regime_analysis.py and
 scripts/exit_geometry.py it is NOT imported by the live trading path or by
@@ -38,22 +46,30 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from alpaca.data.enums import DataFeed
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 
-from bot import analytics, discriminator as D, doctrine
+from bot import analytics, config, discriminator as D, doctrine
 from bot.data import data_client
 from bot.discriminator import Sample
 
 ATR_PERIOD = 14
 DEFAULT_ATR_THRESHOLDS = [1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
 DEFAULT_TOD_THRESHOLDS = [15.0, 30.0, 45.0, 60.0, 90.0, 120.0]
+DEFAULT_BSH_THRESHOLDS = [0.25, 0.40, 0.50, 0.60, 0.75, 1.00]
 
 # Daily-bar history to pull before the first trade, so an ATR(14) exists for it.
 WARMUP_DAYS = 60
+
+# Regular US cash session, ET, as minutes after midnight. The session high a
+# live gate could read is the REGULAR-hours high — the bot does not trade the
+# pre-market and its VWAP is a session VWAP, so pre-market prints must not leak
+# into the statistic.
+SESSION_OPEN_MIN = 9 * 60 + 30
+SESSION_CLOSE_MIN = 16 * 60
 
 
 def _sample(row: dict, day: str, value: float) -> Sample:
@@ -152,6 +168,104 @@ def _atr_samples(rows: list[dict], feed: str) -> tuple[list[Sample], list[str]]:
     return samples, notes
 
 
+def session_high_before(bars: list, entry_et) -> float | None:
+    """Highest REGULAR-HOURS print that closed strictly BEFORE `entry_et`'s minute.
+
+    Pure — `bars` are anything with `.timestamp` (tz-aware) and `.high`, so the
+    tests drive it with stubs and no network. Returns None when nothing
+    qualifies, which is the correct answer for a fill on the opening minute:
+    there is no prior high, so the trade cannot be scored and must be dropped
+    rather than silently tagged 0.0 (a fill on the 09:30 bar is not evidence of
+    a fresh high, it is absence of evidence).
+
+    "Strictly before" is the ex-ante guard. The entry minute's OWN bar contains
+    prints from after the fill, so including it would let the statistic see the
+    future — the exact defect that made realised session range inadmissible on
+    2026-08-13.
+    """
+    cutoff = entry_et.replace(second=0, microsecond=0)
+    highs = []
+    for bar in bars:
+        ts = bar.timestamp.astimezone(config.MARKET_TZ)
+        minute = ts.hour * 60 + ts.minute
+        if ts.date() != cutoff.date():
+            continue
+        if not (SESSION_OPEN_MIN <= minute < SESSION_CLOSE_MIN):
+            continue
+        if ts >= cutoff:
+            continue
+        highs.append(float(bar.high))
+    return max(highs) if highs else None
+
+
+def below_session_high_pct(entry_price: float, session_high: float) -> float:
+    """How far `entry_price` sits below `session_high`, as a % of the fill.
+
+    Floored at 0.0: an entry that IS the session high and an entry that prints a
+    new high above it are the same thing for this statistic — "nothing had
+    already topped this" — and letting the value go negative would spread the
+    fresh-high cohort across a range where a `>=` threshold means nothing.
+    """
+    if entry_price <= 0:
+        return 0.0
+    return max(0.0, (session_high - entry_price) / entry_price * 100.0)
+
+
+def _minute_bars(symbols: list[str], day: str, feed: str) -> dict:
+    """{symbol: [bar, ...]} of 1-minute bars for one session, oldest first."""
+    start = datetime.strptime(day, "%Y-%m-%d").replace(
+        hour=9, minute=30, tzinfo=config.MARKET_TZ)
+    request = StockBarsRequest(
+        symbol_or_symbols=symbols,
+        timeframe=TimeFrame.Minute,
+        start=start,
+        end=start.replace(hour=16, minute=0),
+        feed=DataFeed.SIP if feed == "sip" else DataFeed.IEX,
+    )
+    barset = data_client().get_stock_bars(request)
+    data = getattr(barset, "data", None) or {}
+    return {sym: sorted(bars, key=lambda b: b.timestamp) for sym, bars in data.items()}
+
+
+def _below_session_high_samples(rows: list[dict], feed: str) -> tuple[list[Sample], list[str]]:
+    """Tag each closed trade with how far its fill sat below the session high.
+
+    IMP-052. Motivated by 2026-09-08 and 2026-09-09, where the dominant failure
+    cause was entry quality with an identical mechanism on two different
+    symbols: the session high printed in the opening minutes (XOM 163.01 at
+    09:38; TSLA 375.44 at 09:33) and every subsequent MA crossover bought a
+    lower high. Fetches per SESSION rather than per symbol because the statistic
+    is intraday and the trades cluster into few days.
+    """
+    usable = [r for r in rows if r.get("entry_time") is not None]
+    by_day: dict[str, set] = {}
+    for r in usable:
+        by_day.setdefault(r["entry_time"].strftime("%Y-%m-%d"), set()).add(r["symbol"])
+
+    samples, skipped = [], 0
+    for day in sorted(by_day):
+        bars = _minute_bars(sorted(by_day[day]), day, feed)
+        for r in usable:
+            if r["entry_time"].strftime("%Y-%m-%d") != day:
+                continue
+            # entry_time is naive ET, as the bot writes it.
+            entry_et = r["entry_time"].replace(tzinfo=config.MARKET_TZ)
+            high = session_high_before(bars.get(r["symbol"], []), entry_et)
+            if high is None:
+                skipped += 1
+                continue
+            value = below_session_high_pct(_f(r["entry_price"]), high)
+            samples.append(_sample(r, (r.get("exit_time") or r["entry_time"]).strftime("%Y-%m-%d"),
+                                   value))
+    notes = [f"feed={feed}, 1-minute bars, session high from bars CLOSED before the entry minute",
+             f"{len(by_day)} session(s) fetched"]
+    if skipped:
+        notes.append(f"{skipped} trade(s) skipped — no regular-hours bar before the fill")
+    if feed != "sip":
+        notes.append("IEX-only highs understate the session high — the statistic reads LOW vs SIP")
+    return samples, notes
+
+
 def _time_of_day_samples(rows: list[dict]) -> tuple[list[Sample], list[str]]:
     """Tag each closed trade with minutes after the 09:30 ET open."""
     samples = []
@@ -180,12 +294,12 @@ def _fmt(stats: dict, doc: dict | None = None) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--stat", choices=["atr-1r", "time-of-day"], default="atr-1r",
-                        help="which entry-time statistic to test")
+    parser.add_argument("--stat", choices=["atr-1r", "time-of-day", "below-session-high"],
+                        default="atr-1r", help="which entry-time statistic to test")
     parser.add_argument("--thresholds", type=float, nargs="+",
                         help="thresholds to sweep (defaults per statistic)")
     parser.add_argument("--feed", choices=["sip", "iex"], default="sip",
-                        help="daily-bar feed for atr-1r (default sip)")
+                        help="bar feed for atr-1r / below-session-high (default sip)")
     parser.add_argument("--since", help="only trades entered on/after YYYY-MM-DD")
     args = parser.parse_args(argv)
 
@@ -199,6 +313,10 @@ def main(argv: list[str] | None = None) -> int:
         samples, notes = _atr_samples(rows, args.feed)
         thresholds = args.thresholds or DEFAULT_ATR_THRESHOLDS
         label = f"prior-day daily ATR({ATR_PERIOD}) / 1R at entry"
+    elif args.stat == "below-session-high":
+        samples, notes = _below_session_high_samples(rows, args.feed)
+        thresholds = args.thresholds or DEFAULT_BSH_THRESHOLDS
+        label = "% the fill sits BELOW the session high printed before it"
     else:
         samples, notes = _time_of_day_samples(rows)
         thresholds = args.thresholds or DEFAULT_TOD_THRESHOLDS
