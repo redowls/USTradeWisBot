@@ -3206,3 +3206,81 @@ MFE/MAE from real 1-min SIP bars over each trade's entry→exit window, in R aga
 - Equity **$7,591.11 (−24.09%)**. ⚠️ **Does not close the −25% escalation (thirty-first session)** and must be read against a trailing-10 true win rate of **8.3%** and an era true win rate of **6.9%** — now **below** the 7.9% its own payoff needs to break even. ★ **Tonight's IMP shipped a refutation, not a fix, and that is the honest result: the best entry-quality story two losing sessions could produce does not survive era control. The retire-or-rebuild call is owed by a human and is open four weeks.**
 
 ---
+
+## 2026-09-10 — Daily Review
+
+### Stats
+- Trades: **2 closed (headline 1W / 1L)**, headline win rate **50.0%**. Net **−$28.46 (−0.375%)**. Winner AAPL **+$5.32**; loser UNH **−$33.78**.
+- **Both exits were STOPs. Stop rate 100%. True win rate 0.0%.** See the stop-exit accounting below — the headline 50% is the number the doctrine exists to distrust.
+- Avg winner **+$5.32** / avg loser **−$33.78** → **payoff 0.16**, **profit factor 0.16**. Mean **−0.418R**.
+- Exit mix: **STOP 2 (−$28.46)**. No take-profit, no flatten. Neither TP was approachable: AAPL's needed **+1.07R** against an MFE of **+0.419R**; UNH's needed **+1.61R** against an MFE of **+0.167R**.
+- Holding times: AAPL **87.4m** (09:46:46 → 11:14:08 ET), UNH **36.3m** (09:56:17 → 10:32:37 ET). Both entries in the 09:46–09:56 window.
+- Sizing matched the confidence plan. Both signals scored the bottom band (**AAPL 64.68, UNH 60.65**) and both sized to the floor rung, 6 shares each: risk **$35.18** and **$34.20** = **0.46% / 0.45% of equity** against a `MAX_RISK_PCT` cap of 2.0. The 8% daily-loss halt was never in play (worst point −0.45%).
+- **Broker-reconciled to the cent via the `alpaca` MCP (read-only):** `last_equity` 7,590.99 → `equity` **7,562.53** = **−$28.46**, matching DB `daily_summary` exactly. Cash $7,562.53, `long_market_value` 0, **0 positions**, ACTIVE, not blocked. Both bracket parents filled, both stop legs filled, both TP legs cancelled at the exit — **no orphans, no missed fills, no qty drift, no naked overnight.**
+- Slippage: AAPL's ratcheted stop leg was placed at **321.84 and filled at 321.80** (−$0.04/share = **−$0.24**). UNH's stop was placed at **391.11 and filled at 391.18** — *positive* $0.07/share. Entry fills tie to the DB to six decimals.
+- Reliability: **zero ERROR / Traceback / CRITICAL lines**, NRestarts=0, clean start at 11:52:04 UTC (the pre-market routine's watchlist restart). IMP-052 shipped `scripts/`-only, so the live trading path today was **`80adf6c`**, unchanged — as IMP-052 pre-registered, today was **not** its first live session and no pass condition was owed.
+
+### Stop-exit accounting
+- **Stop rate 2/2 = 100.0%.** **WIN 0 · SCRATCH 0 · FAIL 2** (full-1R **1** / break-even **1** / faded 0). No `EOD_FLATTEN`, so `by_flatten_outcome()` is empty.
+- **True win rate 0.0% vs headline 50.0% — a 50-point gap, and the whole gap is one trade.** AAPL #340 exited **green (+$5.32, +0.276%)** on a stop that had been ratcheted to +0.158R. Ratio **1.151 → profit_R +0.151**, inside the doctrine's `FAIL_MAX_R` of +0.25R. It armed, peaked, and handed back all but $5.32. **It is a failure and it is counted as one.**
+- **Trailing 10 sessions (2026-08-27 → 09-10, n=34):** net **+$134.51**, mean **+0.118R**, **stop rate 23/34 = 67.6%**, **WIN 3 · SCRATCH 15 · FAIL 16 → F+S 91.2%**, FAIL split full-1R 5 / BE 9 / faded 2. Headline win rate **58.8%** against a **true win rate of 8.8%** — a 50-point gap on the trailing window too, so tonight is the trend, not a point.
+- ⚠️ **ESCALATION CLAUSE LIVE FOR A SEVENTH CONSECUTIVE RUN.** Last 3 sessions with trades (**09-08 / 09-09 / 09-10**): **8 trades, 8 stops, 0 WINs, 1 SCRATCH, 7 FAILs → F+S 100.0%**, net **−$79.89**, mean **−0.279R**. `doctrine.escalation_verdict` returns `escalated: true`. **No parameter was tuned tonight.**
+- **Post-gate era (since 2026-07-25, n=118):** stop rate **45.8%**, **WIN 8 (6.8%) · SCRATCH 57 · FAIL 53 → F+S 93.2%**, net **−$113.09**, mean **−0.023R**. Headline **46.6%**.
+- **Dominant failure cause tonight: profit capture (AAPL), with entry quality second (UNH) — and the profit-capture reading was tested and does NOT license a change.** See "What worked / what didn't".
+
+### Market context
+**A risk-off tape that the bot read correctly on one name and backwards on the other.** SIP daily bars: **SPY 762.40 → 757.83 (−0.60%)**, **QQQ 716.31 → 708.69 (−1.06%)** — both closed in the lower half of their range. `sonar` reported "S&P −0.58%, Nasdaq −0.65%, risk-off, led by rising oil and higher Treasury yields"; the S&P figure checks out, the Nasdaq figure understates QQQ's actual −1.06%. **Nineteenth consecutive run in which `sonar`'s numbers needed checking — keep it demoted to regime and leads only.**
+- **AAPL closed +3.56% at 326.57, one cent off its session high of 326.74, having opened 316.67 with a low of 316.51.** It was **the single best-trending large cap on the tape on a red day**, on iPhone-lineup pricing. WebSearch/`sonar` agree on the catalyst.
+- **UNH closed −1.22% at 388.28, near its session low of 387.60**, opening 396.00 after a 399.26 high. `sonar` described a Wells Fargo healthcare-conference turnaround narrative but gave no direction; the tape says the narrative did not hold intraday. This is UNH's **second** consecutive red session (−1.94% on 09-09).
+- **The regime read matters for attribution:** on a −0.60% SPY day the bot took two longs, and one of them was the day's best name. The losing trade is not "long into a falling market" alone — UNH fell while AAPL rose 3.56% in the same tape.
+
+### Trade-by-trade review
+**#340 AAPL BUY 6 @ 320.9133, 09:46:46 ET → STOP @ 321.80, 11:14:08 ET, +$5.32 (+0.276%), conf 64.68, signal MA (breakout_score 0.0000).** Plan stop 315.05 (1.827% of fill), TP 327.19 (**+1.07R from the fill**), `stop_raises` **4**, final broker stop **321.84**.
+- **Path: MAE −0.524R (317.84) first, then MFE +0.419R (323.37) at 11:08 ET, then stopped at 11:14 ET.** The ratchet worked exactly as designed — 4 replaces, last at 11:07 ET setting 321.84 — and a **0.26R pullback** took it out. **AAPL then ran to 326.74 and closed 326.57.**
+- **Root cause: profit capture.** From the fill, the day offered **+0.965R** to the close; the bot banked **+0.151R — 15.7% of the available move — on the best-trending name in the market.** This is the textbook "the trade WAS right and the bot handed it back" case.
+- ★★★ **AND THE OBVIOUS FIX IS REFUTED BY AAPL'S OWN BARS — this is the most important number in tonight's entry.** I replayed #340 minute-by-minute under the live geometry with only `TRAIL_DISTANCE_R` varied, exits at the real 15:55 flatten:
+
+  | trail | exit | reason | P&L | R |
+  |---|---|---|---|---|
+  | **0.25R (live)** | 321.75 | STOP 11:15 | **+$5.05** | +0.143 |
+  | 0.35R | 322.30 | STOP 11:45 | **+$8.31** | +0.236 |
+  | 0.50R | 321.37 | STOP 11:47 | **+$2.73** | +0.078 |
+  | 0.75R | 320.91 | STOP 11:47 | **$0.00** | 0.000 |
+  | 1.00R | 320.91 | STOP 11:47 | **$0.00** | 0.000 |
+  | **no ratchet at all** | 326.07 | EOD_FLATTEN | **+$30.94** | +0.879 |
+  | *actual live* | 321.80 | STOP 11:14 | *+$5.32* | *+0.151* |
+
+  ⚠️ **Widening the trail makes this trade WORSE, not better, and the reason is structural: AAPL traded down to 319.20 — BELOW the 320.9133 entry — at 11:47 ET before the afternoon rally.** Any stop at or above break-even is taken out there. **The ONLY geometry that captures the move is removing IMP-013's break-even floor entirely**, which is barred capital protection and which `ratchet_audit` says costs the book money at population level. **The intuition "the trail was too tight" is false on the very trade that inspired it.**
+
+**#341 UNH BUY 6 @ 396.81, 09:56:17 ET → STOP @ 391.18, 10:32:37 ET, −$33.78 (−1.419%), conf 60.65, signal MA (breakout_score 0.0000).** Plan stop 391.11 (1.436% of fill), TP 406.00 (+1.61R), `stop_raises` **0** — nothing ever armed.
+- **Path: MFE +0.167R reached at 09:57 ET — one minute after the fill — and never again.** Straight to the full-1R stop in 36 minutes. **After the exit it kept falling to 387.60 (−1.616R) and closed 388.28 (−1.496R).**
+- **Root cause: entry quality, and the stop did its job.** The bot bought at 396.81, i.e. **0.619% below the 399.26 session high already printed**, on the second red session in a row for the name, and the position was under water within 60 seconds. **The full-1R stop saved 0.5R** (−0.988R booked vs −1.496R at the close). ★ **Do not read this trade as a stop-geometry failure — a wider stop would have lost more.**
+- **Note the stop distance, 1.436% of the fill, sits BELOW the 1.5% `MIN_STOP_PCT` floor** — because the floor is applied to the *signal-bar close* (397.07) and the fill came in **$0.26 better**. IMP-050's fill-anchored floor only fires on *adverse* fills, so it correctly stayed silent. **Behaving as designed; recorded because it looks like a floor breach and is not.**
+
+### What worked / what didn't
+- ✅ **The full-1R stop worked** (UNH: −0.988R booked against −1.496R at the close).
+- ✅ **The broker reconciliation was perfect** — no orphans, no drift, penny-exact.
+- ✅ **The ratchet is net-positive at book level and tonight did not change that.** `scripts.ratchet_audit --since 2026-07-25` over 100 trades with bars: **helped 19 (+$270.43) / hurt 13 (−$159.58) → NET +$110.85** vs the same trades with the ratchet off. AAPL #340 is one of the 13. **One draw from a bucket that pays is not a lever.**
+- ❌ **Profit capture on AAPL** — 15.7% of an available +0.965R — **but see the refutation above; there is no trail width that fixes it, only the removal of capital protection.**
+- ❌ **Entry quality on UNH** — bought a name below its session high on its second red day, under water inside a minute.
+- ⚠️ **The exit decomposition names the real leak and it is not tonight's trades.** Post-gate: **PLAN_STOP n=16, −$588.99 (avg −$36.81)** against **TAKE_PROFIT n=5 +$250.27** + **RATCHET_STOP n=32 +$181.56** + **EOD_FLATTEN n=47 −$59.23**. **The entire post-gate loss is the 16 trades that never worked at all.** UNH is one of them; AAPL is not.
+- ⚠️ **The VWAP gate refused 90 attempts today (AAPL×48, GOOG×15, META×14, MSFT×13) against 2 fills.** ★ **48 of those refusals were on AAPL — the day's best name, +3.56%.** That is the sharpest single-session argument yet that the flat 0.25% VWAP band mis-prices a strongly trending name. **It is n=1, it is the sixth consecutive run in which the gate question has been carried, and it belongs to the weekly — recorded, not acted on.**
+
+### Lessons & improvement candidates
+1. ★★★ **The escalation clause is live for a seventh run and was honoured: no parameter was tuned.** F+S **100.0%** over 09-08/09-09/09-10 (8 trades, **zero WINs**, −$79.89). The clause bars tuning; it does not bar finding out, and it does not bar fixing an instrument.
+2. ★★★ **SHIPPED — IMP-053: the stop-protection bands now speak the doctrine, and the report stopped calling a scratched trail a win.** Tonight AAPL #340 was simultaneously `doctrine.classify` = **FAIL** and, in `scripts/report`, part of a band printing **`trailed 23 100.0 263.36`**. Across the whole book that band is **23 trades, +$263.36, and ZERO doctrine WINs** — 9 FAILs (ratio ≤ 1.25) and 14 SCRATCHes. A second, quieter edge was wrong too: `full-1R` ended at ratio 0.5 while `doctrine.FULL_STOP_MAX_R` puts it at 0.25, misfiling TSLA #139 (−$119.38). **This is the IMP-049 defect — two instruments, two vocabularies, the wrong one louder — in the loudest instrument in the repo.** Detail in `memory/improvement-log.md`.
+3. ★★★ **(REFUTED TONIGHT, recorded so it is never reopened on a give-back trade) Widening `TRAIL_DISTANCE_R`.** AAPL #340 is the most seductive case the book has produced and its own bars kill it: 0.50R → +$2.73, 0.75R and 1.00R → **$0.00**, because price traded below the entry at 11:47 before the rally. Only "no ratchet at all" captures it (+$30.94), and that means deleting IMP-013's break-even floor — **barred capital protection, and net −$110.85 at book level.** **Do not re-propose a trail widening on a hand-back trade without first replaying that trade's own post-exit path.**
+4. ★★ **(REFUSED — already refuted) The never-green / stall time-stop.** UNH #341 (MFE +0.167R at minute 1, dead thereafter) is a textbook case. It stays **dead**: IMP-032's 42-cell grid found every non-degenerate cell negative, and IMP-041 showed `EOD_FLATTEN` is a net-positive bucket. **UNH does not revive it.**
+5. ★★ **(NOT MINE TONIGHT — but newly MEASURED) `origin/main` does not pass its own test suite, and has not since `b03f5ce`.** The **five-uncommitted-files** problem has been escalated in `todo.md` since the 2026-09-05 weekly; what is new tonight is its cost, measured for the first time because IMP-053 required verifying the staged tree in isolation. **HEAD checked out clean scores 20 failed / 596 passed.** Every failure is `tests/test_exit_sim.py` — **committed** — expecting a `high_price` parameter that exists only in the **uncommitted** `bot/exit_sim.py`. `b03f5ce "housekeeping: commit pre-existing IMP-031 ratchet parity test"` committed the test without its source change. **Blast radius is simulation only** — `bot/exit_sim.py` is imported by no live-path module (`bot/engine.py`, `bot/exits.py`, `bot/strategy.py`, `main.py` all clear), so the running service is unharmed and there is no trading risk. **Left untouched per the standing rule on pre-existing uncommitted changes; the `todo.md` escalation item was updated with the numbers.** ⚠️ **It also means every recent run's "full suite passes" was measured on a working tree that is not what is in git — tonight's IMP was therefore validated on BOTH trees (see the improvement log).**
+6. ★ **The 48 AAPL VWAP refusals on a +3.56% day** — the strongest single-session evidence yet on the flat-band question. **Weekly's, with the numbers attached.**
+7. ⚠️ **The strategy verdict is unchanged and the evidence against it grew again: post-gate 118 trades, true win rate 6.8%, mean −0.023R, net −$113.09; sixteen refuted discriminators now, with tonight adding the trail-widening refutation on the exit side.** Equity **$7,562.53 (−24.37%)** — **thirty-second consecutive session without closing the −25% escalation.** **The retire-or-rebuild call is a human decision and is open four weeks.**
+
+### Notes for pre-market research
+- **AAPL — the one name that behaved like the strategy's thesis and is worth watching, not parking.** +3.56% to 326.57, closed **$0.17 off its session high**, opened at its low. **It took 48 VWAP refusals and 1 fill.** ★ **Concrete, falsifiable observation for tomorrow: if AAPL follows through, the refusal count on a trending name is a watchlist-visible symptom of a gate question the weekly owns — count it again and record it, do not act on it.**
+- **UNH — second consecutive red session (−1.94%, then −1.22%), closed near its low, and now 10 trades / −$233.49 all-time.** ⚠️ **Its registered trigger (registered 08-31, *"next full-1R STOP parks it"*) HAS NOW FIRED: #341 is a full-1R STOP.** ★ **That is the pre-market routine's call to execute, not mine — the trigger was written to be honoured, and tonight is the event it was written for. Do not re-argue it; apply it or record explicitly why not.**
+- **ABNB — the 09-10 pre-market park pre-registered a falsifiable test and it must be scored, not assumed.** The claim was that ABNB is no longer a clean intraday breakout candidate. It **did not trade today** (last fill 07-15), so the park again costs and proves nothing on P&L. **Score it on the tape: if ABNB closes green and above its 20MA within a week, re-enable on its own written condition rather than defending the park.**
+- **XOM — the refuted spike-and-fade mechanism is on the record in the DB note.** Nothing to do; when the strike leg clears, re-enable without re-arguing the fade story.
+- **`sonar` needed checking again (19th run):** its Nasdaq figure (−0.65%) understated QQQ's actual −1.06%, and it gave no direction on UNH while UNH closed near its low. **Regime and leads only, never its numbers.**
+- **No watchlist action was taken by this routine** (watchlist decisions belong to pre-market). Board stands at **17 active**.
+
+---

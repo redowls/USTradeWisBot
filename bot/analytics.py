@@ -56,21 +56,43 @@ EXTENSION_BANDS: tuple[tuple[float, float, str], ...] = (
     (1.0, float("inf"), ">1.0%"),
 )
 
-# Stop-protection bands — split STOP exits by the fraction of the ORIGINAL 1R
-# risk retained at the stop (see stop_protection_ratio). Since IMP-013
-# (2026-07-08) raises the broker stop to break-even at +0.5R and trails it at
-# +1R, the "STOP" exit_reason no longer means one thing: a full-1R stop is a real
-# false-breakout loss (the PF~0.01 leak), while a break-even/trailed stop is a
-# trade IMP-013 rescued. These bands de-blend the two so the residual real-STOP
-# leak and IMP-013's effect can be judged separately. full-1R = stopped at/below
-# the original 1R; break-even ~= stop raised to entry (small slippage/ratchet
-# drift allowed up to +0.05R); trailed = stopped materially above entry (in
-# profit).
-STOP_PROTECTION_BANDS: tuple[tuple[float, float, str], ...] = (
-    (float("-inf"), 0.5, "full-1R"),
-    (0.5, 1.05, "break-even"),
-    (1.05, float("inf"), "trailed"),
+# Stop-protection bands — split STOP exits by the DOCTRINE verdict (IMP-053).
+#
+# Since IMP-013 (2026-07-08) raises the broker stop to break-even and IMP-040
+# (2026-08-24) arms it at +0.25R, the "STOP" exit_reason no longer means one
+# thing: a full-1R stop is a real false-breakout loss (the PF~0.01 leak), while
+# a ratcheted stop is a trade IMP-013 protected. These bands de-blend them.
+#
+# Until IMP-053 they were cut at RATIO edges (0.5 / 1.05) chosen before
+# bot/doctrine.py existed, and both edges disagreed with the doctrine the
+# 2026-09-01 user directive installed:
+#   * the old `trailed` band (ratio > 1.05) swept up every stop that ended a cent
+#     above break-even, and scripts/report rendered it at a `pl > 0` win rate of
+#     100.0%. On the whole book that band is 23 trades / +$263.36 / **zero**
+#     doctrine WINs — 9 of them are FAILs (ratio <= 1.25) and 14 are SCRATCHes.
+#     2026-09-10 AAPL #340 is the live case: ratio 1.151, +$5.32, doctrine FAIL.
+#   * the old full-1R/break-even edge at ratio 0.5 disagreed with
+#     doctrine.FULL_STOP_MAX_R (-0.75R, i.e. ratio 0.25); one real trade
+#     (TSLA 2026-07-10, -$119.38) sits in that gap and was reported as a full-1R
+#     loss the doctrine calls a break-even stop.
+# This is the IMP-049 defect — two instruments answering one question in two
+# vocabularies, with the wrong one louder — in the loudest instrument of all.
+#
+# So the bands no longer carry ratio edges at all: by_stop_protection asks
+# bot/doctrine.py directly, exactly as IMP-041 imports the live exit function
+# rather than copying it, so the two can never drift apart again. Each entry is
+# (label, classify() verdict, fail_kind() — None = every kind of that verdict).
+# The ratio edges each band corresponds to are, for readers: full-1R
+# ratio <= 0.25 · break-even 0.25 < ratio <= 1.25 · trailed-scratch
+# 1.25 < ratio < 2.0 · banked ratio >= 2.0 (test-pinned against the doctrine
+# constants in tests/test_imp053_doctrine_bands.py).
+STOP_PROTECTION_BANDS: tuple[tuple[str, str, str | None], ...] = (
+    ("full-1R", "FAIL", "full-1R"),                 # the real false-breakout loss
+    ("break-even", "FAIL", "break-even"),           # armed, then handed it all back
+    ("trailed-scratch", "SCRATCH", None),           # +0.25R..+1R — capital kept, thesis unpaid
+    ("banked", "WIN", None),                        # >= +1R banked on a stop
 )
+
 
 
 def _bucket(pls: list[float]) -> dict:
@@ -149,21 +171,37 @@ def stop_protection_ratio(row: dict) -> float | None:
 
 
 def by_stop_protection(rows: list[dict]) -> dict:
-    """Bucket STOP-exit P&L by how much of the original 1R was retained.
+    """Bucket STOP-exit P&L by the doctrine verdict on each stop (IMP-053).
 
     Only rows whose exit_reason is STOP and that have a usable
     stop_protection_ratio are counted; returns {band: _bucket(...)} for every
     STOP_PROTECTION_BANDS label (empty dict when no STOP exit has a usable
-    ratio). Pure.
+    ratio). The row set is exactly what it was before IMP-053 — that change
+    re-cut the *labels*, never which trades are counted.
+
+    The verdict comes from bot.doctrine itself rather than from a local copy of
+    its thresholds, so the report and the doctrine cannot drift apart (IMP-049
+    is what that drift costs). The import is function-local on purpose:
+    bot.doctrine imports this module at load time, so a module-level import here
+    would be circular; by call time both modules are fully initialised.
+
+    Note the ``== "STOP"`` filter is deliberately kept rather than switched to
+    doctrine.is_stop_exit's substring match — the DB writes exactly ``'STOP'``
+    and holding the filter fixed is what keeps IMP-053 a labelling change.
+    Pure — no DB, no network.
     """
+    from . import doctrine  # noqa: PLC0415 — deliberate, breaks the import cycle
+
     pairs = [(r, stop_protection_ratio(r)) for r in rows
              if r.get("realized_pl") is not None and r.get("exit_reason") == "STOP"]
     pairs = [(r, rf) for r, rf in pairs if rf is not None]
     if not pairs:
         return {}
+    judged = [(r, doctrine.classify(r), doctrine.fail_kind(r)) for r, _ in pairs]
     out: dict[str, dict] = {}
-    for lo, hi, label in STOP_PROTECTION_BANDS:
-        sub = [_f(r["realized_pl"]) for r, rf in pairs if lo <= rf < hi]
+    for label, verdict, kind in STOP_PROTECTION_BANDS:
+        sub = [_f(r["realized_pl"]) for r, cls, fk in judged
+               if cls == verdict and (kind is None or fk == kind)]
         out[label] = _bucket(sub)
     return out
 

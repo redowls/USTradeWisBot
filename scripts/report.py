@@ -107,13 +107,20 @@ def _print_report(since=None) -> int:
 
     sp = m.get("by_stop_protection", {})
     if sp:
-        print("\nBy stop protection (STOP exits, fraction of original 1R retained):")
-        print("  full-1R = full loss · break-even/trailed = IMP-013 rescued")
-        print(f"  {'band':10} {'trades':>6} {'win%':>6} {'total$':>10} {'exp$':>8} {'PF':>6}")
+        print("\nBy stop protection (STOP exits, doctrine verdict — a stop is a failed trade):")
+        print("  full-1R + break-even = FAIL · trailed-scratch = SCRATCH (+0.25R..+1R: capital")
+        print("  kept, thesis unpaid) · banked = WIN (>= +1R). IMP-053: the win% column is gone")
+        print("  from this table on purpose — 'pl > 0' is the metric the doctrine exists to distrust.")
+        verdicts = {label: verdict for label, verdict, _ in analytics.STOP_PROTECTION_BANDS}
+        print(f"  {'band':16} {'verdict':>8} {'trades':>6} {'total$':>10} {'exp$':>8} {'PF':>6}")
         for band, s in sp.items():
-            if s["trades"] == 0:
+            # Empty bands are suppressed as everywhere else in this report — EXCEPT
+            # the WIN band. An empty `banked` row is not noise, it is the finding:
+            # across 139 STOP exits this book has never once banked +1R on a stop.
+            # Hiding it is how the old `trailed 23 / 100.0% win` line read as success.
+            if s["trades"] == 0 and verdicts.get(band) != doctrine.WIN:
                 continue
-            print(f"  {band:10} {s['trades']:6d} {s['win_rate']:6.1f} "
+            print(f"  {band:16} {verdicts.get(band, '?'):>8} {s['trades']:6d} "
                   f"{s['total_pl']:10.2f} {s['expectancy']:8.2f} {_pf(s):>6}")
 
     fo = m.get("by_flatten_outcome", {})

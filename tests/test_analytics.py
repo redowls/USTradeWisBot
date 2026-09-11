@@ -386,7 +386,11 @@ def test_by_stop_protection_splits_full_loss_from_imp013_rescues():
     # ...while the three IMP-013 break-even rescues are ~scratch (+0.48 combined).
     assert sp["break-even"]["trades"] == 3
     assert sp["break-even"]["total_pl"] == 0.48
-    assert sp["trailed"]["trades"] == 0
+    # IMP-053 replaced the single `trailed` band with a SCRATCH/WIN split; these
+    # four 2026-07-08 stops reach neither (best ratio 1.02 -> still a FAIL).
+    assert sp["trailed-scratch"]["trades"] == 0
+    assert sp["banked"]["trades"] == 0
+    assert "trailed" not in sp
 
 
 def test_by_stop_protection_only_counts_stop_exits_and_is_empty_safe():
