@@ -660,3 +660,104 @@ Run launched ~21:00 UTC, past the routine's 20:40 UTC cutoff for beginning a cod
 - **(f) No risk relaxation.** All limits verified unchanged tonight; a third profitable week is the most dangerous moment to touch one.
 
 ---
+
+---
+
+## Week ending 2026-09-11 (Tue 09-08 → Fri 09-11, 4 sessions — Mon 09-07 Labor Day) — Grade: **D**
+
+### Results
+| Metric | This week | Prior week |
+|---|---|---|
+| Closed trades | 11 | 17 |
+| Net P&L | **−$113.51** | +$118.51 |
+| Profit factor | **0.19** — worst of the run | 2.77 |
+| Headline win rate (sign of P&L) | **45.5%** (5/11) | 52.9% |
+| **True win rate (doctrine)** | **0.0%** (0/11) | 11.8% |
+| **Stop rate** | **72.7%** (8/11) — highest ever recorded | 52.9% |
+| WIN / SCRATCH / FAIL | **0 / 3 / 8** | 2 / 8 / 7 |
+| **FAIL+SCRATCH share** | **100.0%** | 88.2% |
+| Equity | **$7,642.76 → $7,528.64** (−1.49%) | +1.56% |
+
+Equity path: **−20.10, −31.67, −28.57, −33.78 — four consecutive red sessions**, no green day, monotonic drawdown. Broker equity $7,528.64 reconciles to the DB's −$113.51 within $0.61.
+
+**Stop-rate / true-win-rate trend (8 weeks):**
+| Week ending | n | Net | PF | Stop rate | True WR | Headline WR | F+S |
+|---|---|---|---|---|---|---|---|
+| 07-24 | 20 | −$158.02 | 0.56 | 35.0% | 5.0% | 40.0% | 95.0% |
+| 07-31 | 16 | +$31.89 | 1.21 | 43.8% | 12.5% | 62.5% | 87.5% |
+| 08-07 | 20 | −$180.28 | 0.21 | 45.0% | 0.0% | 30.0% | 100.0% |
+| 08-14 | 19 | −$137.84 | 0.42 | 26.3% | 5.3% | 31.6% | 94.7% |
+| 08-21 | 17 | +$37.60 | 1.32 | 29.4% | 11.8% | 47.1% | 88.2% |
+| 08-28 | 21 | +$96.92 | 2.30 | 52.4% | 4.8% | 57.1% | 95.2% |
+| 09-04 | 17 | +$118.51 | 2.77 | 52.9% | 11.8% | 52.9% | 88.2% |
+| **09-11** | **11** | **−$113.51** | **0.19** | **72.7%** | **0.0%** | **45.5%** | **100.0%** |
+
+**The stop rate has risen for four straight weeks (26.3% → 29.4% → 52.4% → 52.9% → 72.7%) and has now nearly tripled off its 08-14 low. F+S has been ≥ 60% for NINE consecutive weeks** — the escalation threshold is two.
+
+### The win column, audited
+Five trades printed positive P&L. **None of them is a WIN.** Four are break-even stop touches scored FAIL by doctrine (TSLA +$2.35 / +0.07R, META +$5.68 / +0.16R, AAPL +$5.32 / +0.15R, MSFT +$0.40 / +0.01R flatten) and one is a SCRATCH (TSM +$12.99 / +0.38R). **The bot did not reach +1R once in 11 trades, and produced zero TAKE_PROFIT fills for the first time in six weeks.** Three trades paid the full 1R: XOM −$38.40 (−1.00R), TSLA −$33.90 (−1.00R), UNH −$33.78 (−0.99R) — those three alone are −$106.08, i.e. **93% of the week's loss came from three full-stop trades**, with the ratchet never arming on any of them.
+- Per-symbol: XOM −$38.55 (2), UNH −$33.78, TSLA −$31.55 (2), NVDA −$27.69, QQQ −$6.33; positive: TSM +$12.99, META +$5.68, AAPL +$5.32, MSFT +$0.40.
+- Exit mix: STOP 8 / EOD_FLATTEN 3 / **TAKE_PROFIT 0**.
+
+### The week's actual finding — IMP-054, and it ends a twelve-session argument
+This is the one thing that makes the week worth having had. `scripts/feasibility.py` replaced `session range / 1R` (which measures the *symbol-day*) with the **WIN ceiling** — max high from the **fill bar → 15:55 flatten**, the only window a trade can actually harvest. Over the post-gate book (n=121):
+
+- **101 of 121 trades (83.5%, net −$638.93) could not have produced a doctrine WIN under ANY exit policy.** The remaining 20 reachable trades are net **+$492.22** and the bot **converted 40.0%** of them into WINs.
+- The P&L gradient is **monotonic across all six ceiling bands**, and **every loss dollar sits where no winning trade was available.**
+- The incumbent metric called 88 trades feasible; **68 of them (net −$604.14, zero WINs) were unwinnable.** Its "feasible" cohort's true WR is 9.1%; the ceiling's is 40.0%.
+
+**Read plainly, this exonerates the exit layer and convicts the entry.** IMP-013/029/040's ratchet is not the problem and never was — it could only ever have affected 16.5% of the book. And it is corroborated by this week's own tape: all 21 candidates the strategy generated on 09-11 were win-infeasible (best refused candidate AMD +0.598R; the three fills topped out at +0.242R / +0.159R / +0.000R).
+
+### Why the stop rate spiked to 72.7% — the mechanism is now legible
+The three full-1R losses all carried the **flat 1.5% `MIN_STOP_PCT` floor** (1.503–1.580% observed) into sessions where the index barely moved (09-11: QQQ travelled **0.56%**, SPY **0.36%**). **A 1R that is 2–3× the instrument's whole daily range makes +1R arithmetically unreachable and makes the stop the only exit the trade can find.** That is not bad luck and it is not an exit-policy failure: it is a **stop-geometry/entry-selection mismatch** — the bot sizes its risk unit off a constant rather than off what the name can actually travel that day. QQQ's 1R was **2.7× its daily range** and it printed **0 of 262 minutes green**.
+
+### Process audit
+- **Risk: clean.** `MAX_RISK_PCT` 2.0, `DAILY_LOSS_HALT_PCT` 8.0, `MAX_CONCURRENT_POSITIONS` 3, entry cutoff 15:30 ET, flatten 15:55 ET, paper endpoint `https://paper-api.alpaca.markets` — all verified unchanged. Circuit breaker never tripped (worst day −0.44%, nowhere near 8%). No overnight holds. Nothing widened, nothing relaxed, nothing proposed.
+- **Reliability: clean on the unit, one real external fragility.** Service `active`, **NRestarts=0** since 2026-09-12 01:50:14 UTC, **zero** error/fail/traceback lines in 7 days of journal. But on 09-11 Alpaca's `get_clock()` returned 500s from **12:15:46–13:04:30 ET** — 46 consecutive loop errors, `tick()` did not run for ~47 minutes with three positions open. **Measured cost $0.00** (all three under water throughout, broker-side bracket stops live at the exchange, `manage_stops` failed open by design, `flatten_watchdog` ran correctly). Real fragility, zero realized damage — correctly deprioritized, but it is luck-adjacent and belongs in `todo.md`.
+- **Five IMPs (050–054), and for a sixth straight week not one changed what the bot does in the market.** 050 anchors the stop to the real fill; 051 exempts that floor from the churn gate; 052 builds *and refutes* the below-session-high discriminator; 053 makes the stop-protection bands speak the doctrine; 054 builds the WIN ceiling. Judged as a set **they compound tightly and cancel nothing** — 050→051 is one fix and its follow-through, 053→054 is one measurement project — and 052 is a model of the discipline this review has asked for: **a hypothesis built, tested, and killed by its own author in one session.** Sixteen entry discriminators have now been refuted this way. Their observed effect on the stop rate is, by construction, **zero** — 050/051 touch stop *placement accuracy*, not geometry, and the other three are analysis-only.
+- **Last week's directives:** (a) 09-08 IMP-040 verdict — **honored**, decided on the persisted columns, ratchet untouched. (b) *"Commit the five un-versioned files before anything else — seventh week of asking"* — **FAILED for an eighth week.** `bot/analytics.py`, `bot/exit_sim.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py` are still unstaged; two untracked result JSONs have joined them. IMP-053 had to perform a **surgical blob rebuild** to commit around them, and IMP-054 recorded that a clean `HEAD` scores **630 passed / 20 failed** — the running tree and the repo now disagree on 20 tests. This is no longer hygiene. (c) retire-or-rebuild put to the human — **still not done, fourth week.** (d)(e) deep research — **failed again**, see below. (f) calendar — correct this time.
+- **Fourth consecutive late start.** Launched **21:00 UTC** against a 20:00 schedule and a 21:10 hard kill: ~10 minutes. `sonar-deep-research` (600s) was impossible for the third straight week, and the `sonar` fallback returned `PPLX_EMPTY` — **so this week has NO external market context at all**, and the regime read below is derived from the bot's own tape measurements. A code change was barred by the 20:40 rule. **The scheduling defect has now cost four weeks of deep research and four weeks of weekly code-change budget; it is escalated in `todo.md` and needs a human to move the cron.**
+
+### Grade rationale — **D**
+**Zero WINs in 11 trades. A 72.7% stop rate, the highest ever recorded on this bot. PF 0.19, the worst of the run. F+S 100%, four red sessions out of four.** There is no padding question to answer this week — the win column is not merely padded, it is **entirely** padding: all five sign-positive trades are break-even scratches, and 93% of the loss is three untouched full stops. On results alone this is an F.
+
+It is a **D** and not an F because the process was not idle and not dishonest: risk was spotless, reliability was spotless, the reporting told the truth about itself all week, IMP-052 killed its own hypothesis rather than shipping it, and **IMP-054 produced the single most decision-relevant measurement in this bot's history** — it settles a twelve-session argument, exonerates the exit layer, and localizes 100% of the loss in trades that were unwinnable at the moment of the fill. A week that loses money and learns the thing that ends the debate is worth more than a week that makes money by harvesting noise.
+
+It is not a C: **eighth consecutive week of un-versioned code in the running process** (now a measurable 20-test divergence), the retire-or-rebuild call the last four weeklies escalated is **still unasked**, and a sixth week with no live-path change while the stop rate triples is not a C-grade outcome, however good the instrumentation is.
+
+### ⚖️ Strategy verdict — **NO DEMONSTRATED EDGE (sixth consecutive week), and the diagnosis is now specific**
+The escalation clause has been live for nine weeks. What changed this week is that "no edge" stopped being an inference from the P&L and became a **measured, mechanical fact with a named location**:
+
+1. **The entry is the entire problem, and IMP-054 proves it rather than arguing it.** 83.5% of the post-gate book was win-infeasible from the fill forward. The bot's dominant failure is not that it exits badly — it is that **it buys at moments from which winning was already impossible**.
+2. **The exit layer is exonerated and should now be left alone.** 40% conversion on the 16.5% of trades where the move was actually there is competent. Stop re-litigating the ratchet, and stop re-litigating the VWAP gate — **three consecutive sessions of clean exoneration**, and on 09-11 every one of its 18 refusals was win-infeasible.
+3. **The breakout premise is dead in practice.** The breakout leg has been dormant since **2026-07-24** — every fill for ~35 sessions has been an `MA` crossover wearing breakout-shaped exit geometry. This is no longer "a breakout bot underperforming"; it is an unfiltered MA-cross system whose risk unit is set by a constant.
+4. **The one live-path change the evidence now points at is the `ATR_STOP_MULT` / `MIN_STOP_PCT` refit** — making 1R a function of what the name can travel, so the risk unit stops exceeding the day's range. ⚠️ It **tightens** rather than widens risk, so it does not touch a capital-protection invariant, and it must be judged on **expectancy and payoff first** (it will *raise* the stop rate mechanically by bringing stops closer — that is not a reason to reject it, and a stop-rate improvement would not be a reason to accept it).
+5. **The human decision is overdue and I am escalating it again, more sharply.** Six weeks of "no demonstrated edge", a proven-dead entry, a working exit, and −$7+/trade lifetime. **Retire (A) or fund an explicit entry rebuild (B).** Shipping a tenth measurement tool is not an answer to it.
+
+### What worked / what didn't
+- **Worked:** IMP-054's ceiling metric (the week's whole value). IMP-052 refuting its own discriminator. Risk and reliability, spotlessly. Honest reporting under a bad tape — nothing was gamed, and the 0.0% true win rate was computed and stated rather than smoothed.
+- **Didn't:** Everything the bot did with money. XOM traded twice for −$38.55 and TSLA twice for −$31.55 — **re-entering names that were already losing on the day, for a third week running** (TSM last month, WMT two weeks ago). Zero TAKE_PROFIT fills. And the flat 1.5% stop floor met the quietest tape of the quarter and made +1R unreachable by arithmetic.
+
+### Market context — **UNAVAILABLE this week**
+`sonar-deep-research` could not be run (10-minute budget vs a 600s call) and the `sonar` fallback returned `PPLX_EMPTY`; no WebSearch fallback was attempted before the budget ran out. **This grade is therefore assigned without an external regime read for the first time** — stated plainly rather than papered over with a guess. What the bot's own tape says: 09-11 was exceptionally quiet (QQQ 0.56% range, SPY 0.36%), consistent with pre-FOMC compression after PPI 09-10 / CPI 09-11. **Next week's calendar is the dominant fact regardless: FOMC 09-15/16.**
+
+### Improvements shipped this week
+- **IMP-050 (09-08, c61bb6a)** — anchor the stop to the real fill, not the signal-bar close. **Observed effect: correct and necessary, F+S share unmoved (88.2% → 100.0%, but not attributable — this fixes stop *accuracy*, not *geometry*).** Slippage between signal bar and fill was silently shifting the 1R anchor, corrupting every `profit_R` the doctrine computes.
+- **IMP-051 (09-09, 80adf6c)** — exempt the fill-anchored stop floor from the churn gate. **Observed effect: PASS, a direct follow-through fix to IMP-050** (the churn gate was suppressing the very re-anchoring IMP-050 introduced). Together 050+051 are one change, correctly sequenced. Stop-rate effect: none by construction.
+- **IMP-052 (09-10, 2623666)** — add the below-session-high entry discriminator **and refute it**. **Observed effect: VALIDATED AS A REFUTATION — the sixteenth entry filter killed by its own author before shipping.** Nothing reached the live path, which is the point. F+S share: unmoved by design.
+- **IMP-053 (09-11, 795a79a)** — make the stop-protection bands speak the doctrine, not the P&L sign. **Observed effect: PASS, and it is why this review can state 0.0% true WR without hand-computation.** Required a surgical blob rebuild to commit around the un-versioned WIP — evidence for directive (b), not against it.
+- **IMP-054 (09-12, c33ef76)** — the WIN ceiling (fill → 15:55), replacing `session range / 1R`. **Observed effect: VALIDATED AND DECISIVE. Zero effect on the stop rate by construction; decisive effect on what we now know causes it.** 83.5% of the book unwinnable; exit layer exonerated; the incumbent metric shown wrong on 77.3% of its own admitted cohort. ⚠️ It also **invalidated the `stop_distance% ÷ ADR20%` gate pre-registered on 09-04** — that gate's motivating table rests on the falsified metric and **must be re-derived against the ceiling before it ships**.
+
+**Judged as a set: they compound, they cancel nothing, and they are aimed at the right question for the first time in a month — but they are the sixth consecutive week of instrumentation while the stop rate tripled.** The saving grace is that this set *finished* the investigation: after IMP-054 there is no longer a measurement question worth answering before acting. **Week ten must change the live path or retire the bot. A tenth instrument would be indefensible.**
+
+### Focus for next week
+- **(a) STOP MEASURING. The next IMP must touch the live path or the bot must be retired.** The investigation is complete: IMP-054 localized the loss and exonerated the exit. A tenth analysis-only IMP is not a defensible outcome.
+- **(b) The `ATR_STOP_MULT` / `MIN_STOP_PCT` refit is the designated change** — make 1R scale with the name's realized daily range instead of a 1.5% constant, so the risk unit stops exceeding what the instrument can travel. ⚠️ **Re-derive its case against IMP-054's ceiling, not against `session range / 1R`** (IMP-054 falsified the latter, and the 09-04 `stop_distance% ÷ ADR20%` gate inherits the error — **do not ship that gate unexamined**). Judge on **expectancy and payoff first, stop rate second**; it will mechanically raise the stop rate and that is not disqualifying. It **tightens** risk, so no invariant is touched.
+- **(c) Commit the five un-versioned files — EIGHTH week of asking, and the divergence is now measurable (630 passed / 20 failed on clean `HEAD`).** The running process executes code that is not in the repo. This must be Monday's first action, ahead of any analysis, and if the daily review does not do it, it should be reported as a blocking defect rather than worked around a ninth time.
+- **(d) Put retire-or-rebuild to the human, in one message, this week — fourth week of asking.** Six weeks of "no demonstrated edge"; a mechanically-proven-dead entry; a working exit; four weeks of escalations that have gone unanswered because they were buried in a weekly file. Ask it directly.
+- **(e) Fix the 21:00 UTC start.** Fourth consecutive late launch; it has now cost four weeks of deep research and four weeks of weekly code-change budget. `todo.md` item; needs a human to move the cron.
+- **(f) Investigate the same-day re-entry pattern.** XOM 2× (−$38.55), TSLA 2× (−$31.55) — third consecutive month this shape appears. Analysis only, and *after* (b).
+- **(g) Calendar: FOMC 09-15/16 is next week's dominant event.** Expect compression into Tuesday and a violent, fade-prone Wednesday afternoon — the worst possible tape for a constant-width stop. Retry `sonar-deep-research` FIRST next run if the start time is fixed.
+- **(h) No risk relaxation.** All limits verified unchanged tonight. A losing week is not a reason to widen anything, and nothing here proposes it.
+
+**No code shipped tonight.** Launched ~21:00 UTC, past the routine's 20:40 UTC cutoff — analysis-only by rule, for the fourth consecutive week.

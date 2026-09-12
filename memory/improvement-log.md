@@ -979,3 +979,23 @@ Entry template:
   - **(c) Any VWAP-gate change.** ★ **Third consecutive session of clean exoneration** — 18 refusals tonight, **every one win-infeasible**, on a day purpose-built to indict the gate (four big movers refused). **Stop re-litigating it on single sessions.**
   - **(d) Any entry-layer filter.** Sixteen refuted. Tonight's three fills sat **0.40% / 0.55% / 0.04%** below their session highs — **inside the cohort IMP-052's below-session-high refutation already covers.** **Do not reopen it.**
   - **(e) Any watchlist action.** UNH's trigger fired and the pre-market routine honoured it (board now **16 active**). QQQ is the name with a new structural case against it — 1R **2.7×** its daily range, 0 of 262 minutes green — and **a registered trigger, not a park argued off one session, is the honest instrument.** Written up in the daily review's "Notes for pre-market research".
+
+## Weekly audit — week ending 2026-09-11 (weekly review, 2026-09-12)
+
+**Grade D. No code shipped (run launched ~21:00 UTC, past the 20:40 cutoff — analysis only, 4th consecutive week).**
+Week: 11 trades, **−$113.51, PF 0.19, true WR 0.0%, stop rate 72.7% (record), F+S 100%** — 4 red sessions of 4, zero TAKE_PROFIT fills, all 5 sign-positive trades are break-even scratches, 93% of the loss from 3 untouched full stops.
+
+**Observed effect recorded against this week's IMPs (full text in `memory/weekly-review.md`):**
+- **IMP-050** — correct/necessary; fixes stop *accuracy*, not geometry. **F+S share: not attributable.**
+- **IMP-051** — PASS, the follow-through half of IMP-050. **Stop-rate effect: none by construction.**
+- **IMP-052** — VALIDATED AS A REFUTATION (16th entry filter killed before shipping). **F+S: unmoved by design.**
+- **IMP-053** — PASS; it is why the 0.0% true WR is directly readable. **Stop-rate effect: none by construction.**
+- **IMP-054** — **VALIDATED AND DECISIVE.** Zero stop-rate effect by construction; decisive on *cause*. 83.5% of the post-gate book (n=121) was win-infeasible from the fill forward; exit layer exonerated (40% conversion where the move existed); incumbent `session range / 1R` wrong on 77.3% of its own admitted cohort. ⚠️ **Invalidates the `stop_distance% ÷ ADR20%` gate pre-registered 09-04 — re-derive against the ceiling before shipping it.**
+
+**Judged as a set: they compound and cancel nothing, and they finished the investigation — but they are the sixth consecutive week of instrumentation while the stop rate tripled (26.3% → 72.7% over four weeks).**
+
+⚖️ **Verdict: NO DEMONSTRATED EDGE, 6th consecutive week — now a mechanical finding, not an inference. The ENTRY is the whole problem; the exit is exonerated; the breakout leg has been dormant since 2026-07-24.**
+
+**Binding for next week:** (1) **the next IMP must touch the live path or the bot retires — a tenth analysis-only IMP is indefensible**; the designated change is the **`ATR_STOP_MULT` / `MIN_STOP_PCT` refit** (1R scaled to realized daily range instead of the flat 1.5% floor; tightens risk, touches no invariant; judge on expectancy/payoff first, stop rate second; re-derive against IMP-054's ceiling). (2) **Commit the five un-versioned WIP files — 8th week of asking, divergence now measurable at 630 passed / 20 failed on clean `HEAD`.** (3) **Put retire-or-rebuild to the human directly — 4th week of asking.** (4) Fix the 21:00 UTC start (4 weeks of lost budget). (5) FOMC 09-15/16.
+
+**Risk invariants verified unchanged:** `MAX_RISK_PCT` 2.0, `DAILY_LOSS_HALT_PCT` 8.0, `MAX_CONCURRENT_POSITIONS` 3, entry cutoff 15:30 ET, flatten 15:55 ET, paper endpoint. Circuit breaker never tripped; service active, NRestarts=0, zero journal errors in 7 days.
