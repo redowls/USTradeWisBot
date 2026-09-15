@@ -3377,3 +3377,71 @@ MFE/MAE from real 1-min SIP bars over entry→exit, in R against the LIVE 1R (`f
 - Equity **$7,528.80 (−24.71%)**. ⚠️ **Does not close the −25% escalation (thirty-third session).** Trailing-10 true win rate **5.9%**, era **6.6%** against the **8.5%** it needs. ★ **Tonight's instrument says the honest thing out loud: 83.5% of this book never had a winning trade available to it. That is not a tuning problem, and the retire-or-rebuild call is owed by a human.**
 
 ---
+
+## 2026-09-14 — Daily Review
+
+### Stats
+- Trades: **1 closed (0W / 1L)**, headline win rate **0.0%**. Net **−$1.14 (−0.015%)**. The only fill of the session was **META #347**.
+- Avg winner **n/a** / avg loser **−$1.14** → payoff **n/a**, profit factor **0.00**. Exit mix: **STOP 1**. No take-profit; all-time TP rate now **27/310 (8.7%)**.
+- Holding time **6.5 minutes** (09:47:37 → 09:54:06 ET) — the shortest trade in the post-gate book.
+- **Equity $7,528.64 → $7,527.50 (−24.72%).** ⚠️ Does not close the −25% escalation (**thirty-fourth session**).
+- **Broker-reconciled to the cent via the `alpaca` MCP (read-only).** `last_equity` 7,528.64 → `equity` 7,527.50 = **−$1.14**, matching DB `daily_summary` exactly. Cash $7,527.50, `long_market_value` $0, **0 positions**, ACTIVE, not blocked. The bracket parent (`5ca4b0b5…`, 3 @ 660.49) ties to the DB entry exactly; the TP leg was cancelled at 13:54:05Z and the ratcheted stop leg filled at 660.11. **No orphans, no naked overnight — ~61 consecutive clean sessions.**
+- Sizing matched the plan: confidence **60.x** (bottom band), risk **$36.30 = 0.482% of equity** against a `MAX_RISK_PCT` cap of 2.0. The 8% daily-loss halt was never remotely in play (worst point of the day −0.015%).
+- Reliability: **zero loop errors**, **NRestarts=0**, clean 11:52:54 UTC start. Journal holds only systemd lifecycle lines; the bot's own log is clean end-to-end.
+- Slippage: the break-even stop leg sat at **660.49** and filled at **660.11** — **−$0.38/share = −$1.14**. ⚠️ **The entire day's loss is stop slippage.** On the stop price itself the trade was exactly flat.
+
+### Market context
+**An index-level risk-off day that was a violent SECTOR ROTATION underneath, and the bot's whole watchlist sat on the winning side of it.** S&P 500 **−0.48% to 7,619.98**, Nasdaq Composite **−0.56% to 26,186.41**, Dow **−0.29%** — but the damage was entirely semis: a semiconductor gauge fell **5.9%** after Amodei, Altman and Musk publicly called to pace frontier AI development, with NVDA **−3.26%**. Money rotated straight into software and mega-cap non-semis: Salesforce **+4.73%**, IBM **+2.36%**, Alphabet **+2.15%**. Brent topped **$105**, the 10-year hovered near **5%**, and **~85–90% is priced for a 25bp HIKE at Wednesday's FOMC** — the first since 2023.
+**My own SIP bars agree and sharpen it. Every name that signalled today TRENDED UP ALL SESSION:** META open 657.83 → close 666.34 (**+1.29%**, high 668.60), GOOG **+1.93%**, MSFT **+1.71%**, NFLX **+1.68%**, CRM **+1.48%**; only AAPL was red (**−0.39%**). ★ **This was the cleanest one-way trending tape the bot has seen in weeks, in exactly the names on its board — and it participated for six and a half minutes.**
+⚠️ **`sonar` FAILED FOR A TWENTIETH CONSECUTIVE RUN (`PPLX_EMPTY`), the second distinct failure mode this week after 09-14's pre-market `HTTP 401`.** Fell back to WebSearch immediately; never blocked the run. **Every symbol-level number above is from the bot's own SIP bars, not from either service.**
+
+### Stop-exit accounting
+- **Stop rate: 1/1 = 100.0%.** Exit mix STOP 1 / TAKE_PROFIT 0 / EOD_FLATTEN 0.
+- **WIN 0 · SCRATCH 0 · FAIL 1** → FAIL split **full-1R 0 / break-even 1 / faded 0**.
+- **True win rate 0.0% — headline win rate 0.0%.** ★ The two agree today only because the trade lost a few cents; had the stop filled two ticks higher it would have printed green and the doctrine would still have scored it FAIL. `profit_R` **−0.031R**.
+- **Trailing 10 sessions (2026-08-31 → 09-14, n=29): stop rate 62.1%, WIN 2 · SCRATCH 11 · FAIL 16, F+S share 93.1%, true WR 6.9% against a headline WR of 48.3%, net +$3.86, mean +0.008R.** FAIL split **full-1R 4 / break-even 9 / faded 3**.
+- **Where the money actually sits over those 10 sessions:** `full-1R` **4 trades, −$144.26**; `break-even` **9 trades, +$15.57**; `trailed-scratch` **5 trades, +$86.57**; `banked` **0 trades**. ★ **IMP-013/029/040's protection is not the leak and is demonstrably working — the entire trailing-10 loss is four trades that never reached +0.25R at all.**
+- **Dominant failure cause: ENTRY QUALITY.** META #347's IMP-054 WIN ceiling was **+0.670R** — a doctrine WIN was arithmetically unavailable under **any** exit policy from the moment of the fill. The break-even stop did not cost the trade anything it could have had; it protected $36.30 of risk on a trade that had no win in it.
+- **Escalation clause: still live.** F+S ≥ 60% on the last three sessions with trades (09-10, 09-11, 09-14) and on nine consecutive weeks. ⚠️ **And today the designated remedy was tested and failed — see IMP-055.**
+
+### Trade-by-trade review
+**META #347 — BUY 3 @ 660.49, 09:47:37 ET → STOP @ 660.11, 09:54:06 ET, −$1.14, −0.031R, FAIL (break-even).**
+- Plan: stop **648.39** (1R = **$12.10 = 1.832% of entry**, ATR-driven — 3×ATR14(5m) cleared the 1.5% floor), TP **673.07** (1.5R), confidence **60.x**, risk **$36.30**.
+- Path, from SIP 1-minute bars: MAE **−$2.52 (−0.208R)** on the 09:47 fill bar; MFE **+$3.41 (+0.282R)** at the 09:51 high of 663.90. The ratchet armed off that high — the broker stop leg was replaced at **13:51:44Z**, four minutes after the fill — and pinned the stop at the entry price. The 09:54 bar printed a low of **659.20**, took the break-even stop, and the position was flat 6.5 minutes after it opened.
+- **What META did next: nothing the bot could have used, and everything a naive reading would blame the exit for.** It ran to the session high **668.60 at 14:08** and closed **666.34**. From the fill that peak is **+0.670R** and the close is **+0.483R**. ★ **The ceiling never reached +1R, so no trail width, no target and no time-stop could have converted this into a doctrine WIN.**
+- **Root cause: ENTRY QUALITY, not profit capture and not stop geometry.** The MA crossover bought at 660.49 into a name whose remaining session offered two-thirds of one R. The exit did the only useful thing available to it — it returned the capital.
+- ⚠️ **The one genuine defect the trade exposes is mechanical, not strategic: 100% of the realized loss is stop slippage** (stop 660.49, fill 660.11). On a 3-share position that is $1.14; on the book it is the systematic reason simulated stops read better than real ones.
+
+### The 101 refusals — the VWAP gate audited on the tape it was most suspect on
+The gate fired **101 times across 6 symbols** (META×38, AAPL×21, MSFT×20, GOOG×15, CRM×6, NFLX×1) on a day when every one of those names trended up. **That is the strongest prima-facie case against IMP-022 that has ever existed**, so it was measured rather than assumed.
+- **83 of the 101 were scoreable** (the other 18 fired before 10:40 ET, when ATR14 on 5-minute bars has not yet formed — a real limit of this method, stated rather than hidden). Each was given the stop the bot would have used (`max(3×ATR14(5m), 1.5%)`) and its IMP-054 ceiling measured from the refusal minute to 15:55.
+- **12 of 83 (14.5%) were win-feasible. 71 (85.5%) could never have produced a doctrine WIN.** Median ceiling **+0.438R**; best **+1.274R**.
+- Per symbol: **META 0/38 feasible** (best +0.621R), **GOOG 0/15** (best +0.498R), **AAPL 0/13** (best +0.189R), **NFLX 0/1** (+0.248R); **CRM 6/6** (best +1.274R) and **MSFT 6/10** (best +1.130R) carried the entire feasible set.
+- ★ **Read plainly: on the most trend-favourable tape in weeks, 85.5% of what the VWAP gate refused was unwinnable — a fourth consecutive clean exoneration, and the first one earned on a trending session rather than a choppy one.** The 85.5% figure also matches IMP-054's book-wide **83.5%** almost exactly, which is the point: **the gate is not selecting badly out of a good candidate pool; the candidate pool itself is 85% unwinnable, and the gate is merely the layer that notices.**
+- ⚠️ **Stated against myself:** CRM and MSFT did offer 12 feasible refusals, `MAX_CONCURRENT_POSITIONS` is 3 so at most 3 could have been held, and a refused candidate has no fill to prove it would have converted. **This is not a claim the gate is costless. It is a claim it is not today's problem.**
+
+### What worked / what didn't
+- **Worked:** the break-even ratchet, doing exactly its job on a trade with no win in it. Risk discipline — 0.482% risked, no limit approached. Reliability — zero errors, zero restarts, no naked overnight. Broker reconciliation to the cent. And the pre-market routine's read was **right**: it called the semi/software split before the open and parked QQQ and SPY on ceiling arithmetic that today's session corroborated.
+- **Didn't:** everything about participation. **The cleanest trending tape in weeks produced one fill, 6.5 minutes of exposure, and −$1.14.** The signal that did fire bought a moment with 0.67R of room in it. And **the entire realized loss was stop slippage**, which is the second time this month the P&L sign was decided by fill quality rather than by the thesis.
+
+### Lessons & improvement candidates
+1. **SHIPPED as IMP-055 — and it is a REFUTATION of the change the weekly designated.** The week-ending-09-11 weekly named one live-path change (`ATR_STOP_MULT`/`MIN_STOP_PCT` refit: shrink 1R so +1R becomes reachable) and required it be re-derived against IMP-054's ceiling. It was, over the full post-gate book, and **it fails**. See below and `memory/improvement-log.md`.
+2. **Stop slippage is now worth measuring properly.** 100% of today's loss and a systematic optimistic bias in every replay. Cheap, bounded, and it would tighten the noise budget that made today's grid unreadable in the net-P&L dimension. **Candidate for the next run.**
+3. **DO NOT re-open the VWAP gate.** Fourth clean exoneration, first on a trending tape. Anyone reading "101 refusals on a rally" as a gate failure is reading the wrong layer.
+4. **DO NOT re-open the ratchet.** Trailing-10 says `break-even` is net **+$15.57** and `trailed-scratch` net **+$86.57**; the whole loss is four trades that never reached +0.25R.
+
+### Notes for pre-market research
+- **META** — signalled once, 38 refusals, ran +1.29% and never offered more than **+0.670R** from the fill or **+0.621R** from any refusal. ⚠️ **8 of 9 post-gate trades win-infeasible after today.** This is the third name whose ceiling record now looks like QQQ's did before it was parked. **Not a park recommendation from this routine — but if it prints one more win-infeasible fill, register a trigger in its own currency.**
+- **CRM and MSFT were the day's only win-feasible candidates** (6/6 and 6/10 refusals ≥ +1R ceiling, best +1.274R / +1.130R). ★ **These two are carrying the board's real opportunity and both were refused all day for being extended above VWAP.** Worth watching whether they signal early enough to clear the gate on a future trend day — no action requested.
+- **AAPL** — 13 refusals, best ceiling **+0.189R**, the worst of the six, and the only red close on the board (−0.39%). **Low-yield name on a day that suited everything around it. Watch.**
+- **GOOG** — 15 refusals, best ceiling **+0.498R**, closed **+1.93%**, the board's strongest move. ⚠️ **A name can rise 1.93% and still never offer one R — that is the flat-1R problem in one line, and IMP-055 says tightening 1R does not fix it.**
+- **QQQ / SPY parks are corroborated** — neither signalled, and today's sector split is exactly the regime in which an index ETF's range compresses further.
+- **⚠️ FOMC decision Wednesday 09-16 14:00 ET, ~85–90% priced for a 25bp HIKE.** Expect compression Tuesday and a violent, fade-prone Wednesday afternoon. **The worst possible tape for a constant-width stop, and IMP-055 has just shown the constant-width stop cannot be fixed by shrinking it.**
+- **⚠️ `sonar` is dead — twentieth consecutive failure, now in two modes (`HTTP 401` pre-market, `PPLX_EMPTY` post-close). The key appears revoked. Needs a human.**
+- **⚠️ THE FIVE-FILE UNCOMMITTED SET IS UNCHANGED — SIXTEENTH CONSECUTIVE ESCALATION, AND IT IS NOW A REPORTED BLOCKING DEFECT RATHER THAN A WORKAROUND.** `bot/analytics.py`, `bot/exit_sim.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py`, plus untracked `backtest_result.json` / `gate_monitor_result.json`. ★ **Left byte-identical, as this routine's ground rules require: it may stage only files it touched this run.** The weekly's directive (c) asked the daily review to commit them; **the routine's own rule forbids it, and the weekly's own fallback — "report it as a blocking defect rather than working around it a ninth time" — is therefore what is being done.** Working tree: **663 passed**. It needs a human or a weekly-review run to clear.
+
+### Verdict
+⚖️ **NO DEMONSTRATED EDGE — and after today the argument is complete rather than merely repeated.** Every layer downstream of the entry has now been tested and exonerated on its own evidence: **the exit layer** (IMP-054 — 83.5% of the book was unwinnable from the fill, and the exit converted 40% of what was reachable), **the VWAP gate** (four consecutive audits, today's on a trending tape, 85.5% of refusals unwinnable), **the break-even/trail ratchet** (trailing-10: both protected buckets net positive, the whole loss in four unprotected trades), and now **the stop geometry itself** (IMP-055 — tightening 1R doubles the number of trades from which a WIN is arithmetically available and converts none of them). **Sixteen entry discriminators have been refuted. There is no remaining knob outside the entry signal, and the entry signal is an unfiltered MA crossover whose breakout leg has been dormant since 2026-07-24.**
+★ **The retire-or-rebuild decision is now the ONLY open item, it is a human decision, and it is the fifth consecutive week of asking.**
+
+---

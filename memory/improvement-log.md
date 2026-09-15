@@ -999,3 +999,66 @@ Week: 11 trades, **−$113.51, PF 0.19, true WR 0.0%, stop rate 72.7% (record), 
 **Binding for next week:** (1) **the next IMP must touch the live path or the bot retires — a tenth analysis-only IMP is indefensible**; the designated change is the **`ATR_STOP_MULT` / `MIN_STOP_PCT` refit** (1R scaled to realized daily range instead of the flat 1.5% floor; tightens risk, touches no invariant; judge on expectancy/payoff first, stop rate second; re-derive against IMP-054's ceiling). (2) **Commit the five un-versioned WIP files — 8th week of asking, divergence now measurable at 630 passed / 20 failed on clean `HEAD`.** (3) **Put retire-or-rebuild to the human directly — 4th week of asking.** (4) Fix the 21:00 UTC start (4 weeks of lost budget). (5) FOMC 09-15/16.
 
 **Risk invariants verified unchanged:** `MAX_RISK_PCT` 2.0, `DAILY_LOSS_HALT_PCT` 8.0, `MAX_CONCURRENT_POSITIONS` 3, entry cutoff 15:30 ET, flatten 15:55 ET, paper endpoint. Circuit breaker never tripped; service active, NRestarts=0, zero journal errors in 7 days.
+
+## IMP-055 — 2026-09-15 (reviewing 2026-09-14)
+
+**`scripts/stop_geometry.py` + `tests/test_imp055_stop_geometry.py` — re-derive the weekly's designated `ATR_STOP_MULT`/`MIN_STOP_PCT` refit against IMP-054's ceiling, and REFUTE it.**
+
+### What the weekly asked for, and why this is the answer to it
+The week-ending-09-11 weekly (Grade D) named exactly one live-path change and forbade a tenth measurement in its place: *"make 1R scale with the name's realized daily range instead of a 1.5% constant"* — with the binding condition that it be **re-derived against IMP-054's WIN ceiling**, judged on **expectancy and payoff first, stop rate second**, and that the `stop_distance% ÷ ADR20%` gate pre-registered on 09-04 **must not ship unexamined** because it inherits the metric IMP-054 falsified.
+
+**This is that re-derivation. It was run, and the designated change fails.** Shipping it anyway to satisfy "the next IMP must touch the live path" would have been shipping a change the data refutes — the one thing the anti-gaming rules forbid outright.
+
+### Why the ceiling alone could not answer it (the trap this module exists to avoid)
+`scripts.feasibility` reports the ceiling **in R**, and **R is the stop distance**. Shrinking the stop therefore raises every ceiling *mechanically*, and would "prove" any tightening whatsoever. **META #347 (2026-09-14) is the worked example: ceiling +0.670R at the live 1.832% stop, +1.117R at 60% of it, +1.340R at 50%.** Nothing about the tape changed; only the denominator did. Answering the question honestly requires re-walking the bars **with the tighter stop actually in place**, so the trades a tighter stop would have KILLED are charged against it at the same time as the ones it would have rescued.
+
+### Method
+Every post-gate trade (n=122, 35 sessions since 2026-07-25) re-planned and re-run under each candidate 1R policy:
+- `stop' = entry − sd'`, `tp' = entry + RR_RATIO·sd'`, `qty' = floor(dollar_risk / sd')` — **dollar risk per trade held CONSTANT**, exactly as `sizing.plan_position` already works. A tighter stop buys more shares at the same budget; **nothing is widened, no invariant is touched, `MAX_RISK_PCT` is untouched.**
+- The live IMP-013/028/040 ratchet (`be=0.25R trail@0.25R-0.25R min=0.1%`) is then simulated bar by bar to the 15:55 flatten via `exit_sim.simulate_exit`.
+- Two policy families: `scale=k` (uniform tightening, k ∈ 1.0…0.5) and `adrcap=c` (**the weekly's designated shape** — cap 1R at c × the name's ADR20$, c ∈ 0.75…0.30, computed over the 20 sessions **strictly before** the entry day so the predictor cannot leak the answer).
+- **SIP feed, not the IEX feed `bot.data` uses.** `bot/exit_sim.py` records that sparse bars make simulated stops fire *less* often than real ones, which biases a tightening what-if optimistic — the single largest threat to this measurement. SIP removes most of it.
+
+### The result: the arithmetic half is TRUE, the trading half is FALSE
+| policy | stop% | net | exp | payoff | PF | stop rate | W/S/F | true WR | **reach** | **conv** |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **scale=1.00** (live) | 1.57 | +71.50 | +0.59 | **0.61** | 1.11 | 66.4% | 4/53/65 | 3.3% | **20** | **4 (20.0%)** |
+| scale=0.90 | 1.41 | +190.88 | +1.56 | 0.60 | 1.32 | 70.5% | 5/48/69 | 4.1% | 24 | 5 (20.8%) |
+| scale=0.80 | 1.26 | +118.17 | +0.97 | 0.50 | 1.20 | 73.0% | 3/46/73 | 2.5% | 30 | 3 (10.0%) |
+| scale=0.70 | 1.10 | +52.05 | +0.43 | 0.47 | 1.07 | 76.2% | 3/46/73 | 2.5% | 35 | 3 (8.6%) |
+| scale=0.60 | 0.94 | −6.70 | −0.05 | 0.43 | 0.99 | 81.1% | 3/38/81 | 2.5% | 43 | 3 (7.0%) |
+| scale=0.50 | 0.79 | −102.43 | −0.84 | **0.40** | 0.89 | 85.2% | 3/43/76 | 2.5% | **49** | **3 (6.1%)** |
+| adrcap=0.75 | 1.43 | +155.01 | +1.27 | 0.54 | 1.23 | 73.0% | 6/43/73 | 4.9% | 26 | 6 (23.1%) |
+| adrcap=0.60 | 1.31 | +31.92 | +0.26 | 0.45 | 1.04 | 77.0% | 4/42/76 | 3.3% | 29 | 4 (13.8%) |
+| adrcap=0.50 | 1.18 | +79.51 | +0.65 | 0.41 | 1.12 | 81.1% | 4/38/80 | 3.3% | 36 | 4 (11.1%) |
+| adrcap=0.40 | 0.99 | −73.43 | −0.60 | 0.34 | 0.91 | 83.6% | 5/31/86 | 4.1% | 43 | 5 (11.6%) |
+| adrcap=0.30 | 0.75 | −57.11 | −0.47 | 0.32 | 0.93 | 89.3% | 5/32/85 | 4.1% | 51 | 5 (9.8%) |
+
+**`reach`** = trades whose IMP-054 ceiling clears +1R **once the stop is tightened**. **`conv`** = how many of those the *same replay* actually turned into a doctrine WIN.
+
+1. ⚠️ **THE KILLER NUMBER. Tightening 1R from 1.57% to 0.79% takes the reachable cohort from 20 trades to 49 — it MORE THAN DOUBLES (+145%) the number of trades from which a +1R win is arithmetically available — and conversions stay pinned at 3–5. The conversion rate COLLAPSES from 20.0% to 6.1%, and the absolute WIN count FALLS from 4 to 3.** Every extra "reachable" trade created by shrinking the denominator is one the tighter stop then kills before the move arrives. **That is the whole hypothesis, tested in its own currency, and refuted.**
+2. **Payoff falls MONOTONICALLY at every single step, in BOTH families: 0.61 → 0.60 → 0.50 → 0.47 → 0.43 → 0.40 (scale) and 0.54 → 0.45 → 0.41 → 0.34 → 0.32 (adrcap).** Eleven grid points, two independent parameterizations, one direction — and the weekly's own instruction was *payoff first*. **The live 1.57% stop has the best payoff in the entire grid.**
+3. **True win rate does not respond at all** — 2.5%–4.9% everywhere, with no relationship to stop width. The metric the change was supposed to move is inert.
+4. **Stop rate rises monotonically 66.4% → 85.2% / 89.3%,** exactly as pre-registered. Stated so it cannot be mistaken for a finding: **this was predicted in advance and is not the reason for rejection.**
+
+### ⚠️ Honesty bounds, stated before the conclusion
+- **The noise budget is $800.43** (sum|error| of the `scale=1.00` fidelity row; the baseline sims +$71.50 against a real −$147.85). **No candidate's net-P&L delta clears it, so EVERY net/expectancy/PF figure above is formally unreadable and is marked as such by the tool itself.** The refutation rests on **`reach` vs `conv`** and on the **monotonic payoff ordering** — structural quantities where the simulator's bias applies equally to every row — **not on the net column.**
+- The largest single source of that budget is **stop slippage**: the simulator fills AT the stop price, reality fills through it. META #347 is the day's proof — stop 660.49, fill 660.11, and **100% of the day's −$1.14 is that $0.38/share.** Measuring it is the next run's candidate.
+- **Share quantization is material on a $7.5k account.** At `scale=0.80` a 3-share trade buys 3 shares of a $9.68 stop = 80% of the risk budget, not 100%. Tested explicitly (`test_dollar_risk_is_held_constant_…`) and bounded to under one share's risk, but it adds real variance at these sizes.
+- 18 of the day's 101 VWAP refusals could not be scored (pre-10:40 ET, before ATR14(5m) forms).
+
+### Regression test — META #347, the trade that motivated it
+`tests/test_imp055_stop_geometry.py` (10 tests) encodes the real SIP bar path and asserts **both halves**: the ceiling climbs **+0.670R → +1.340R** and crosses the WIN bar at 60% of the live width, **and the verdict stays `FAIL` at every single width** — because `BREAKEVEN_TRIGGER_R` is denominated in R, so a tighter 1R arms the ratchet *earlier*, pins the stop at entry *sooner*, and hands the same 09:54 pullback the trade. **At 50% the stop fires before the 09:51 high even prints, so the trade's own MFE shrinks from +3.41 to +1.71 — the tighter stop does not capture the move earlier, it removes the trade from the move.**
+
+### Validation
+**663 passed** (was 653; +10). `scripts.smoke_test` ALL GREEN (PAPER, PA3ESJUO8RU0, equity $7,527.50, 14 active symbols). `scripts.check_exits` ALL GREEN (0 open positions). `scripts.check_sizing_ladder` ALL GREEN (n=122, ladder pinned at the 0.5% floor tier, IMP-021 veto holding).
+**Risk invariants re-read and unchanged:** `MAX_RISK_PCT` 2.0, `DAILY_LOSS_HALT_PCT` 8.0, `MAX_CONCURRENT_POSITIONS` 3, `ENTRY_CUTOFF_ET` 15:30, `FLATTEN_ET` 15:55, `ALPACA_PAPER` True. **Analysis-only: no engine, config, or live-path file was modified.**
+
+### ⚖️ Verdict and what it settles
+**The designated live-path change is dead, killed by exactly the instrument the weekly said to kill it with.** 1R is **not** the wrong size. Making it smaller manufactures reachability and converts none of it.
+
+With that, **every layer downstream of the entry has been tested and exonerated on its own evidence**: the exit (IMP-054), the VWAP gate (four audits, today's on a trending tape — 85.5% of 83 scoreable refusals unwinnable), the break-even/trail ratchet (trailing-10: both protected buckets net positive, the entire loss in four trades that never reached +0.25R), and now the stop geometry. **Sixteen entry discriminators refuted. There is no remaining knob outside the entry signal.**
+
+⚠️ **The weekly's binary — "week ten must change the live path or retire the bot" — has been answered: the live-path change it designated does not work. That collapses the decision to retire-or-rebuild, it is a human decision, and this is the fifth consecutive week of asking.** The `stop_distance% ÷ ADR20%` gate pre-registered on 09-04 is the `adrcap` family above and should now be considered **formally withdrawn, not merely unexamined.**
+
+**Blocking defect carried, not worked around (16th escalation):** the five un-versioned WIP files (`bot/analytics.py`, `bot/exit_sim.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py`) plus two untracked result JSONs remain unstaged and byte-identical. The weekly's directive (c) asked the daily review to commit them; **this routine's ground rules permit staging only files it touched this run**, so the weekly's own stated fallback was taken instead — report it as a blocking defect. Needs a human or a weekly-review run.
