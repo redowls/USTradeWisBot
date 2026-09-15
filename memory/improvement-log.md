@@ -1061,4 +1061,7 @@ With that, **every layer downstream of the entry has been tested and exonerated 
 
 ⚠️ **The weekly's binary — "week ten must change the live path or retire the bot" — has been answered: the live-path change it designated does not work. That collapses the decision to retire-or-rebuild, it is a human decision, and this is the fifth consecutive week of asking.** The `stop_distance% ÷ ADR20%` gate pre-registered on 09-04 is the `adrcap` family above and should now be considered **formally withdrawn, not merely unexamined.**
 
+### Commit + deployment
+**Committed `f616583`, pushed to `origin/main`.** Service restarted **2026-09-15 01:48:49 UTC** — graceful shutdown, clean start, `active`, **NRestarts=0**, market-closed sleep as expected. ★ **Deployment verified against the live unit, not assumed** (the 2026-06-23 DEPLOY-GAP lesson): `ActiveEnterTimestamp` 01:48:49 UTC post-dates the commit. **IMP-055 is analysis-only, so the restart changes no trading behaviour — it confirms health, nothing more.**
+
 **Blocking defect carried, not worked around (16th escalation):** the five un-versioned WIP files (`bot/analytics.py`, `bot/exit_sim.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py`) plus two untracked result JSONs remain unstaged and byte-identical. The weekly's directive (c) asked the daily review to commit them; **this routine's ground rules permit staging only files it touched this run**, so the weekly's own stated fallback was taken instead — report it as a blocking defect. Needs a human or a weekly-review run.
