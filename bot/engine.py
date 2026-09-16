@@ -309,6 +309,33 @@ class Engine:
             ((confidence.score(ev), ev) for ev in signals.evaluate_watchlist()),
             key=lambda x: x[0], reverse=True,
         )
+
+        # --- Refused-candidate ledger (IMP-056) ---
+        # Every `continue` below is a candidate the bot generated and did not
+        # buy, and until now none of them left a database row: `signals` only
+        # receives a row once a trade_id exists. On 2026-09-15 that meant the
+        # WHOLE session (34 refusals, 0 fills) survived only as `ENTRY SKIPPED`
+        # lines in a log that rotates daily and keeps 14 days. Collected here and
+        # flushed once per tick so the write is a single round trip that cannot
+        # sit between a gate decision and an order.
+        refusals: list[dict] = []
+
+        def _refuse(ev: dict, conf: float, reason: str, detail: str) -> None:
+            """Record one refusal: the action dict, unchanged, plus the ledger row."""
+            actions.append({"symbol": ev["symbol"], "confidence": conf,
+                            "action": "skip", "detail": detail})
+            refusals.append({"symbol": ev["symbol"], "ts": now_naive,
+                             "reason": reason, "detail": detail,
+                             "confidence": conf,
+                             "signal_type": ev.get("signal_type"),
+                             "price": ev.get("close"),
+                             "session_vwap": ev.get("session_vwap"),
+                             # ATR is the one input gate_monitor's counterfactual
+                             # cannot recover from the log, which is why all five
+                             # of its VWAP replays priced the stop at the flat
+                             # MIN_STOP_PCT floor rather than 3xATR.
+                             "atr": ev.get("atr")})
+
         for conf, ev in scored:
             if open_count >= config.MAX_CONCURRENT_POSITIONS:
                 break
@@ -337,9 +364,8 @@ class Engine:
             equiv = config.equivalent_symbols(ev["symbol"])
             held_equiv = equiv & held
             if held_equiv:
-                actions.append({"symbol": ev["symbol"], "confidence": conf,
-                                "action": "skip",
-                                "detail": f"underlying_held_{sorted(held_equiv)[0]}"})
+                _refuse(ev, conf, "underlying_held",
+                        f"underlying_held_{sorted(held_equiv)[0]}")
                 continue
             # Re-entry throttle: daily per-symbol cap + cooldown after last
             # exit, aggregated across the equivalence group.
@@ -347,16 +373,15 @@ class Engine:
             if acts:
                 entries = sum(a["entries"] for a in acts)
                 if entries >= config.MAX_ENTRIES_PER_SYMBOL_PER_DAY:
-                    actions.append({"symbol": ev["symbol"], "confidence": conf,
-                                    "action": "skip", "detail": "max_entries_per_symbol"})
+                    _refuse(ev, conf, "max_entries_per_symbol",
+                            "max_entries_per_symbol")
                     continue
                 exits_seen = [a["last_exit"] for a in acts if a["last_exit"] is not None]
                 if exits_seen:
                     mins_since = (now_naive - max(exits_seen)).total_seconds() / 60.0
                     if mins_since < config.REENTRY_COOLDOWN_MIN:
                         wait = int(config.REENTRY_COOLDOWN_MIN - mins_since)
-                        actions.append({"symbol": ev["symbol"], "confidence": conf,
-                                        "action": "skip", "detail": f"cooldown_{wait}m"})
+                        _refuse(ev, conf, "cooldown", f"cooldown_{wait}m")
                         continue
             # --- VWAP entry-quality gate (IMP-022) ---
             # Skip fills stretched more than VWAP_MAX_DIST_PCT above the symbol's
@@ -366,9 +391,7 @@ class Engine:
             # fills fade to the stop. Fail-open when VWAP is undefined.
             vwap_dist = sizing.vwap_distance_pct(ev.get("close"), ev.get("session_vwap"))
             if vwap_dist is not None and vwap_dist > config.VWAP_MAX_DIST_PCT:
-                actions.append({"symbol": ev["symbol"], "confidence": conf,
-                                "action": "skip",
-                                "detail": f"above_vwap_+{vwap_dist:.2f}%"})
+                _refuse(ev, conf, "above_vwap", f"above_vwap_+{vwap_dist:.2f}%")
                 self._log(f"ENTRY SKIPPED {ev['symbol']}: entry {ev['close']:.2f} is "
                           f"+{vwap_dist:.2f}% above session VWAP "
                           f"{ev['session_vwap']:.2f} (>{config.VWAP_MAX_DIST_PCT}% — "
@@ -379,8 +402,7 @@ class Engine:
                 equity, buying_power, held_symbols=held, open_positions_count=open_count,
             )
             if not plan.tradable:
-                actions.append({"symbol": plan.symbol, "confidence": conf,
-                                "action": "skip", "detail": plan.skip_reason})
+                _refuse(ev, conf, "not_tradable", plan.skip_reason)
                 continue
             # --- Stale-signal / gap guard (IMP-008; symmetric IMP-009) ---
             # entry/stop/TP are anchored to the signal-bar close, but the order
@@ -402,9 +424,8 @@ class Engine:
             slip = sizing.entry_slippage_pct(live, plan.entry_price)
             if slip is not None and abs(slip) > config.MAX_ENTRY_SLIPPAGE_PCT:
                 direction = "up" if slip > 0 else "down"
-                actions.append({"symbol": plan.symbol, "confidence": conf,
-                                "action": "skip",
-                                "detail": f"stale_signal_gap_{direction}_{slip:+.2f}%"})
+                _refuse(ev, conf, "stale_signal_gap",
+                        f"stale_signal_gap_{direction}_{slip:+.2f}%")
                 self._log(f"ENTRY SKIPPED {plan.symbol}: live {live:.2f} is "
                           f"{slip:+.2f}% vs signal entry {plan.entry_price:.2f} "
                           f"(|move|>{config.MAX_ENTRY_SLIPPAGE_PCT}% — stale-signal "
@@ -422,8 +443,7 @@ class Engine:
             # ever REDUCE size; a favourable fill never buys more.
             resized = sizing.resize_for_live_risk(plan, live, equity)
             if not resized.tradable:
-                actions.append({"symbol": resized.symbol, "confidence": conf,
-                                "action": "skip", "detail": resized.skip_reason})
+                _refuse(ev, conf, "live_risk", resized.skip_reason)
                 continue
             if resized.shares != plan.shares:
                 self._log(f"SIZE REDUCED {plan.symbol}: {plan.shares} -> "
@@ -454,6 +474,12 @@ class Engine:
                 actions.append({"symbol": plan.symbol, "confidence": conf,
                                 "action": "rejected", "detail": res["error"]})
                 self._log(f"ENTRY REJECTED {plan.symbol}: {res['error']}")
+        # One round trip per tick, after every entry decision is made, so the
+        # ledger can never delay an order. Dry runs never write — same rule
+        # `record_entry` already follows, and it keeps scripts/check_engine.py
+        # (dry_run=True) a pure read of the live book.
+        if refusals and not self.dry_run:
+            logbook.record_entry_refusals(refusals)
         return actions
 
     # --- end-of-day flatten ---

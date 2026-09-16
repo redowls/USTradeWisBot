@@ -63,6 +63,79 @@ def log_signal(
     )
 
 
+# --- Refused entry candidates (IMP-056) -------------------------------------
+
+#: The refusal reasons ``Engine.consider_entries`` can record, in the order it
+#: asks them. IMP-042 established that every ELIGIBILITY question is asked before
+#: the VWAP quality gate; keeping that distinction as a first-class column means
+#: a future audit can separate "the bot could not have bought this" from "the bot
+#: judged the price bad" without parsing a free-text detail string — which is the
+#: exact mis-attribution IMP-042 had to unpick out of the log.
+REFUSAL_ELIGIBILITY = ("underlying_held", "max_entries_per_symbol", "cooldown")
+REFUSAL_QUALITY = ("above_vwap", "not_tradable", "stale_signal_gap", "live_risk")
+REFUSAL_REASONS = REFUSAL_ELIGIBILITY + REFUSAL_QUALITY
+
+#: Width of entry_refusals.detail. Every detail the engine builds today is well
+#: inside it (the longest is ~29 chars), but the batch is written as ONE
+#: executemany, so a single over-long string would fail the whole tick's ledger
+#: rather than its own row. Truncating trades 3 characters for 34 refusals.
+REFUSAL_DETAIL_MAX = 64
+
+
+def record_entry_refusals(rows: list[dict]) -> int:
+    """Persist refused entry candidates. Returns rows accepted (0 on failure).
+
+    The count is ``len(rows)``, NOT the driver's rowcount: ``db.executemany``
+    sets ``fast_executemany``, under which pyodbc reports ``-1`` for a batch
+    however many rows it inserted. Verified against the live table — a one-row
+    batch that stored correctly still returned -1 — so returning the driver's
+    number would make "0 on failure" indistinguishable from success.
+
+    NEVER raises. A refusal ledger is a measurement; a database hiccup while
+    writing it must not cost the bot a tick of trading. Catches ``Exception``
+    and deliberately NOT ``BaseException`` so tests/conftest.py's
+    ``LiveDatabaseWriteBlocked`` guard still fires here (IMP-043's lesson: a
+    swallowing writer turns a test that tried to write into one that quietly
+    passed).
+    """
+    if not rows:
+        return 0
+    try:
+        db.executemany(
+            """
+            INSERT INTO entry_refusals
+                (symbol, ts, reason, detail, confidence, signal_type,
+                 price, session_vwap, atr)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                [
+                    r.get("symbol"),
+                    _et_naive(r.get("ts")),
+                    r.get("reason"),
+                    (r.get("detail") or None) and r["detail"][:REFUSAL_DETAIL_MAX],
+                    r.get("confidence"),
+                    r.get("signal_type"),
+                    r.get("price"),
+                    r.get("session_vwap"),
+                    r.get("atr"),
+                ]
+                for r in rows
+            ],
+        )
+        return len(rows)
+    except Exception:  # noqa: BLE001 - measurement must never break trading
+        return 0
+
+
+def get_entry_refusals(trade_date: date) -> list[dict]:
+    """Every entry candidate refused on ``trade_date``, oldest first."""
+    return db.query(
+        "SELECT * FROM entry_refusals WHERE CAST(ts AS DATE) = ? ORDER BY ts, symbol",
+        [trade_date],
+    )
+
+
 # --- Trade entry / exit -----------------------------------------------------
 
 def record_entry(

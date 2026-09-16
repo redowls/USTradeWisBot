@@ -81,6 +81,40 @@ BEGIN
     CREATE INDEX IX_signals_symbol_ts ON dbo.signals(symbol, ts);
 END;
 
+-- entry_refusals — WHY each candidate was NOT taken (IMP-056).
+-- `signals` above only ever receives a row with a trade_id attached, so every
+-- candidate the engine REFUSED leaves no database record at all. On 2026-09-15
+-- that was the entire session: 34 refusals, 0 fills, and the whole day's
+-- decision record existed only as `ENTRY SKIPPED` lines in
+-- /var/log/ustradewisbot/bot.log — which rotates daily and keeps 14
+-- (/etc/logrotate.d/ustradewisbot). The post-gate era opened 2026-07-25, so the
+-- refused-candidate stream older than ~14 days is ALREADY unrecoverable and one
+-- more day of it is destroyed every night at 17:00.
+-- This is IMP-043's fix applied to the entry side: same defect (the measurement
+-- lives in a rotating log), same remedy (make it a durable row).
+-- `atr` is recorded because scripts/gate_monitor.py cannot recover it from the
+-- log, and has therefore priced every VWAP counterfactual it has ever run at the
+-- flat MIN_STOP_PCT floor instead of the 3xATR stop the bot would really have
+-- used. No FK to watchlist: a refusal is a historical fact and must survive the
+-- symbol later being parked or removed.
+IF OBJECT_ID('dbo.entry_refusals', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.entry_refusals (
+        refusal_id   BIGINT IDENTITY(1,1) PRIMARY KEY,
+        symbol       VARCHAR(10)   NOT NULL,
+        ts           DATETIME2     NOT NULL,
+        reason       VARCHAR(24)   NOT NULL,
+        detail       VARCHAR(64)   NULL,
+        confidence   DECIMAL(5,2)  NULL,
+        signal_type  VARCHAR(10)   NULL,
+        price        DECIMAL(12,4) NULL,
+        session_vwap DECIMAL(12,4) NULL,
+        atr          DECIMAL(12,4) NULL
+    );
+    CREATE INDEX IX_entry_refusals_ts ON dbo.entry_refusals(ts);
+    CREATE INDEX IX_entry_refusals_symbol_ts ON dbo.entry_refusals(symbol, ts);
+END;
+
 -- daily_summary — per-day P&L recap
 IF OBJECT_ID('dbo.daily_summary', 'U') IS NULL
 BEGIN
