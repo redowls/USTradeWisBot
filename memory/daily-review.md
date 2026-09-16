@@ -3448,3 +3448,93 @@ The gate fired **101 times across 6 symbols** (META×38, AAPL×21, MSFT×20, GOO
 **IMP-055 (`f616583`, pushed)** — `scripts/stop_geometry.py` + `tests/test_imp055_stop_geometry.py`: the weekly's designated `ATR_STOP_MULT`/`MIN_STOP_PCT` refit, re-derived against IMP-054's ceiling over the full post-gate book — **and refuted**. **663 passed** (+10, and the new tests pass on clean `HEAD` too, adding no failures to either tree); `smoke_test` / `check_exits` / `check_sizing_ladder` ALL GREEN. Service restarted **01:48:49 UTC**, `active`, NRestarts=0, clean startup. **Analysis-only — no engine, config, or live-path file was modified, and no risk invariant was touched.**
 
 ---
+
+## 2026-09-15 — Daily Review
+
+### Stats
+- **Trades: 0.** No fills, no orders, no positions. Net **$0.00**, equity **$7,527.50** unchanged open to close. Win rate n/a; the day has no headline to distrust.
+- **The bot was not idle — it generated 34 entry candidates and bought none of them.** IMP-022's VWAP gate refused every one: **META ×25, BAC ×5, CRM ×2, GOOG ×1, INTC ×1**, spanning 09:30:08 → 15:25:42 ET. `ENTRY REJECTED` 0, `SIZE REDUCED` 0, breakout veto held (0 strong-breakout trades through).
+- **Equity $7,527.50 (−24.73%).** ⚠️ Does not close the −25% escalation (**thirty-fifth session**).
+- **Broker-reconciled via the `alpaca` MCP (read-only) and it is exact:** `equity` = `last_equity` = `cash` = **7,527.50**, `long_market_value` $0, **0 positions, 0 orders of any status on the date**, ACTIVE, `trading_blocked` false. Intraday portfolio history is a **flat line — seven hourly points, all 7,527.50, profit_loss 0 at every one**. DB `daily_summary` agrees: 0 buys / 0 sells / $0.0000. **~62 consecutive clean sessions, no naked overnight.**
+- Reliability: **zero errors, zero loop errors, NRestarts=0**, clean 11:52:59 UTC start, `daily summary written` at 16:00:55 ET. The journal holds only systemd lifecycle lines; the application log is clean end-to-end.
+- ⚠️ **`signals` recorded NOTHING for the session** — it only ever receives a row once a `trade_id` exists. **34 candidates, 0 database rows.** That is tonight's improvement; see IMP-056.
+
+### Stop-exit accounting
+- **Stop rate 0/0 — undefined, not 0%.** No trade closed, so there is no WIN/SCRATCH/FAIL split to report and no true-vs-headline gap to measure. ★ **Recorded explicitly so a future reader does not mistake an empty day for a clean one.**
+- **Trailing 10 sessions with trades (2026-08-31 → 09-14, n=29): stop rate 18/29 = 62.1%, WIN 2 · SCRATCH 11 · FAIL 16 → F+S 93.1%, true WR 6.9% against a headline WR of 48.3%,** net **+$3.86**, mean **+0.008R**. FAIL split **full-1R 4 / break-even 9 / faded 3**. Unchanged from 09-14 by construction — today added no closed trade to the window.
+- **Where the money sits over those 10 sessions:** `full-1R` **4 trades, −$144.26**; `break-even` **9, +$15.57**; `trailed-scratch` **5, +$86.57**; `banked` **0**. ★ **IMP-013/029/040's protection is still not the leak — the entire trailing-10 loss is four trades that never reached +0.25R.**
+- **Post-gate era (since 2026-07-25, n=122):** stop rate **45.1%**, **WIN 8 (6.6%) · SCRATCH 59 · FAIL 55 → F+S 93.4%**, net **−$147.85**, mean **−0.030R**, headline **45.9%**. `breakeven_true_win_rate` = **8.5%** needed at this book's own payoff; it prints **6.6%**. **Still below its own bar.**
+- ⚠️ **ESCALATION CLAUSE LIVE FOR AN ELEVENTH CONSECUTIVE RUN.** `doctrine.escalation_verdict` returns `escalated: true` on 09-10 / 09-11 / 09-14 — **6 trades, 0 WINs, 2 SCRATCH, 4 FAIL, F+S 100.0%**, −$63.22, mean −0.297R. **No parameter was tuned tonight.**
+- **Dominant failure cause: ENTRY QUALITY, and today it is measurable without a single fill** — see the ceiling audit below. The entry signal produced 34 proposals and not one of them contained a winning trade.
+
+### Root cause of the zero-trade day — audited, not assumed
+The honest question on a 0-fill day is whether the gate starved a good strategy. It was tested the way the last four sessions tested it, and the answer is the sharpest yet.
+
+**(1) IMP-054 ceiling on ALL 34 refusals** (stop = the 1.5% `MIN_STOP_PCT` floor, refusal minute → 15:55 flatten):
+
+      scored 34/34   win-FEASIBLE 0  (0.0%)
+        META  n=25  0/25 feasible  best +0.695R  median +0.093R
+        BAC   n= 5  0/5            best +0.045R  median +0.017R
+        CRM   n= 2  0/2            best +0.793R
+        INTC  n= 1  0/1            best -0.007R
+        GOOG  n= 1  0/1            best -0.262R
+
+★★★ **Zero of thirty-four. Not one candidate the strategy generated all day could have produced a doctrine WIN under ANY exit policy.** The best moment available to the bot in a six-hour session was CRM's **+0.793R**.
+
+**(2) The five first-blocked candidates, priced forward to the flatten** — the moment the bot actually wanted in, and what it would have owned:
+
+| sym | refused | price | ceiling | post-entry high | 15:55 close |
+|---|---|---|---|---|---|
+| GOOG | 09:30:08 | 345.72 | **−0.262R** | 344.36 (−0.39%) | 341.37 (**−1.26%**) |
+| META | 09:44:36 | 671.87 | **+0.695R** | 678.87 (+1.04%) | 669.88 (**−0.30%**) |
+| INTC | 10:01:03 | 100.00 | **−0.007R** | 99.99 (−0.01%) | 97.02 (**−2.99%**) |
+| CRM | 11:35:00 | 259.25 | **+0.793R** | 262.33 (+1.19%) | 255.49 (**−1.45%**) |
+| BAC | 15:00:48 | 59.77 | **+0.045R** | 59.81 (+0.07%) | 59.53 (**−0.40%**) |
+
+★★ **All five close BELOW their refusal price, average −1.28%.** Two of the five (**GOOG, INTC**) never printed a single tick above the price the bot wanted to pay.
+
+**(3) `gate_monitor --replay-skips`, running the live geometry and the real IMP-013/028/040 ratchet:** *if taken*, headline **1W/4L**, **−0.54% per trade, sum −2.70%**, outcomes EOD 1 / STOP 2 / TRAIL 2, doctrine **WIN 0 · SCRATCH 1 · FAIL 4** (full-1R 2 / BE 1 / faded 1), stop rate **80%**, **true win rate 0.0%**, mean **−0.36R**. Verdict: **✅ gate PAID**, and because the replay uses the floor stop rather than 3×ATR this is a **lower bound** on what it saved.
+
+⚖️ **Verdict on the day: the zero was correct, and it is the best outcome the strategy was capable of producing.** The gate is exonerated for a **fifth consecutive session**, now on the cleanest test type yet — a day where it refused *everything* and every single refusal is independently shown to have been unwinnable and, on the five replayable ones, loss-making. ⚠️ **This is emphatically NOT "the gate is too tight."** It is the entry signal proposing 34 moments that contained no trade, and one downstream filter being the only layer that noticed.
+
+### Market context
+**A risk-off compression day into FOMC, exactly as the pre-market routine predicted.** S&P 500 **−0.45% to 7,585.73**, Nasdaq Composite **−0.78% to 25,981.57**, Dow **−0.63%**, with the **10-year at ~5.008%, its highest since 2007**, as the two-day FOMC opened with **~93% priced for a 25bp HIKE** on Wednesday. Brent stayed bid on Middle East supply risk. AI names partly cushioned the tape after Monday's Amodei/Altman/Musk slowdown call (AMD +2%, QCOM +4%).
+**My own SIP bars (every symbol number here is the bot's, not a search engine's):** SPY open→close **−0.36%** (range 0.55%), QQQ **−0.59%** (0.83%). Board: META **+1.69%** (range 3.44%, high 678.87 @10:03), AAPL +0.35%, AMD +0.48%, BAC +0.21%, CRM −0.43%, GOOG −0.55%, NVDA −0.56%, MSFT −0.58%, TSLA −0.59%, INTC −1.74%, AMZN −1.55%, COST −1.75%, NFLX −1.81%, TSM −1.91%.
+- ⚠️ **META was the day's one real trend and the bot spent the whole session trying to buy it — 25 times — at 670–672 against a 09:44 ceiling of +0.695R.** Its high printed at **10:03**; every refusal from 14:21 onward chased a move that was five hours old. **The gate refused a stretched chase, and the ceiling says the chase had nothing in it.**
+- ⚠️ **`sonar` returned `PPLX_EMPTY` — twenty-second consecutive failure.** The 09-15 pre-market run identified the root cause from the 401 body: `insufficient_quota` — **the Perplexity account is out of credit, not the key revoked.** **This is a billing fix and it needs a human.** WebSearch supplied the regime and macro and was not asked for symbol numbers.
+
+### Trade-by-trade review
+**No trades closed on 2026-09-15.** The 34 refusals are root-caused above; the five first-blocked candidates carry the per-name detail that a trade table would normally hold.
+
+### What worked / what didn't
+- ✅ **Capital protection and bookkeeping, perfectly.** Broker/DB reconciliation exact on a flat day, 0 positions, 0 orders, flat intraday equity curve, ACTIVE and unblocked, 8% halt never near, zero errors, NRestarts=0.
+- ✅ **The VWAP gate, for a fifth consecutive session, and this is its strongest evidence.** 34 refusals, **0 win-feasible**, and the five replayable ones average **−1.28% to the flatten**. ★ **A day with no P&L to argue about is the cleanest test the gate has had.**
+- ✅ **The pre-market routine's read was right ahead of the tape** — it called FOMC compression and a mean-reversion morning as "the tape this strategy's MA-crossover entry reads worst", and the session produced exactly that.
+- ❌ **The entry signal, comprehensively.** 34 proposals, **best ceiling +0.793R**, **median +0.093R**. On a day when META travelled 3.44% and INTC 4.01%, the signal's own candidates offered a median of **nine hundredths of one R**.
+- ❌ **Observability, and it is now the binding constraint.** The bot's entire day existed only in a log that rotates daily and keeps 14. **Fixed tonight — IMP-056.**
+
+### Lessons & improvement candidates
+1. ★★★ **SHIPPED as IMP-056 — the refused-candidate ledger (`dbo.entry_refusals`).** Today is the argument: **34 candidates, 0 fills, 0 database rows.** `signals` only receives a row once a `trade_id` exists, so a session like this writes nothing durable at all and the whole decision record lives in `/var/log/ustradewisbot/bot.log` — **daily rotation, 14 kept**. The post-gate era opened **2026-07-25**, so **~39 days of the refused stream is ALREADY unrecoverable and one more day dies every night at 17:00**. ★ **This is IMP-043's defect on the entry side and it gets IMP-043's remedy**: that IMP moved the ratchet's evidence out of the same rotating log into `trades.stop_raises` / `final_stop_price` precisely because "IMP-040's evidence expires at about the moment its verdict is due." **683 tests pass (+20)**, commit `0128fe9`, pushed; service restarted clean **2026-09-16 01:44:14 UTC**. Detail in `memory/improvement-log.md`.
+2. ★★★ **Why the ledger and not a parameter: the refused population is ~10× the filled one, and every verdict this bot has reached was measured through the 122-trade keyhole.** Sixteen entry discriminators have been refuted on *filled* trades only. Today the bot produced **34 candidates and 0 fills** — a sample the existing instruments cannot see at all. **If the human answers "rebuild", the first question is what the candidate stream looks like, and until tonight the answer was "gone in 14 days."**
+3. ★★ **The ledger also repairs the gate counterfactual itself.** `gate_monitor._replay_geometry`'s own docstring concedes it uses the flat `MIN_STOP_PCT` floor "because ATR is not recoverable from the log" — so **all five VWAP audits, including tonight's, priced the stop at 1.5% rather than the real 3×ATR.** `entry_refusals.atr` removes that approximation from every future audit. **Not back-fillable; it starts from today.**
+4. ★★ **Stop-slippage measurement — deferred, and deliberately.** The 09-14 review nominated it and it remains a real defect (100% of that day's −$1.14 was slippage; it is the largest single component of IMP-055's $800.43 noise budget). ⚠️ **But today closed zero trades and therefore produced no new slippage data, while it produced 34 refusals that are being destroyed on a clock.** **Carried to the next session with trades.**
+5. ★ **DO NOT re-open the VWAP gate.** Fifth consecutive exoneration, and the first one earned on a session where it refused 100% of the candidate stream. **A reader who sees "0 trades, 34 refusals, META +1.69%" and concludes the gate is too tight is reading the wrong layer — the ceilings are in this entry.**
+6. ★ **DO NOT re-open the ratchet or the stop geometry.** No stop fired; IMP-055 refuted tightening 1R six days ago and nothing today bears on it.
+
+### ⚖️ Verdict
+**NO DEMONSTRATED EDGE — and today adds a new kind of evidence rather than repeating the old kind.** Every previous verdict was inferred from 122 *filled* trades. Today the strategy generated **34 candidates and not one of them, by arithmetic, contained a winning trade** — measured with no fill, no exit rule and no P&L to argue about. ★ **The bot is not losing a fight; it is showing up to fights that cannot be won, and on 2026-09-15 it correctly declined all thirty-four of them.**
+**Post-gate: 122 trades, true win rate 6.6% against the 8.5% its own payoff needs, F+S 93.4%, sixteen refuted discriminators, zero breakout signals in 52 sessions.** Equity **$7,527.50 (−24.73%)**, thirty-fifth consecutive session without closing the −25% escalation. ⚠️ **The retire-or-rebuild call is the only open item, it is a human decision, and this is the fifth consecutive week of asking.**
+
+### Notes for pre-market research
+- **★★★ NOTHING ON THIS BOARD WAS BUYABLE YESTERDAY AND IT WAS NOT THE GATE'S FAULT — DO NOT RE-WEIGHT THE WATCHLIST ON THIS SESSION.** 34 candidates, **0 win-feasible**, best **+0.793R**, median **+0.093R**. ⚠️ **The tempting read is "META ran +1.69% and we refused it 25 times." The ceiling from the FIRST refusal (09:44, 671.87) was +0.695R and META closed BELOW that price.** n=1 session is how the last sixteen discriminators died.
+- **★★ META EARNED ITS TRIGGER'S ATTENTION WITHOUT FIRING IT.** 25 refusals, **0/25 win-feasible**, and the 09-14 note ("if it prints one more win-infeasible FILL, register a trigger in its own currency") is **still unsatisfied — there was no fill.** ★ **Score it honestly: a refusal is not a fill, and the condition as written has not been met.** Post-gate META is now 8 of 10 fills win-infeasible plus 25 win-infeasible refusals in one day. **Worth considering whether META's trigger should be re-denominated in ceiling terms now that the refusal ledger will make that measurable — but that is the pre-market routine's call, not this one's.**
+- **★★ INTC AND GOOG NEVER PRINTED A TICK ABOVE THE PRICE THE BOT WANTED TO PAY.** INTC refused 10:01 @100.00, closed **97.02 (−2.99%)**; GOOG refused 09:30:08 @345.72, closed **341.37 (−1.26%)**. ⚠️ **GOOG's refusal was at 09:30:08 — eight seconds into the session, +0.64% above a VWAP built from essentially one bar.** The gate was right anyway, but **a VWAP computed from the first seconds of the session is a thin input** and is worth a look when there is budget.
+- **★ CRM OFFERED THE DAY'S BEST MOMENT AND IT WAS STILL ONLY +0.793R.** Refused 11:35 @259.25, high 262.33, closed 255.49 (−1.45%). **The board's best-ceiling name on a 2.82%-range day could not reach one R.** That is the flat 1.5% floor problem restated — and IMP-055 has already refuted shrinking it.
+- **★ BAC's 09-14 TRIGGER IS STILL UN-FIRED** (registered on the Moynihan IB-fee guidance cut). 5 refusals, no fill, closed +0.21%. **Carry it as written.**
+- **⚠️ FOMC DECISION LANDS TODAY, WED 09-16 AT 14:00 ET, ~93% PRICED FOR A 25bp HIKE — the first since 2023, presser 14:30.** Expect a violent, fade-prone afternoon squarely inside the entry window. ★ **The worst possible tape for a constant-width stop, and the pre-market routine should expect either zero fills again or a late-session chase.**
+- **⚠️ `sonar` IS OUT OF CREDIT, NOT BROKEN — twenty-second consecutive failure.** The 09-15 pre-market run read the 401 body: `insufficient_quota`. **A billing action by a human, not a key rotation.** WebSearch remains the fallback; use the bot's own SIP bars for every symbol-level number.
+- **⚠️ THE FIVE-FILE UNCOMMITTED SET IS UNCHANGED — SEVENTEENTH CONSECUTIVE ESCALATION.** `bot/analytics.py`, `bot/exit_sim.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py`, plus untracked `backtest_result.json` / `gate_monitor_result.json`. **Left byte-identical (diff re-measured before and after: 211 insertions / 7 deletions, unchanged).** This routine may stage only files it touched. **Re-measured tonight: clean `HEAD` + IMP-056's files = 660 passed / 20 failed, all 20 the pre-existing `tests/test_exit_sim.py` failures; IMP-056 adds ZERO new failures to either tree.** **Needs a human or a weekly-review run.**
+- **★ FROM TODAY, REFUSALS ARE QUERYABLE.** `dbo.entry_refusals` is live and the bot is running the code that fills it (restart verified, `dry_run=False`). **The next pre-market run can ask "what did the signal actually propose yesterday, and was any of it winnable?" against the database instead of a log.** Table starts empty; the first rows arrive on the 09-16 session.
+- Equity **$7,527.50 (−24.73%)**. Trailing-10 true win rate **6.9%**, era **6.6%** against the **8.5%** it needs. Board stands at **14 active**.
+
+---
