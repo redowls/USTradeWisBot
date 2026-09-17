@@ -161,6 +161,18 @@ def _replay_geometry() -> tuple[float, float]:
     from the log. That is deliberately conservative *in favour of the gate*: real
     stops are >= the floor, so a floor-width stop gets hit at least as often as
     the real one, which can only make the blocked set look worse than it was.
+
+    IMP-057 MEASURED that caveat instead of leaving it as a worry, and on the
+    first session with a refusal ledger it was not an approximation at all: the
+    floor bound on **52 of 52** refusals (2026-09-16), median 3xATR width 0.72%
+    against the 1.5% floor, so this function's geometry was EXACT and the five
+    VWAP counterfactuals that carried the caveat stand unqualified. ATR is now
+    recoverable — ``dbo.entry_refusals.atr`` stores it per refusal — so
+    ``python -m scripts.refusal_audit --date <session>`` re-checks the binding
+    every session and will say so if a high-ATR name ever makes the ATR term
+    bind. Left reading the floor deliberately: this monitor must keep working on
+    log-only sessions that pre-date the ledger, and the refusal audit is where
+    the exact geometry now lives.
     """
     return -float(config.MIN_STOP_PCT), float(config.MIN_STOP_PCT) * float(config.RR_RATIO)
 
