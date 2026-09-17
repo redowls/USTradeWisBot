@@ -1111,3 +1111,67 @@ The session produced **34 entry candidates and no fills** — META ×25, BAC ×5
 - **(c) Any entry-layer filter.** Sixteen refuted. **Do not make the ceiling the seventeenth** — it is computed from bars printed after the moment it scores and is pure lookahead, exactly as IMP-054's docstring warns.
 - **(d) Any stop-geometry or ratchet change.** No stop fired; IMP-055 refuted tightening 1R six days ago on the full post-gate book and nothing in a zero-trade session bears on it.
 - **(e) Any watchlist action.** META's 09-14 trigger is worded on a **fill** and there was no fill — **a refusal is not a firing event**. BAC's 09-14 trigger likewise un-fired. Written up in the daily review's "Notes for pre-market research" so the pre-market routine owns the call.
+
+---
+
+## IMP-057 — 2026-09-17 (reviewing 2026-09-16)
+
+**`scripts/refusal_audit.py` — the entry layer's blame ceiling. Score every `dbo.entry_refusals` row at the REAL live stop geometry, so the refused-candidate population (13× the filled one) becomes measurable and `gate_monitor._replay_geometry`'s floor approximation stops being an unquantified caveat.**
+
+### Problem: the refused stream became durable last night and nothing could read it
+IMP-056 shipped `dbo.entry_refusals` on 2026-09-16 at 01:44 UTC and **pre-registered this as the next step**. Its first live session wrote **52 rows** — `underlying_held` 34, `cooldown` 9, `above_vwap` 9 — against **9** `ENTRY SKIPPED` lines in `bot.log`. So 43 of the 52 decisions had never been recorded anywhere, by any mechanism, in the bot's history.
+- ★★★ **Every verdict this repo has reached was measured through the filled-trade keyhole (n=126).** Sixteen refuted entry discriminators, IMP-054's feasibility ceiling and IMP-055's stop-geometry grid all ran on trades that **filled**. The refused population is roughly an order of magnitude larger and **no instrument could see it at all** — on 2026-09-15 it was 34 candidates against 0 fills.
+- ★★ **And it repairs a caveat that qualified five audits.** `gate_monitor._replay_geometry`'s own docstring concedes it prices the blocked set at the flat `MIN_STOP_PCT` floor *"because ATR is not recoverable from the log"*. Every VWAP counterfactual this repo has run therefore used **1.5%** instead of the live `max(ATR × ATR_STOP_MULT, MIN_STOP_PCT%)`. `entry_refusals` stores **`price` AND `atr`** — the exact two inputs `bot.sizing.plan_position` uses — so the real geometry is now reconstructable.
+- ★ **Why this and not a parameter: the escalation clause is live for a TWELFTH consecutive run** (09-11/09-14/09-16: 8 trades, WIN 0, F+S 100.0%, −$82.61, mean −0.283R). **The clause bars tuning and asks for the structural verdict with numbers attached.** No config value and no trading behaviour changed tonight.
+
+### Change
+- **`scripts/refusal_audit.py`** (new) — `refusal_geometry`, `geometry_binding`, `build_records`, `summarize`, `format_report`, `main`.
+  - **`refusal_geometry` reproduces `bot.sizing.plan_position`'s two lines verbatim** — `max(atr * ATR_STOP_MULT, price * MIN_STOP_PCT / 100)` — rather than approximating with the floor, which is the entire point of the ledger storing `atr`. Pinned by a test that calls the real `plan_position` and compares.
+  - **`geometry_binding` reports WHICH term set the stop**, per session. That is the measurement that retires the caveat: when the floor binds everywhere, `_replay_geometry` was exact; when the ATR binds anywhere, those rows are precisely where its verdict was softest.
+  - **The vocabulary is imported, never redefined.** `WIN_CEILING_R`/`is_reachable`/`win_ceiling_r`/`window_bars` come from `scripts.feasibility` (which takes the WIN bar from `bot.doctrine`), `SCRATCH_CEILING_R` from `config.BREAKEVEN_TRIGGER_R`, and **`ELIGIBILITY_REASONS` from `bot.logbook.REFUSAL_ELIGIBILITY`** — the module that actually writes the column. **IMP-049 and IMP-053 were both caused by two instruments carrying two vocabularies for one verdict; a test asserts the eligibility/quality sets partition `logbook.REFUSAL_REASONS` exactly, so a future added reason must be classified or fail loudly.**
+  - **`paid` is deliberately conservative.** A filter scores `PAID` only when it refused nothing win-feasible **and** the refused set fell on average. An unwinnable refusal that nonetheless drifted up scores **`neutral`, not PAID**, because the bot's own 15:55 flatten would have banked that drift. A win-feasible refusal scores **`COST`** — the verdict can convict a filter, which is what makes it a test rather than a rubber stamp.
+- **`scripts/gate_monitor.py`** — **docstring only, zero behaviour.** `_replay_geometry` now records that the caveat was measured (floor bound 52/52 on 2026-09-16, median 3×ATR width 0.72% vs the 1.5% floor) and points at the new script. **Left reading the floor deliberately: this monitor must keep working on log-only sessions that pre-date the ledger.**
+
+### ⚠️ Blast radius: zero trading behaviour, and zero even on the live path's imports
+**NO entry condition, NO signal, NO scorer, NO sizing, NO stop, NO take-profit, NO ratchet, NO risk limit, NO watchlist, NO config value, and no change to any file under `bot/`.** The new module is a read-only script that imports `bot.config` + `bot.logbook` only; a test asserts it does **not** import `execution`, `broker` or `engine` — *a diagnostic that can reach the order path is a diagnostic that can trade.* Like `scripts/feasibility.py` it is not imported by `scripts/report.py` or the live loop, so its network dependency cannot break the always-on incubation report.
+⚠️ **DIAGNOSTIC ONLY, AND THE DOCSTRING SAYS SO IN CAPITALS.** Every number it prints comes from bars printed AFTER the moment it scores and is unknowable at decision time. **Sixteen entry discriminators have been refuted — this must not become the seventeenth by mistaking a post-hoc ceiling for a prediction.**
+
+### First-run result (2026-09-16) — the reason it was worth shipping tonight
+      ALL REFUSALS       n=52  win-feasible 0 (0.0%)  best +0.761R  median +0.183R  ->flatten -1.061% (-0.707R)  rose 0
+        eligibility      n=43  win-feasible 0         best +0.761R  median +0.172R  ->flatten -1.012%            rose 0
+        quality (VWAP)   n= 9  win-feasible 0         best +0.532R  median +0.286R  ->flatten -1.292%            rose 0
+      by reason:  underlying_held 34 PAID · cooldown 9 PAID · above_vwap 9 PAID
+      geometry:   floor bound 52/52 (100.0%)   ATR bound 0/52   median 3xATR 0.72% vs 1.5% floor
+
+- ★★★ **0 of 52 win-feasible, and `rose = 0` — every one of the 52 refused candidates closed BELOW the price the bot wanted to pay.**
+- ★★★ **Combined with IMP-054 on the same session's four fills (ceilings +0.807R / +0.237R / +0.095R / +0.017R, 0/4 win-feasible): 56 entry decisions, ZERO win-feasible.** And the best ceiling of all 56 belonged to a trade the bot **took** — selection was optimal, there was nothing to select.
+- ★★ **`cooldown` is scored for the first time since it shipped on 2026-06-10.** Nine META refusals between 09:57 and 10:10 at 679.67–681.02 after #348 stopped out; META closed 673.59. **The re-entry throttle paid, and nobody had ever checked.**
+- ★★ **`underlying_held` 31/34 were GOOG, refused continuously 09:58 → 11:13 while the open GOOG position rode MFE +0.095R to a full −1R.** The MA-crossover signal is **a persistent STATE, not an event** — a structural fact about the signal that no filled-trade instrument can show.
+- ★ **The caveat was harmless: floor bound 52/52, so `_replay_geometry`'s geometry was EXACT on this session and all five previous VWAP counterfactuals stand unqualified.**
+
+### Validation
+**708 passed** (was 683; **+25**, all in `tests/test_imp057_refusal_audit.py`). Fixtured on **five real ledger rows** copied from the live table — META 677.14/atr 2.6244 `underlying_held`, META 680.21/2.8103 `cooldown`, GOOG 342.72/0.7862 `underlying_held`, TSLA 362.21/1.4086 `above_vwap`, INTC 102.44/0.4346 `above_vwap` — with expected ceilings from that session's SIP bars, not invented numbers.
+- ⚠️ **Validated on BOTH trees.** The five pre-existing uncommitted WIP files are **not mine** and were left **byte-identical** (diff re-measured before and after: 211 insertions / 7 deletions, unchanged). **Clean `HEAD` + this IMP's three files scores 685 passed / 20 failed in a throwaway `git worktree`; the 20 are the unchanged pre-existing `tests/test_exit_sim.py` failures. This IMP adds ZERO new failures to either tree and all 25 of its tests pass on both.** Worktree removed afterwards (`git worktree list` back to one entry).
+- `scripts.smoke_test` **ALL GREEN** (PAPER, PA3ESJUO8RU0, equity $7,479.65, 14 active symbols). `scripts.check_exits` **ALL GREEN** (0 open positions). `scripts.check_engine` **ALL GREEN** — and left `entry_refusals` at **52 rows**, i.e. the dry-run tick still writes nothing. `scripts.check_sizing_ladder` **ALL GREEN** (n=126, ladder pinned at the 0.5% floor tier, IMP-021 veto holding).
+- **Live read-only round trip:** `python -m scripts.refusal_audit --date 2026-09-16` ran against the real table and the real SIP feed and scored **52/52 rows** with no skips. **No write of any kind was issued** — the script has no INSERT/UPDATE path and `entry_refusals` was re-counted at 52 afterwards.
+- **Risk invariants re-read and unchanged:** `ALPACA_PAPER` **True**, `MAX_RISK_PCT` 2.0, `DAILY_LOSS_HALT_PCT` 8.0, `MAX_CONCURRENT_POSITIONS` 3, `ENTRY_CUTOFF_ET` 15:30, `FLATTEN_ET` 15:55, `VWAP_MAX_DIST_PCT` 0.25, `MIN_CONFIDENCE` 60, `MIN_STOP_PCT` 1.5, `ATR_STOP_MULT` 3.0, `BREAKEVEN_TRIGGER_R` 0.25, `TRAIL_TRIGGER_R` 0.25, `TRAIL_DISTANCE_R` 0.25, `RR_RATIO` 1.5, `REENTRY_COOLDOWN_MIN` 30.
+
+### Expected impact and how to score it
+**Zero on trade selection, sizing and P&L, by design.** What it buys is that the refused population — the one sample large enough to judge a *replacement* entry signal — is now scoreable per session, per filter and per symbol.
+- **Pass condition, already met on its own first run:** every ledger row scored with no skips, the per-filter verdict printed, and the floor-vs-ATR binding reported.
+- **What to watch next:** whether any filter ever flips from `PAID` to `COST`, and whether the ATR term ever binds. **Both are now one command away instead of unanswerable.**
+- **Observed effect:** (n/a on P&L — it cannot have one. Its first run is recorded in the 2026-09-16 daily review.)
+
+### Deliberately NOT shipped tonight (recorded so it is not re-litigated)
+- **(a) Any 1R / stop-geometry change, even though today's sharpest number invites one.** META was the day's best decision and its ceiling was **+0.807R** against a +1.0R WIN bar on a 1.399% stop. ⚠️ **IMP-055 refuted the stop-geometry refit on the full post-gate book on 09-14, the anti-gaming rule forbids widening, and the escalation clause bars tuning.** ★ **The honest reading is that the signal selects moves that are small relative to the noise the instrument must tolerate — a signal problem with a geometry symptom. It belongs to the retire-or-rebuild call.**
+- **(b) Any trail-width change.** META's 0.25R trail banked +0.229R and **every hold-longer alternative was worse** (META closed 673.59 = −0.48R from the fill). The trail was not the failure.
+- **(c) Any VWAP-gate change.** **Sixth consecutive exoneration** and the first at the exact geometry: 9 refusals, 0 win-feasible, mean −1.292% to the flatten, none rose.
+- **(d) Any `cooldown` or `underlying_held` change.** Both were measured **PAID** tonight — for the cooldown, for the first time ever. **A filter that just passed its first audit is not a candidate for removal.**
+- **(e) Any entry-layer filter built on the ceiling.** It is pure lookahead. **Do not make it the seventeenth refuted discriminator.**
+- **(f) Stop-slippage measurement — CLOSED, not deferred a third time.** Two stop exits today cost **−$0.36 total (0.75% of the day's loss)** and net entry slippage was **+$1.90 in the bot's favour**. **The 09-14 nomination rested on a session whose entire loss was $1.14. It is not the leak.**
+- **(g) Any watchlist action.** META's 09-14 fill-denominated trigger **has now fired on its own terms** (win-infeasible fill, ceiling +0.807R) and TSM's fill was the session's worst entry — **both handed to the pre-market routine in the daily review's notes, which owns the `watchlist` table.**
+- **(h) The mid-session `logrotate` split** (17:00 UTC = 13:00 ET, so each session's log lands in two files). Real but now minor: IMP-056 put the entry decisions in the database. **Recorded in the daily review, not fixed.**
+
+### Commit + deployment
+**Committed `4654905`, pushed to `origin/main`** (the five pre-existing WIP files verified still unstaged and byte-identical afterwards: 211 insertions / 7 deletions, unchanged). **Service restarted 2026-09-17 01:49:34 UTC** — graceful shutdown (`signal 15 received — shutting down` → `stopped`), clean start (`USTradeWisBot starting (dry_run=False)` → `market closed — sleeping ~42024s until next open`), `is-active` **active**, **NRestarts=0**, MainPID 3585662, **zero ERROR / Traceback / CRITICAL lines**. Market closed, so the restart was safe.
+★ **Deployment verified against the live unit, not assumed** (the 2026-06-23 DEPLOY-GAP lesson): `ActiveEnterTimestamp` post-dates the commit. ⚠️ **Note this IMP touched no file under `bot/`, so the restart changed no running behaviour whatsoever — it is a hygiene restart onto the pushed tree, not a deployment of new logic.**
