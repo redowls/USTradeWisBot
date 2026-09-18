@@ -895,3 +895,14 @@ Ordered by expected impact; each item needs replay validation before code.
   tested (80–95% stop exits, zero TP fills). Any future entry test must be paired with an
   explicit exit-geometry decision, not inherit IMP-040 by default.
 - The July WIP set is now committed (e75563e) — stop escalating it.
+
+---
+
+## 2026-09-18 — Retire-or-rebuild: DECIDED (rebuild), IMP-059 shipped
+
+The operator chose **rebuild the entry** (option B) and, after the entry-lab results, **wired the ORB entry in** (`ENTRY_MODE="orb"`, commit `3f73dd6`) with the **IMP-013 ratchet geometry restored** (0.5 / 1.0 / 1.0). Item 2 above is closed. What the reviews must do now:
+
+1. **Score the ORB book on its own terms.** Expectancy (R) and payoff first, stop rate second, exactly as the doctrine says. The 12-month held-out expectation is **+0.08R/trade, ~0.85 trades/session, true WR ~13%, stop rate ~45%** — a thin, not-yet-significant edge (t≈1). F+S ≥ 60% over 3 traded sessions triggers the escalation clause for ORB as it did for MA.
+2. **Do not re-tune the ratchet for the first 4 weeks.** IMP-040's 0.25R geometry FAILED under ORB on 12 months (PF 0.83); the dead band at exactly +1R is part of what was tested. Any exit change must first pass `python -m scripts.entry_lab --rules orb --start <12m ago>` with the candidate `--be/--trail/--trail-dist` flags.
+3. **Watch the refusal ledger:** `orb_market_filter`, `orb_low_volume`, `orb_after_cutoff`, `orb_below_vwap` rows show which condition does the work; `scripts/refusal_audit.py` scores them.
+4. **Re-run the lab monthly** (`--cache` makes it cheap) and record held-out expectancy beside the live number; divergence between the two is the first sign the sim is optimistic (slippage 0.03%/fill is the assumption).
