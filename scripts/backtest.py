@@ -40,6 +40,8 @@ def _equity() -> float:
 
 def format_report(s: dict) -> str:
     gate = "IMP-021 + IMP-022 VWAP gate" if s.get("vwap_gate") else "IMP-021 only (no VWAP gate)"
+    if config.ENTRY_MODE == "orb":
+        gate = "IMP-059 ORB entry (no index market filter in this harness)"
     lines = [
         f"📊 USTradeWisBot — 30-day backtest (whole strategy, {gate})",
         f"Window: {s['window']}  ({s['sessions']} sessions)",
@@ -86,7 +88,9 @@ def main(argv: list[str] | None = None) -> int:
         d = features.get("vwap_dist_pct")
         return d is None or d <= config.VWAP_MAX_DIST_PCT
 
-    entry_filter = None if "--no-vwap-gate" in argv else _vwap_gate
+    # IMP-059: the VWAP-distance gate is an MA-mode gate; the live engine does not
+    # apply it to ORB entries, so the backtest must not either.
+    entry_filter = None if ("--no-vwap-gate" in argv or config.ENTRY_MODE == "orb") else _vwap_gate
 
     equity = _equity()
     # Fetch history: window sessions + warmup, with RTH-filter slack.

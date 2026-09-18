@@ -14,6 +14,7 @@ explain every trade.
 from __future__ import annotations
 
 import math
+from datetime import datetime, time
 
 import pandas as pd
 
@@ -167,7 +168,107 @@ def regime(comp: pd.DataFrame) -> tuple[bool, float]:
     return False, config.REGIME_MULT_FAIL
 
 
-# --- Top-level evaluation ---------------------------------------------------
+# --- IMP-059: opening-range breakout entry ------------------------------------
+
+def completed_bars(df: pd.DataFrame, now: datetime | None) -> pd.DataFrame:
+    """Drop the bar still forming at ``now`` so the rule reads CLOSED bars only.
+
+    The bars endpoint returns the current 5-min bar too, with "close" = the last
+    trade so far. bot/entry_lab.py entered at the close of a COMPLETED bar, so
+    the live rule must judge the same bar: anything whose start lies inside the
+    current 5-min bucket is not finished. ``now=None`` (backtest windows) keeps
+    every bar — a window's last bar is by construction the bar being judged.
+    """
+    if now is None or df is None or df.empty:
+        return df
+    now_et = now.astimezone(config.MARKET_TZ)
+    bucket = now_et.replace(minute=(now_et.minute // 5) * 5, second=0, microsecond=0)
+    return df[df.index < bucket]
+
+
+def _orb_cutoff() -> time:
+    hh, mm = (int(x) for x in str(config.ORB_CUTOFF_ET).split(":"))
+    return time(hh, mm)
+
+
+def orb_features(df: pd.DataFrame) -> dict:
+    """Opening-range-breakout state of the LAST bar of ``df`` (a closed bar).
+
+    Mirrors bot.entry_lab.rule_orb exactly:
+      * range     = high of the first ORB_RANGE_BARS bars of the session;
+      * candidate = this bar closes above range*(1+ORB_BUFFER_PCT) AND the prior
+                    bar closed at/below the range — a FRESH break, one trigger per
+                    break, never on every bar that happens to sit above it;
+      * signal    = candidate AND not after ORB_CUTOFF_ET AND rel_vol >=
+                    ORB_MIN_REL_VOL AND (close > session VWAP if required).
+    ``blocks`` names every failed condition so a refused candidate is auditable
+    in dbo.entry_refusals. The market filter (index above its own VWAP) is
+    applied in evaluate_watchlist, the only place that has the index bars.
+    """
+    out: dict = {"candidate": False, "signal": False, "blocks": [], "or_high": None,
+                 "rel_vol": None, "bar_idx": None}
+    if df is None or len(df) < 2:
+        out["blocks"].append("no_bars")
+        return out
+    last_ts = df.index[-1]
+    day = df[df.index.normalize() == last_ts.normalize()]
+    k = int(config.ORB_RANGE_BARS)
+    bar_idx = len(day) - 1
+    out["bar_idx"] = bar_idx
+    if bar_idx < k:
+        out["blocks"].append("range_incomplete")
+        return out
+    or_high = _safe(day["high"].iloc[:k].max())
+    close = _safe(day["close"].iloc[-1])
+    prev_close = _safe(day["close"].iloc[-2])
+    out["or_high"] = round(or_high, 4)
+    if not close > or_high * (1.0 + float(config.ORB_BUFFER_PCT) / 100.0):
+        out["blocks"].append("no_break")
+        return out
+    if not prev_close <= or_high:
+        out["blocks"].append("not_fresh")
+        return out
+    out["candidate"] = True
+    if last_ts.time() > _orb_cutoff():
+        out["blocks"].append("after_cutoff")
+    rel_vol = _safe(indicators.relative_volume(df["volume"]).iloc[-1])
+    out["rel_vol"] = round(rel_vol, 3)
+    if config.ORB_MIN_REL_VOL and not rel_vol >= float(config.ORB_MIN_REL_VOL):
+        out["blocks"].append("low_volume")
+    if config.ORB_REQUIRE_ABOVE_VWAP:
+        vwap = _safe(indicators.session_vwap(df).iloc[-1])
+        if not (vwap > 0 and close > vwap):
+            out["blocks"].append("below_vwap")
+    out["signal"] = not out["blocks"]
+    return out
+
+
+def orb_market_ok(bars: dict[str, pd.DataFrame], now: datetime | None) -> tuple[bool, str]:
+    """Index-regime filter for ORB entries: the filter symbol's last CLOSED bar
+    must close above its own session VWAP. Fails CLOSED (no entries) when the
+    index bars are unavailable — the lab scored a missing market read as False.
+    """
+    sym = (config.ORB_MARKET_FILTER_SYMBOL or "").strip().upper()
+    if not sym:
+        return True, "market filter disabled"
+    df = bars.get(sym)
+    if df is None or df.empty:
+        try:
+            df = data.get_bars(sym, n_bars=120)
+        except Exception as exc:  # transient data error: fail closed, say why
+            return False, f"{sym} bars unavailable ({type(exc).__name__})"
+    df = completed_bars(df, now)
+    if df is None or df.empty:
+        return False, f"{sym} has no completed bar yet"
+    close = _safe(df["close"].iloc[-1])
+    vwap = _safe(indicators.session_vwap(df).iloc[-1])
+    if vwap <= 0:
+        return False, f"{sym} VWAP undefined"
+    ok = close > vwap
+    return ok, f"{sym} {close:.2f} {'above' if ok else 'below'} VWAP {vwap:.2f}"
+
+
+# --- Top-level evaluation -----------------------------------------------------
 
 def _classify(bo_score: float, ma: float, value: float) -> str | None:
     has_breakout = bo_score > 0.0
@@ -200,7 +301,7 @@ def _null_result(symbol: str) -> dict:
         "symbol": symbol, "breakout_score": 0.0, "ma_score": 0.0,
         "value_score": 0.0, "momentum_score": 0.0, "regime_ok": False,
         "regime_multiplier": 0.0, "signal_type": None, "broke_level": None,
-        "close": None, "atr": None, "session_vwap": None, "bars": 0,
+        "close": None, "atr": None, "session_vwap": None, "bars": 0, "orb": None,
     }
 
 
@@ -230,7 +331,16 @@ def evaluate(symbol: str, df: pd.DataFrame | None = None, n_bars: int = 120) -> 
     vwap_series = indicators.session_vwap(df)
     vwap_last = _safe(vwap_series.iloc[-1]) if len(vwap_series) else 0.0
     session_vwap = round(vwap_last, 4) if vwap_last and vwap_last > 0 else None
-
+    signal_type = _classify(bo_score, ma, value)
+    orb: dict | None = None
+    if config.ENTRY_MODE == "orb":
+        # IMP-059: the ORB rule replaces the MA/breakout classification as the
+        # entry decision; the component scores are still computed and persisted
+        # so every fill stays comparable with the pre-IMP-059 book.
+        orb = orb_features(df)
+        signal_type = "ORB" if orb["signal"] else None
+        if orb["candidate"] and orb["or_high"]:
+            broke_level = orb["or_high"]
     return {
         "symbol": symbol,
         "breakout_score": round(bo_score, 4),
@@ -239,7 +349,8 @@ def evaluate(symbol: str, df: pd.DataFrame | None = None, n_bars: int = 120) -> 
         "momentum_score": round(mom, 4),
         "regime_ok": regime_ok,
         "regime_multiplier": regime_mult,
-        "signal_type": _classify(bo_score, ma, value),
+        "signal_type": signal_type,
+        "orb": orb,
         "broke_level": round(broke_level, 4) if broke_level is not None else None,
         "close": round(_safe(df["close"].iloc[-1]), 4),
         "atr": round(_safe(comp["atr"].iloc[-1]), 4),
@@ -249,6 +360,27 @@ def evaluate(symbol: str, df: pd.DataFrame | None = None, n_bars: int = 120) -> 
 
 
 def evaluate_watchlist(n_bars: int = 120) -> list[dict]:
-    """Evaluate every active watchlist symbol from one batched data fetch."""
+    """Evaluate every active watchlist symbol from one batched data fetch.
+
+    In ORB mode (IMP-059) every symbol is judged on its last COMPLETED bar and
+    the index market filter is applied here: a fresh break while the index sits
+    below its own VWAP stays a *candidate* (so the refusal ledger records it)
+    but is not a signal.
+    """
     bars = data.get_watchlist_bars(n_bars=n_bars)
-    return [evaluate(sym, df=df, n_bars=n_bars) for sym, df in bars.items()]
+    if config.ENTRY_MODE != "orb":
+        return [evaluate(sym, df=df, n_bars=n_bars) for sym, df in bars.items()]
+    now = datetime.now(config.MARKET_TZ)
+    mkt_ok, mkt_detail = orb_market_ok(bars, now)
+    out: list[dict] = []
+    for sym, df in bars.items():
+        ev = evaluate(sym, df=completed_bars(df, now), n_bars=n_bars)
+        orb = ev.get("orb")
+        if orb is not None:
+            orb["market"] = mkt_detail
+            if orb.get("candidate") and not mkt_ok:
+                orb["blocks"].append("market_filter")
+                orb["signal"] = False
+                ev["signal_type"] = None
+        out.append(ev)
+    return out
