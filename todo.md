@@ -906,3 +906,16 @@ The operator chose **rebuild the entry** (option B) and, after the entry-lab res
 2. **Do not re-tune the ratchet for the first 4 weeks.** IMP-040's 0.25R geometry FAILED under ORB on 12 months (PF 0.83); the dead band at exactly +1R is part of what was tested. Any exit change must first pass `python -m scripts.entry_lab --rules orb --start <12m ago>` with the candidate `--be/--trail/--trail-dist` flags.
 3. **Watch the refusal ledger:** `orb_market_filter`, `orb_low_volume`, `orb_after_cutoff`, `orb_below_vwap` rows show which condition does the work; `scripts/refusal_audit.py` scores them.
 4. **Re-run the lab monthly** (`--cache` makes it cheap) and record held-out expectancy beside the live number; divergence between the two is the first sign the sim is optimistic (slippage 0.03%/fill is the assumption).
+
+### 2026-09-18 — ORB fragility stress test (peer session + re-check), watch items
+
+The pass is **front-loaded and concentrated**. Re-checked on the lab output after shipping:
+- 6-month held-out split in halves: **07-14..08-14 n19 PF 3.01 +0.182R · 08-17..09-16 n19 PF 0.67 −0.087R.** 12-month held-out: 05-13..07-09 PF 1.51 · 07-14..09-16 PF 1.28, but **by month 08 = −$52, 09 = $0.** The last eight weeks of tape did not pay.
+- Concentration: 6m held-out NVDA **+$136 of +$66 net** (the rest of the book is negative); 12m held-out NVDA +$99 / META +$64 / TSLA +$47 of +$219; top-3 trades = $156–162.
+- Sensitivities (peer session, 6.5m window): slippage 0.06% instead of 0.03% → PF 1.28→1.16; without the SPY filter PF 1.10; **without `ORB_MIN_REL_VOL ≥ 1.3` PF 0.80 — the volume gate is load-bearing**; k=3 PF 0.73; cutoff 13:00 PF 1.22.
+
+**Standing instructions for the daily/weekly reviews (ORB era):**
+1. Report **recent-half expectancy** (last 10 traded sessions) beside the cumulative figure; a cumulative PF above 1 carried by an old month is not evidence.
+2. Report **NVDA's share of ORB P&L** every week; if one name is >60% of net after 30 trades, say so as a concentration warning, not a win.
+3. **`ORB_MIN_REL_VOL` is never relaxed** and the SPY filter is never removed to raise the trade count (anti-gaming: both are the reasons the config passed).
+4. **Kill criterion:** after **30 live ORB trades**, if expectancy ≤ 0 or F+S ≥ 60% over the last 3 traded sessions, write "ORB has no demonstrated live edge" plainly and put **retire** to the operator as the only remaining option — do not ship a parameter change instead.
