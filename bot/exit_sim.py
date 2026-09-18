@@ -126,6 +126,7 @@ def ratchet_stop(
     current_stop: float,
     live_price: float | None,
     geometry: ExitGeometry,
+    high_price: float | None = None,
 ) -> float | None:
     """New (higher) stop for a long, or None when it should not move.
 
@@ -136,18 +137,24 @@ def ratchet_stop(
     cannot silently drift apart.
 
     R is anchored to the ORIGINAL plan stop, never the already-moved stop.
+    ``high_price`` mirrors IMP-031: the break-even stage tests the highest price
+    PRINTED since entry, the trail stage keeps testing the live price. It exists
+    here so the parity assertion above stays exact now that the live function
+    takes it — ``simulate_exit`` already passes each bar's high as ``live_price``,
+    which is why the simulator has always modelled a bot that sees every high.
     """
     if not geometry.trailing_enabled or live_price is None:
         return None
     risk = entry_price - initial_stop
     if risk <= 0 or entry_price <= 0:
         return None
-    gain_r = (live_price - entry_price) / risk
-    if gain_r >= geometry.trail_trigger_r:
+    peak = live_price if high_price is None else max(live_price, high_price)
+    candidate: float | None = None
+    if (live_price - entry_price) / risk >= geometry.trail_trigger_r:
         candidate = live_price - geometry.trail_distance_r * risk
-    elif gain_r >= geometry.breakeven_trigger_r:
-        candidate = entry_price
-    else:
+    if (peak - entry_price) / risk >= geometry.breakeven_trigger_r:
+        candidate = entry_price if candidate is None else max(candidate, entry_price)
+    if candidate is None:
         return None
     min_step = entry_price * geometry.ratchet_min_pct / 100.0
     if candidate <= current_stop + min_step:

@@ -11,6 +11,7 @@ from bot.replay import (
     simulate_bracket,
     vwap_distance_rows,
     vwap_skip_whatif,
+    vwap_skip_whatif_split,
 )
 
 
@@ -169,3 +170,64 @@ def test_vwap_skip_whatif_empty_is_safe():
     assert r["n_total"] == 0 and r["n_kept"] == 0 and r["n_skipped"] == 0
     assert r["delta"] == 0.0 and r["kept_win_pct"] == 0.0
     assert r["skipped_pl"] == 0.0 and r["kept_pl"] == 0.0
+
+
+# --- IMP-021: held-out (out-of-sample) validation of the ★★ VWAP-skip gate -----
+# Today (2026-07-20, 0W/4L −$87.86) is the first genuinely out-of-sample session
+# after IMP-020's in-sample validation. Its four real fills, three of them AT or
+# BELOW session VWAP (the "safe" side): QCOM −0.157% −40.32 · MU +0.035% −25.18 ·
+# INTC −0.628% −22.12 · AVGO +0.27% −0.24. At the +0.25% gate only AVGO is above
+# threshold, so the gate skips a −$0.24 scratch and KEEPS the three real losers —
+# the held-out kept book stays net-negative. This is the step-(2) evidence the
+# gate's "kept book flips positive" claim does not carry out of sample.
+TODAY_20_ROWS = [
+    dict(trade_id=172, symbol="QCOM", day="2026-07-20", dist_pct=-0.157, pl=-40.32, win=False),
+    dict(trade_id=173, symbol="MU", day="2026-07-20", dist_pct=0.035, pl=-25.18, win=False),
+    dict(trade_id=174, symbol="INTC", day="2026-07-20", dist_pct=-0.628, pl=-22.12, win=False),
+    dict(trade_id=175, symbol="AVGO", day="2026-07-20", dist_pct=0.27, pl=-0.24, win=False),
+]
+# A couple of in-sample above-VWAP losers so the in-sample skip side is net-losing.
+INSAMPLE_ROWS = [
+    dict(trade_id=170, symbol="AMD", day="2026-07-17", dist_pct=3.82, pl=-115.32, win=False),
+    dict(trade_id=169, symbol="UNH", day="2026-07-17", dist_pct=0.65, pl=-40.02, win=False),
+    dict(trade_id=160, symbol="AAPL", day="2026-07-16", dist_pct=-0.20, pl=32.32, win=True),
+]
+
+
+def test_vwap_skip_whatif_split_holdout_today_kept_book_stays_negative():
+    # split at today -> held-out is exactly today's four fills.
+    res = vwap_skip_whatif_split(INSAMPLE_ROWS + TODAY_20_ROWS, 0.25, "2026-07-20")
+    ho = res["held_out"]
+    assert ho["n_total"] == 4
+    assert ho["n_skipped"] == 1 and ho["n_kept"] == 3      # only AVGO (+0.27%) skipped
+    assert ho["skipped_pl"] == -0.24                       # a scratch, not the losers
+    assert ho["kept_pl"] == -87.62                         # QCOM+MU+INTC survive the gate
+    # The skip side technically removed a (tiny) net-losing trade...
+    assert res["held_out_removed_losers"] is True
+    # ...but the stronger "kept book flips positive" claim FAILS out of sample.
+    assert res["held_out_kept_positive"] is False
+    # in-sample skip side is net-losing too, so the direction is consistent.
+    assert res["generalizes"] is True
+
+
+def test_vwap_skip_whatif_split_kept_book_flips_positive_when_holdout_losers_above_vwap():
+    # A held-out window whose losers are all ABOVE VWAP and whose one winner is
+    # below it: skipping the above-VWAP losers leaves a net-positive kept book.
+    holdout = [
+        dict(trade_id=200, symbol="AMD", day="2026-07-20", dist_pct=1.20, pl=-80.0, win=False),
+        dict(trade_id=201, symbol="AAPL", day="2026-07-20", dist_pct=-0.10, pl=25.0, win=True),
+    ]
+    res = vwap_skip_whatif_split(INSAMPLE_ROWS + holdout, 0.25, "2026-07-20")
+    ho = res["held_out"]
+    assert ho["n_skipped"] == 1 and ho["kept_pl"] == 25.0
+    assert res["held_out_kept_positive"] is True
+    assert res["generalizes"] is True
+
+
+def test_vwap_skip_whatif_split_empty_holdout_does_not_generalize():
+    # split beyond every day -> held-out empty -> nothing removed, no generalisation.
+    res = vwap_skip_whatif_split(INSAMPLE_ROWS, 0.25, "2099-01-01")
+    assert res["held_out"]["n_total"] == 0
+    assert res["held_out_removed_losers"] is False
+    assert res["held_out_kept_positive"] is False
+    assert res["generalizes"] is False

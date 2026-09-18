@@ -4,6 +4,7 @@ Usage:
   python -m scripts.replay                 # fidelity baseline + breakeven + VWAP what-ifs
   python -m scripts.replay --be 0.75       # add a custom breakeven trigger (in R)
   python -m scripts.replay --vwap-skip 1.0 # add a custom VWAP-skip threshold (in %)
+  python -m scripts.replay --holdout-days 3 # held-out window = last N sessions (default 2)
 
 Read the caveats in bot/replay.py before acting on the output: the baseline
 row's |error| is the simulation noise budget — a what-if delta has to clear it
@@ -15,6 +16,11 @@ from __future__ import annotations
 import sys
 
 from bot import replay
+
+# Step (3) of the ★★ pre-ship checklist: the threshold is fixed at the band edge
+# where the VWAP-distance win/P&L sign flips (IMP-019), not curve-fit.
+GATE_THRESHOLD_PCT = 0.25
+DEFAULT_HOLDOUT_SESSIONS = 2
 
 
 def _print_run(label: str, result: dict, baseline_abs_error: float | None = None) -> None:
@@ -31,6 +37,8 @@ def main(argv: list[str]) -> int:
         if "--be" in argv else []
     extra_skip = [float(a) for a in argv[argv.index("--vwap-skip") + 1:]
                   if _is_float(a)] if "--vwap-skip" in argv else []
+    holdout_sessions = int(argv[argv.index("--holdout-days") + 1]) \
+        if "--holdout-days" in argv else DEFAULT_HOLDOUT_SESSIONS
 
     trades = replay.load_closed_trades()
     if not trades:
@@ -58,6 +66,8 @@ def main(argv: list[str]) -> int:
     _print_vwap_bands(trades, all_bars)
     print()
     _print_vwap_skip(trades, all_bars, baseline["abs_error"], extra_skip)
+    print()
+    _print_vwap_skip_holdout(trades, all_bars, holdout_sessions)
     print("=" * 72)
     return 0
 
@@ -100,6 +110,44 @@ def _print_vwap_skip(
               f"{r['kept_pl']:>10.2f}{r['skipped_pl']:>10.2f}"
               f"{r['delta']:>+10.2f}{r['kept_win_pct']:>9.1f}"
               f"{r['skipped_win_pct']:>9.1f}{clears}")
+
+
+def _print_vwap_skip_holdout(
+    trades: list[dict], all_bars: dict, holdout_sessions: int
+) -> None:
+    """★★ pre-ship step (2): does the VWAP-skip edge hold OUT-OF-SAMPLE?
+
+    Splits the gate-evaluable book so the most recent ``holdout_sessions`` days
+    are held out, then runs the +0.25% gate (step 3's fixed threshold) on the
+    in-sample vs held-out partitions. Two claims are reported separately: whether
+    the SKIP side still removes net-losers out of sample (generalises), and the
+    stronger whether the KEPT book flips net-positive there. NOT an engine change.
+    """
+    rows = replay.vwap_distance_rows(trades, all_bars)
+    days = sorted({r["day"] for r in rows})
+    if len(days) <= holdout_sessions:
+        print("VWAP-skip HELD-OUT check — skipped (not enough distinct sessions).")
+        return
+    split_day = days[-holdout_sessions]
+    res = replay.vwap_skip_whatif_split(rows, GATE_THRESHOLD_PCT, split_day)
+    print(f"VWAP-skip HELD-OUT check (step 2) — gate @ >+{GATE_THRESHOLD_PCT:.2f}% "
+          f"above VWAP, split at {split_day} "
+          f"(held-out = last {holdout_sessions} sessions):")
+    print(f"  {'window':>10}{'trades':>8}{'kept':>6}{'skip':>6}{'kept$':>10}"
+          f"{'skip$':>10}{'delta$':>10}{'kept+?':>8}")
+    for name, r in (("in-sample", res["in_sample"]), ("held-out", res["held_out"])):
+        kept_pos = "yes" if r["kept_pl"] > 0 else "no"
+        print(f"  {name:>10}{r['n_total']:>8}{r['n_kept']:>6}{r['n_skipped']:>6}"
+              f"{r['kept_pl']:>10.2f}{r['skipped_pl']:>10.2f}"
+              f"{r['delta']:>+10.2f}{kept_pos:>8}")
+    verdict = ("GENERALISES — skip side removes net-losers in both windows"
+               if res["generalizes"] else
+               "does NOT generalise — skip side is not net-losing out of sample")
+    kept_note = ("; kept book flips net-positive out of sample too (strong)"
+                 if res["held_out_kept_positive"] else
+                 "; BUT kept book stays net-negative out of sample — recent "
+                 "losers were filled at/below VWAP, so the gate cannot catch them")
+    print(f"  verdict: {verdict}{kept_note}")
 
 
 def _is_float(text: str) -> bool:

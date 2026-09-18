@@ -56,6 +56,25 @@ EXTENSION_BANDS: tuple[tuple[float, float, str], ...] = (
     (1.0, float("inf"), ">1.0%"),
 )
 
+# Momentum bands for breakout-driven (BREAKOUT/BOTH) trades — the momentum_score
+# component of the confidence blend, bucketed at entry. Unlike the refuted
+# per-trade discriminators (confidence IMP-004, volume 2026-06-26, entry-extension
+# IMP-007, time-of-day IMP-016), momentum has never been broken out on its own,
+# and the data shows a sharp cliff at the bottom: BOTH signals with
+# momentum_score < 0.1 are the single worst discrete bucket in the book (0 wins,
+# see daily-review 2026-07-22 — UNH mom 0.00 -> -$59.88, following 2026-07-20 INTC
+# mom 0.17 -> -$22.12). This surfaces that cliff so a "require a momentum floor on
+# breakouts" entry gate can be judged on accumulating evidence before any engine
+# change (measurement-first, per IMP-004/007/016/020). Only trades whose signal is
+# breakout-driven (BREAKOUT/BOTH) land here — an MA-only entry is not a breakout.
+MOMENTUM_BANDS: tuple[tuple[float, float, str], ...] = (
+    (float("-inf"), 0.1, "<0.1"),
+    (0.1, 0.3, "0.1-0.3"),
+    (0.3, 0.5, "0.3-0.5"),
+    (0.5, 0.7, "0.5-0.7"),
+    (0.7, float("inf"), "0.7+"),
+)
+
 # Stop-protection bands — split STOP exits by the DOCTRINE verdict (IMP-053).
 #
 # Since IMP-013 (2026-07-08) raises the broker stop to break-even and IMP-040
@@ -92,7 +111,6 @@ STOP_PROTECTION_BANDS: tuple[tuple[str, str, str | None], ...] = (
     ("trailed-scratch", "SCRATCH", None),           # +0.25R..+1R — capital kept, thesis unpaid
     ("banked", "WIN", None),                        # >= +1R banked on a stop
 )
-
 
 
 def _bucket(pls: list[float]) -> dict:
@@ -231,6 +249,31 @@ def by_flatten_outcome(rows: list[dict]) -> dict:
         "faded": _bucket([p for p in flat if p < 0]),
         "drifted-up": _bucket([p for p in flat if p >= 0]),
     }
+
+
+def by_breakout_momentum(rows: list[dict]) -> dict:
+    """Bucket breakout-driven (BREAKOUT/BOTH) closed-trade P&L by momentum_score.
+
+    Only trades whose signal_type is BREAKOUT or BOTH and that carry a usable
+    momentum_score are counted (MA-only entries are not breakouts and are
+    excluded); returns {band: _bucket(...)} for every MOMENTUM_BANDS label (empty
+    dict when none qualify). Surfaces the low-momentum cliff — BOTH breakouts with
+    momentum_score < 0.1 are the worst discrete bucket in the book (0 wins; UNH
+    2026-07-22 mom 0.00 -> -$59.88, INTC 2026-07-20 mom 0.17 -> -$22.12) — so a
+    "require a momentum floor on breakouts" entry gate can be valued on evidence
+    before any engine change. Pure — no DB, no network.
+    """
+    pairs = [(r, r.get("momentum_score")) for r in rows
+             if r.get("realized_pl") is not None
+             and (r.get("signal_type") in ("BREAKOUT", "BOTH"))
+             and r.get("momentum_score") is not None]
+    if not pairs:
+        return {}
+    out: dict[str, dict] = {}
+    for lo, hi, label in MOMENTUM_BANDS:
+        sub = [_f(r["realized_pl"]) for r, mom in pairs if lo <= _f(mom) < hi]
+        out[label] = _bucket(sub)
+    return out
 
 
 # Time-of-day bands — minutes AFTER the 09:30 ET open at which the entry filled.
@@ -458,7 +501,7 @@ def load_closed_trades(since: date | None = None) -> list[dict]:
         "SELECT t.trade_id, t.symbol, t.realized_pl, t.realized_pl_pct, "
         "t.exit_reason, t.entry_time, t.exit_time, t.entry_price, "
         "t.stop_price, t.exit_price, "
-        "s.signal_type, s.confidence, s.broke_level "
+        "s.signal_type, s.confidence, s.broke_level, s.momentum_score "
         "FROM trades t LEFT JOIN signals s ON s.trade_id = t.trade_id "
         "WHERE t.status = 'CLOSED' AND t.realized_pl IS NOT NULL"
     )

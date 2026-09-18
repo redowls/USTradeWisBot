@@ -241,6 +241,7 @@ def vwap_distance_rows(
         rows.append({
             "trade_id": t["trade_id"],
             "symbol": t["symbol"],
+            "day": t["entry_time"].strftime("%Y-%m-%d"),
             "dist_pct": round((entry - vwap) / vwap * 100.0, 3),
             "pl": pl,
             "win": pl > 0,
@@ -323,4 +324,47 @@ def vwap_skip_whatif(rows: list[dict], threshold_pct: float) -> dict:
         "delta": round(-skipped_pl, 2),
         "kept_win_pct": _win_pct(kept),
         "skipped_win_pct": _win_pct(skipped),
+    }
+
+
+def vwap_skip_whatif_split(
+    rows: list[dict], threshold_pct: float, split_day: str
+) -> dict:
+    """Step (2) of the ★★ gate pre-ship checklist: does the VWAP-skip edge hold
+    OUT-OF-SAMPLE?
+
+    IMP-020 (step 1) confirmed skipping fills >``threshold_pct`` above the
+    session VWAP clears the noise budget on the whole recorded book — but that
+    book was also the set the threshold was read off (in-sample). todo.md
+    requires confirming on a *held-out* window before the gate can go to human
+    sign-off. This partitions ``rows`` (from ``vwap_distance_rows``, each row
+    carrying a ``day``) by entry day into **in-sample** (``day < split_day``) and
+    **held-out** (``day >= split_day``), runs ``vwap_skip_whatif`` on each, and
+    reports whether the edge GENERALIZES.
+
+    Two distinct claims are tracked separately because one can hold out-of-sample
+    while the other fails:
+      - ``held_out_removed_losers`` — on the held-out window the skipped set is
+        net-losing (the SKIP side helps: the gate removes trades that lost).
+      - ``held_out_kept_positive`` — the KEPT book flips net-positive out of
+        sample (the stronger claim; it fails when recent losers were filled
+        at/below VWAP, so the gate could not have caught them).
+    ``generalizes`` = the skip side removed net-losers in BOTH windows (a
+    consistent, non-curve-fit direction), not the stronger kept-positive claim.
+    Empty windows are safe (``vwap_skip_whatif`` on [] → all zeros → not net
+    losing → does not generalise).
+    """
+    in_sample = [r for r in rows if r["day"] < split_day]
+    held_out = [r for r in rows if r["day"] >= split_day]
+    ins = vwap_skip_whatif(in_sample, threshold_pct)
+    hos = vwap_skip_whatif(held_out, threshold_pct)
+    held_out_removed_losers = hos["skipped_pl"] < 0
+    return {
+        "threshold_pct": threshold_pct,
+        "split_day": split_day,
+        "in_sample": ins,
+        "held_out": hos,
+        "held_out_removed_losers": held_out_removed_losers,
+        "held_out_kept_positive": hos["kept_pl"] > 0,
+        "generalizes": ins["skipped_pl"] < 0 and held_out_removed_losers,
     }
