@@ -879,3 +879,19 @@ Ordered by expected impact; each item needs replay validation before code.
 **New item 4 — `PERPLEXITY_API_KEY` appears revoked.** `sonar` has failed **20 consecutive runs** and is now failing in two distinct modes: `HTTP 401 Unauthorized` (2026-09-14 pre-market, key present at 53 chars) and `PPLX_EMPTY` (2026-09-14 post-close). Both routines fall back to WebSearch and neither blocks, but every routine's market-context step is degraded. **Needs a human to rotate the key.**
 
 **Item 3 (five uncommitted files) — sixteenth consecutive escalation, unchanged.** Still `bot/analytics.py`, `bot/exit_sim.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py`, plus untracked `backtest_result.json` / `gate_monitor_result.json`. The week-ending-09-11 weekly asked the daily review to commit them; **this routine's ground rules permit staging only files it touched in its own run**, so the weekly's own stated fallback was taken instead — reported as a blocking defect rather than worked around. Working tree now scores **663 passed**; clean `HEAD` does not. **Still needs a human `git add` or a decision to discard.**
+
+## Entry rebuild (option B) — status 2026-09-18 (IMP-059)
+
+- Operator chose option B (rebuild the ENTRY, keep exits/risk). Built `bot/entry_lab.py` — a
+  walk-forward backtest gate — and tested ORB / prior-day-high / session-high / VWAP-reclaim
+  on 6 and 12 months of SIP 5-min bars under the live exit geometry and two alternatives.
+- **Result: no candidate clears the held-out gate robustly. Nothing shipped.** Details in
+  `memory/improvement-log.md` IMP-059.
+- Standing rule from here: an entry-signal change ships ONLY after
+  `.venv/bin/python -m scripts.entry_lab --start <12 months ago> --end <yesterday>` shows
+  held-out expectancy > 0, PF ≥ 1.2, n ≥ 30 with parameters chosen in-sample. Add new rules
+  to `entry_lab.RULES`; do not tune on the held-out window.
+- Open for the operator: the live 0.25R ratchet (IMP-040) caps every breakout-style entry
+  tested (80–95% stop exits, zero TP fills). Any future entry test must be paired with an
+  explicit exit-geometry decision, not inherit IMP-040 by default.
+- The July WIP set is now committed (e75563e) — stop escalating it.
