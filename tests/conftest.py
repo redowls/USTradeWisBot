@@ -59,3 +59,15 @@ def _no_live_db_writes(monkeypatch):
 
     for name in _WRITE_PATHS:
         monkeypatch.setattr(db, name, _blocked(name))
+
+
+@pytest.fixture(autouse=True)
+def _legacy_tests_run_in_ma_mode(monkeypatch):
+    """Every test written before IMP-059 pins MA-mode behaviour (the IMP-021
+    vetoes, the IMP-022 VWAP-distance gate, MA refusal vocabulary). They keep
+    doing that under the MA entry; tests of the ORB entry opt in explicitly
+    (see tests/test_imp059_orb_entry.py::orb_mode), and because that fixture
+    runs after this autouse one, its setattr wins.
+    """
+    from bot import config
+    monkeypatch.setattr(config, "ENTRY_MODE", "ma")

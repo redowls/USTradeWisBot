@@ -300,3 +300,33 @@ def _assert_weights() -> None:
 
 
 _assert_weights()
+
+
+# --- Entry mode (IMP-059, 2026-09-18) ------------------------------------------
+# "ma"  = the incumbent 5-min EMA-stack crossover (signals._classify with the
+#         IMP-021 vetoes and the IMP-022 VWAP-distance gate). Measured
+#         win-infeasible FROM THE FILL on 83.5% of the post-gate book (IMP-054);
+#         weekly verdict "no demonstrated edge" for six consecutive weeks.
+# "orb" = opening-range breakout — bot/entry_lab.py `rule_orb`, chosen by the
+#         walk-forward gate (parameters fixed in-sample, judged held-out; see
+#         IMP-059 in memory/improvement-log.md for the numbers). The first
+#         ORB_RANGE_BARS 5-min bars of the session define the range; the FIRST
+#         completed bar that closes above the range high (prior bar at/below it),
+#         before ORB_CUTOFF_ET, with volume >= ORB_MIN_REL_VOL x the 20-bar
+#         average, above the session VWAP, and with ORB_MARKET_FILTER_SYMBOL
+#         above its own session VWAP, is the entry. Everything downstream —
+#         sizing.plan_position geometry, the bracket, the ratchet, the 15:55
+#         flatten, the caps and the cooldown — is unchanged.
+# DORMANT (2026-09-18): the walk-forward gate did NOT clear any candidate entry —
+# on 12 months ORB fails under the live geometry (held-out PF 0.83) and is fragile
+# under every alternative (IMP-059). This mode exists on the imp059-orb-entry-mode
+# branch for a future rule that DOES clear `scripts.entry_lab`; it must not be
+# switched on without a fresh gate PASS recorded in memory/improvement-log.md.
+ENTRY_MODE = "ma"
+ORB_RANGE_BARS = 6              # 30 minutes of 5-min bars
+ORB_CUTOFF_ET = "11:30"         # a break that comes later is not an opening-range break
+ORB_MIN_REL_VOL = 1.3           # trigger-bar volume vs the 20-bar average (indicators.relative_volume)
+ORB_BUFFER_PCT = 0.0            # close must exceed the range high by this % (0 = any close above)
+ORB_REQUIRE_ABOVE_VWAP = True   # the trigger close must sit above the session VWAP
+ORB_MARKET_FILTER_SYMBOL = "SPY"  # entries only while this symbol closes above ITS session VWAP; "" disables
+ORB_CONFIDENCE = 70.0           # flat: the risk ladder is 0.5% at every rung, so this only has to clear MIN_CONFIDENCE

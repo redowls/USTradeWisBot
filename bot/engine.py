@@ -340,6 +340,14 @@ class Engine:
             if open_count >= config.MAX_CONCURRENT_POSITIONS:
                 break
             if conf < config.MIN_CONFIDENCE or not ev.get("signal_type"):
+                # IMP-059: a fresh break above the opening range that a quality
+                # condition (cutoff / volume / VWAP / market filter) turned away is
+                # still a decision — the feasibility audits need the refused
+                # population, not only the fills, so it gets a ledger row.
+                orb = ev.get("orb") or {}
+                if orb.get("candidate") and orb.get("blocks"):
+                    _refuse(ev, float(config.ORB_CONFIDENCE), f"orb_{orb['blocks'][0]}"[:24],
+                            ("orb_blocked_" + "+".join(orb["blocks"]))[:64])
                 continue
             # --- Eligibility BEFORE quality (IMP-042) ---
             # The held-skip, the daily cap and the cooldown answer "could this
@@ -390,7 +398,11 @@ class Engine:
             # 30-day backtest both agree). Fills at/below VWAP hold; stretched-above
             # fills fade to the stop. Fail-open when VWAP is undefined.
             vwap_dist = sizing.vwap_distance_pct(ev.get("close"), ev.get("session_vwap"))
-            if vwap_dist is not None and vwap_dist > config.VWAP_MAX_DIST_PCT:
+            # IMP-059: not applied in ORB mode. The ORB rule already requires the
+            # trigger close to be ABOVE the session VWAP, and a range break is by
+            # nature stretched above it; the +0.25% cap was measured on MA fills
+            # (IMP-022) and was NOT part of the configuration that passed the gate.
+            if config.ENTRY_MODE != "orb" and vwap_dist is not None and vwap_dist > config.VWAP_MAX_DIST_PCT:
                 _refuse(ev, conf, "above_vwap", f"above_vwap_+{vwap_dist:.2f}%")
                 self._log(f"ENTRY SKIPPED {ev['symbol']}: entry {ev['close']:.2f} is "
                           f"+{vwap_dist:.2f}% above session VWAP "
@@ -469,7 +481,7 @@ class Engine:
                                 "action": "bought", "order_id": res["order_id"],
                                 "trade_id": trade_id})
                 self._log(f"ENTRY {plan.shares} {plan.symbol} @ {plan.entry_price} "
-                          f"(conf {conf:.0f}) order={res['order_id']}")
+                          f"({ev.get('signal_type')} conf {conf:.0f}) order={res['order_id']}")
             else:
                 actions.append({"symbol": plan.symbol, "confidence": conf,
                                 "action": "rejected", "detail": res["error"]})
@@ -626,6 +638,11 @@ class Engine:
     def run(self) -> None:
         self._install_signal_handlers()
         self._log(f"USTradeWisBot starting (dry_run={self.dry_run})")
+        self._log(f"entry mode={config.ENTRY_MODE} (ORB range={config.ORB_RANGE_BARS} bars, "
+                  f"cutoff {config.ORB_CUTOFF_ET} ET, relvol>={config.ORB_MIN_REL_VOL}, "
+                  f"market filter={config.ORB_MARKET_FILTER_SYMBOL or 'off'}); "
+                  f"ratchet BE {config.BREAKEVEN_TRIGGER_R}R / trail {config.TRAIL_TRIGGER_R}R"
+                  f"@{config.TRAIL_DISTANCE_R}R (enabled={config.TRAILING_STOP_ENABLED})")
         notify.heartbeat(f"USTradeWisBot started (paper={broker.account_summary()['paper']})")
 
         while self.running:

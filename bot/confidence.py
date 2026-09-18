@@ -17,6 +17,10 @@ from . import config
 
 def score(evaluation: dict) -> float:
     """Return 0-100 confidence from a bot.signals.evaluate() result dict."""
+    # IMP-059: an opening-range-breakout signal carries no component blend; it is
+    # sized on the flat ladder at a constant confidence (bot/entry_lab.py did the same).
+    if evaluation.get("signal_type") == "ORB":
+        return round(float(config.ORB_CONFIDENCE), 2)
     blend = (
         config.WEIGHT_BREAKOUT * evaluation.get("breakout_score", 0.0)
         + config.WEIGHT_MA * evaluation.get("ma_score", 0.0)
