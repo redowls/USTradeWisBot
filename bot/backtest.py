@@ -64,6 +64,9 @@ class BtTrade:
     regime_mult: float = 0.0
     ma_score: float = 0.0
     value_score: float = 0.0
+    # Bracket geometry (entry_lab needs the original 1R to express P&L in R).
+    stop_price: float | None = None
+    take_profit_price: float | None = None
 
     @property
     def win(self) -> bool:
@@ -219,6 +222,7 @@ def symbol_trades_for_day(
             regime_mult=round(float(ev.get("regime_multiplier", 0.0)), 4),
             ma_score=round(float(ev.get("ma_score", 0.0)), 4),
             value_score=round(float(ev.get("value_score", 0.0)), 4),
+            stop_price=round(plan.stop_price, 4), take_profit_price=round(plan.take_profit_price, 4),
         ))
         entries_used += 1
         cooldown_until = exit_ts + timedelta(minutes=config.REENTRY_COOLDOWN_MIN)
