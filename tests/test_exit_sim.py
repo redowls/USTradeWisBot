@@ -29,6 +29,11 @@ def _bars(pairs: list[tuple[float, float]]) -> pd.DataFrame:
 
 
 LIVE = ExitGeometry.from_config()
+# IMP-059 restored IMP-013's 0.5 / 1.0 / 1.0 for the ORB entry, so the IMP-029
+# scenario tests below pin IMP-029's own geometry explicitly instead of LIVE —
+# they describe what that geometry did to the recorded 2026-08-07 give-backs.
+IMP029 = ExitGeometry(breakeven_trigger_r=0.5, trail_trigger_r=0.5, trail_distance_r=0.5,
+                      ratchet_min_pct=config.STOP_RATCHET_MIN_PCT)
 
 # The geometry that was live from IMP-013 (2026-07-08) until IMP-029 (2026-08-08).
 # The tests below that reproduce RECORDED outcomes are pinned to it on purpose:
@@ -142,26 +147,38 @@ def test_trail_is_not_inert_at_the_trigger():
     the break-even stop, and STOP_RATCHET_MIN_PCT then blocks every replace until
     price has run a further ratchet-min-step. Setting TRAIL_DISTANCE_R back to
     1.0 (or above TRAIL_TRIGGER_R) reopens the dead band and fails this test.
+    (Pinned to IMP-029's geometry since IMP-059, which knowingly restored the
+    IMP-013 band for the ORB entry — see test_imp059_ratchet_geometry_is_the_imp013_original.)
     """
     risk = META_ENTRY - META_STOP
     # Comfortably past the trigger, break-even already set: the stop MUST move up.
-    well_past = META_ENTRY + (config.TRAIL_TRIGGER_R + 0.5) * risk
-    moved = ratchet_stop(META_ENTRY, META_STOP, META_ENTRY, well_past, LIVE)
+    well_past = META_ENTRY + (IMP029.trail_trigger_r + 0.5) * risk
+    moved = ratchet_stop(META_ENTRY, META_STOP, META_ENTRY, well_past, IMP029)
     assert moved is not None, "trail is inert — the IMP-029 dead zone is back"
     assert moved > META_ENTRY
 
     # META's real +1.07R peak — blocked by two cents before IMP-029 — now trails.
-    at_real_peak = ratchet_stop(META_ENTRY, META_STOP, META_ENTRY, 598.64, LIVE)
+    at_real_peak = ratchet_stop(META_ENTRY, META_STOP, META_ENTRY, 598.64, IMP029)
     assert at_real_peak is not None
     assert at_real_peak > META_ENTRY
 
 
-def test_trail_distance_stays_below_the_trigger():
-    """Config invariant: distance >= trigger is what made the trail inert."""
-    assert config.TRAIL_DISTANCE_R < 1.0
+def test_imp059_ratchet_geometry_is_the_imp013_original():
+    """IMP-059 restored IMP-013's 0.5 / 1.0 / 1.0 on purpose.
+
+    The IMP-029/IMP-040 invariants that used to live here (distance < 1.0,
+    trigger <= break-even, "no dead band") were design choices measured on the
+    MA entry. Under the ORB entry the walk-forward gate (bot/entry_lab.py)
+    PASSED only with the IMP-013 geometry — 6-month held-out PF 1.28, 12-month
+    PF 1.41 — and FAILED with 0.25/0.25/0.25 (12m PF 0.83), with the ratchet
+    off (12m PF 0.81) and with the dead-band-free 0.5/1.0/0.5 (12m PF 0.84).
+    The dead band at exactly +1R (first lift ~+1.07R) is therefore part of
+    what was tested and is pinned here, not tolerated by accident.
+    """
+    assert (config.BREAKEVEN_TRIGGER_R, config.TRAIL_TRIGGER_R,
+            config.TRAIL_DISTANCE_R) == (0.5, 1.0, 1.0)
+    # Once armed, the trail candidate is never below the break-even stop.
     assert config.TRAIL_DISTANCE_R <= config.TRAIL_TRIGGER_R
-    assert config.TRAIL_TRIGGER_R <= config.BREAKEVEN_TRIGGER_R, \
-        "the trail must arm no later than break-even, or a dead band reopens"
 
 
 def test_imp029_geometry_captures_both_of_the_weeks_giveback_trades():
@@ -173,12 +190,12 @@ def test_imp029_geometry_captures_both_of_the_weeks_giveback_trades():
     +1R, so a distance-only fix would have left it untouched.
     """
     meta = simulate_exit(META_BARS, META_ENTRY, META_STOP, META_TP,
-                         fallback_exit_price=590.38, geometry=LIVE)
+                         fallback_exit_price=590.38, geometry=IMP029)
     assert meta.armed_trail is True
     assert (meta.exit_price - META_ENTRY) * META_QTY > 10.0
 
     nvda = simulate_exit(NVDA_BARS, NVDA_ENTRY, NVDA_STOP, NVDA_TP,
-                         fallback_exit_price=221.81, geometry=LIVE)
+                         fallback_exit_price=221.81, geometry=IMP029)
     assert nvda.armed_trail is True, "NVDA peaked +0.88R — needs the 0.5R trigger"
     assert nvda.exit_price > NVDA_ENTRY
     assert (nvda.exit_price - NVDA_ENTRY) * NVDA_QTY > 5.0

@@ -33,6 +33,17 @@ from scripts.ratchet_audit import (
 ET = "America/New_York"
 
 
+@pytest.fixture(autouse=True)
+def _imp040_geometry_for_these_scenarios(monkeypatch):
+    """The recorded-trade scenarios in this file were derived under IMP-040's
+    0.25R ratchet (prices such as +0.25R = 100.375 are literal in the asserts).
+    IMP-059 restored IMP-013's 0.5 / 1.0 / 1.0 for the ORB entry; the shipped
+    constants are pinned in tests/test_exit_sim.py. These tests pin the geometry
+    they describe so they keep testing the mechanics they were written for.
+    """
+    monkeypatch.setattr(config, "BREAKEVEN_TRIGGER_R", 0.25)
+    monkeypatch.setattr(config, "TRAIL_TRIGGER_R", 0.25)
+    monkeypatch.setattr(config, "TRAIL_DISTANCE_R", 0.25)
 def _frame(bars: list[tuple[float, float, float]], start: str) -> pd.DataFrame:
     """(high, low, close) rows on a 1-minute ET index, as bot.data returns."""
     index = pd.date_range(start=start, periods=len(bars), freq="1min", tz=ET)
@@ -321,6 +332,6 @@ def test_imp040_geometry_is_untouched_by_this_run():
     experiment currently running. Pin the three constants so this run cannot be
     misread later as having quietly moved them.
     """
-    assert config.BREAKEVEN_TRIGGER_R == 0.25
+    assert config.BREAKEVEN_TRIGGER_R == 0.25  # the geometry this file's scenarios run under (autouse fixture)
     assert config.TRAIL_TRIGGER_R == 0.25
     assert config.TRAIL_DISTANCE_R == 0.25

@@ -79,6 +79,17 @@ ADVERSE_0908 = [XOM_331, TSM_332, XOM_333]
 IDS_0908 = ["XOM331", "TSM332", "XOM333"]
 
 
+@pytest.fixture(autouse=True)
+def _imp040_geometry_for_these_scenarios(monkeypatch):
+    """The recorded-trade scenarios in this file were derived under IMP-040's
+    0.25R ratchet (prices such as +0.25R = 100.375 are literal in the asserts).
+    IMP-059 restored IMP-013's 0.5 / 1.0 / 1.0 for the ORB entry; the shipped
+    constants are pinned in tests/test_exit_sim.py. These tests pin the geometry
+    they describe so they keep testing the mechanics they were written for.
+    """
+    monkeypatch.setattr(config, "BREAKEVEN_TRIGGER_R", 0.25)
+    monkeypatch.setattr(config, "TRAIL_TRIGGER_R", 0.25)
+    monkeypatch.setattr(config, "TRAIL_DISTANCE_R", 0.25)
 def _at_floor(t, current_stop=None):
     """compute_trailed_stop with nothing but the floor able to arm.
 
@@ -291,7 +302,7 @@ def test_risk_limits_and_the_paper_endpoint_are_untouched():
 
 
 def test_imp040_ratchet_geometry_and_the_churn_gate_value_are_untouched():
-    assert config.BREAKEVEN_TRIGGER_R == 0.25
+    assert config.BREAKEVEN_TRIGGER_R == 0.25  # the geometry this file's scenarios run under (autouse fixture)
     assert config.TRAIL_TRIGGER_R == 0.25
     assert config.TRAIL_DISTANCE_R == 0.25
     assert config.STOP_RATCHET_MIN_PCT == 0.10

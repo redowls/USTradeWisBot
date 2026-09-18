@@ -1,3 +1,4 @@
+import pytest
 """IMP-013 tests — break-even + trailing stop management.
 
 The 06-08..07-07 audit (123 closed trades): STOP exits -$3,266 (56 trades,
@@ -33,6 +34,17 @@ from bot import config, data, engine, execution, exits, logbook
 # Base case: entry 100, initial stop 98.5 (risk 1.5) -> 0.25R = 0.375, so the
 # trigger sits at 100.375.
 
+@pytest.fixture(autouse=True)
+def _imp040_geometry_for_these_scenarios(monkeypatch):
+    """The recorded-trade scenarios in this file were derived under IMP-040's
+    0.25R ratchet (prices such as +0.25R = 100.375 are literal in the asserts).
+    IMP-059 restored IMP-013's 0.5 / 1.0 / 1.0 for the ORB entry; the shipped
+    constants are pinned in tests/test_exit_sim.py. These tests pin the geometry
+    they describe so they keep testing the mechanics they were written for.
+    """
+    monkeypatch.setattr(config, "BREAKEVEN_TRIGGER_R", 0.25)
+    monkeypatch.setattr(config, "TRAIL_TRIGGER_R", 0.25)
+    monkeypatch.setattr(config, "TRAIL_DISTANCE_R", 0.25)
 def test_no_move_below_breakeven_trigger():
     # +0.2R (100.30) — not yet at the +0.25R trigger.
     assert exits.compute_trailed_stop(100.0, 98.5, 98.5, 100.30) is None

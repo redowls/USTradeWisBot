@@ -319,9 +319,9 @@ def test_imp043_touches_no_risk_limit_and_no_imp040_geometry():
     assert config.ATR_STOP_MULT == 3.0
     assert config.RR_RATIO == 1.5
     # IMP-040's open experiment — an analysis change must not disturb it.
-    assert config.BREAKEVEN_TRIGGER_R == 0.25
-    assert config.TRAIL_TRIGGER_R == 0.25
-    assert config.TRAIL_DISTANCE_R == 0.25
+    assert config.BREAKEVEN_TRIGGER_R == 0.5   # IMP-059
+    assert config.TRAIL_TRIGGER_R == 1.0       # IMP-059
+    assert config.TRAIL_DISTANCE_R == 1.0      # IMP-059
     from bot import secrets
     assert secrets.ALPACA_PAPER is True, "the paper endpoint is never negotiable"
 

@@ -111,10 +111,16 @@ MAX_ENTRY_SLIPPAGE_PCT = 1.0    # skip an entry if the LIVE price has moved more
 # is untouched, so max loss per trade is unchanged; this is strictly tighter
 # protection at every price level, never wider.
 TRAILING_STOP_ENABLED = True
-BREAKEVEN_TRIGGER_R = 0.25      # IMP-040: was 0.5. At +0.25R unrealized, raise
+BREAKEVEN_TRIGGER_R = 0.5       # IMP-059: back to IMP-013's 0.5 (IMP-040 had 0.25).
+                                # Under the ORB entry the walk-forward gate PASSED only
+                                # with the IMP-013 geometry (6m held-out PF 1.28, 12m
+                                # PF 1.41) and FAILED under 0.25/0.25/0.25 (12m PF 0.83),
+                                # with the ratchet off (12m PF 0.81) and with 0.5/1.0/0.5
+                                # (12m PF 0.84). At +0.5R unrealized, raise
                                 # the stop to entry — a trade that showed profit
                                 # can no longer close red.
-TRAIL_TRIGGER_R = 0.25          # IMP-040: was 0.5. IMP-029 (weekly): was 1.0.
+TRAIL_TRIGGER_R = 1.0           # IMP-059: back to IMP-013's 1.0 (IMP-040 0.25, IMP-029 0.5).
+                                # History of the 0.25 setting, kept for the record:
                                 # With TRAIL_DISTANCE_R
                                 # also 1.0 the trail candidate at the trigger was
                                 # live - 1R == ENTRY — exactly the level break-even
@@ -125,7 +131,11 @@ TRAIL_TRIGGER_R = 0.25          # IMP-040: was 0.5. IMP-029 (weekly): was 1.0.
                                 # Now the trail arms at the SAME point break-even
                                 # does, so the two stages are one continuous ratchet
                                 # with no dead band between them.
-TRAIL_DISTANCE_R = 0.25         # IMP-040: was 0.5. Trail this many R below the
+TRAIL_DISTANCE_R = 1.0          # IMP-059: back to IMP-013's 1.0 (IMP-040 0.25). NOTE the
+                                # IMP-029 dead band (trail candidate == break-even at
+                                # exactly +1R, so the first lift lands ~+1.07R) is part of
+                                # the geometry the gate tested and passed; the 0.5-distance
+                                # variant that removes it FAILED (see above). Trail this many R below the
                                 # live price (ratchet: the stop only ever moves
                                 # UP). Must stay < 1.0 and <= TRAIL_TRIGGER_R or
                                 # the dead band returns; see tests/test_exit_sim.py
@@ -322,7 +332,7 @@ _assert_weights()
 # under every alternative (IMP-059). This mode exists on the imp059-orb-entry-mode
 # branch for a future rule that DOES clear `scripts.entry_lab`; it must not be
 # switched on without a fresh gate PASS recorded in memory/improvement-log.md.
-ENTRY_MODE = "ma"
+ENTRY_MODE = "orb"           # operator decision 2026-09-18 — see IMP-059 addendum
 ORB_RANGE_BARS = 6              # 30 minutes of 5-min bars
 ORB_CUTOFF_ET = "11:30"         # a break that comes later is not an opening-range break
 ORB_MIN_REL_VOL = 1.3           # trigger-bar volume vs the 20-bar average (indicators.relative_volume)

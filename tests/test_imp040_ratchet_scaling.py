@@ -35,7 +35,12 @@ def _bars(pairs: list[tuple[float, float]]) -> pd.DataFrame:
                          "low": [p[1] for p in pairs]})
 
 
-LIVE = ExitGeometry.from_config()
+# IMP-059 restored IMP-013's 0.5 / 1.0 / 1.0 for the ORB entry. These tests
+# describe IMP-040's arithmetic on recorded trades, so they pin IMP-040's own
+# geometry explicitly; only the exit_sim-vs-live parity test reads the config.
+LIVE = ExitGeometry(breakeven_trigger_r=0.25, trail_trigger_r=0.25, trail_distance_r=0.25,
+                    ratchet_min_pct=config.STOP_RATCHET_MIN_PCT)
+SHIPPED = ExitGeometry.from_config()
 
 # The geometry that was live from IMP-029 (2026-08-08) until IMP-040. Pinned as
 # a literal so these paired controls keep documenting what the bot really did on
@@ -74,18 +79,16 @@ MSFT_BARS = _bars([
 
 # --- The shipped geometry -----------------------------------------------------
 
-def test_imp040_is_one_scaled_ratchet_at_the_shipped_value():
-    """All three constants moved together to 0.25R — that is the whole change."""
-    assert config.BREAKEVEN_TRIGGER_R == 0.25
-    assert config.TRAIL_TRIGGER_R == 0.25
-    assert config.TRAIL_DISTANCE_R == 0.25
-    # IMP-029's shape is preserved: break-even and the trail arm at the SAME
-    # point, so the two stages remain one continuous ratchet with no dead band.
-    assert config.TRAIL_TRIGGER_R == config.BREAKEVEN_TRIGGER_R
-    # And the IMP-029 config invariants still hold at the new scale.
-    assert config.TRAIL_DISTANCE_R < 1.0
+def test_imp040_geometry_was_superseded_by_imp059():
+    """IMP-040 scaled the ratchet to 0.25/0.25/0.25 for the MA entry. IMP-059
+    replaced the entry (ORB) and, on the walk-forward gate, that geometry
+    FAILED (12-month held-out PF 0.83) while IMP-013's original passed. The
+    scaling tests above still pin the ratchet ARITHMETIC (a scaled ratchet
+    locks in what it should); the shipped constants are now IMP-013's.
+    """
+    assert (config.BREAKEVEN_TRIGGER_R, config.TRAIL_TRIGGER_R,
+            config.TRAIL_DISTANCE_R) == (0.5, 1.0, 1.0)
     assert config.TRAIL_DISTANCE_R <= config.TRAIL_TRIGGER_R
-    assert config.TRAIL_TRIGGER_R <= config.BREAKEVEN_TRIGGER_R
 
 
 def test_imp040_trail_is_not_inert_at_the_new_trigger():
@@ -95,7 +98,7 @@ def test_imp040_trail_is_not_inert_at_the_new_trigger():
     the trigger the stop still has to lift ABOVE entry.
     """
     risk = MSFT_ENTRY - MSFT_STOP
-    well_past = MSFT_ENTRY + (config.TRAIL_TRIGGER_R + 0.5) * risk
+    well_past = MSFT_ENTRY + (LIVE.trail_trigger_r + 0.5) * risk
     moved = ratchet_stop(MSFT_ENTRY, MSFT_STOP, MSFT_ENTRY, well_past, LIVE)
     assert moved is not None, "trail is inert — the IMP-029 dead zone is back"
     assert moved > MSFT_ENTRY
@@ -109,7 +112,7 @@ def test_imp040_ratchet_still_matches_the_live_implementation(live_price):
     The book evidence for IMP-040 was produced by exit_sim; if it diverges from
     the code the bot actually runs, that evidence is worthless.
     """
-    assert ratchet_stop(AAPL_ENTRY, AAPL_STOP, AAPL_STOP, live_price, LIVE) == \
+    assert ratchet_stop(AAPL_ENTRY, AAPL_STOP, AAPL_STOP, live_price, SHIPPED) == \
         exits.compute_trailed_stop(AAPL_ENTRY, AAPL_STOP, AAPL_STOP, live_price)
 
 

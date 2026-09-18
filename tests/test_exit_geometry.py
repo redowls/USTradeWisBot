@@ -285,9 +285,9 @@ def test_imp040_geometry_is_untouched_by_this_run():
     IMP-040's window is open until ~2026-09-08 and this change exists to make
     that verdict computable, not to pre-empt it.
     """
-    assert config.BREAKEVEN_TRIGGER_R == 0.25
-    assert config.TRAIL_TRIGGER_R == 0.25
-    assert config.TRAIL_DISTANCE_R == 0.25
+    assert config.BREAKEVEN_TRIGGER_R == 0.5   # IMP-059
+    assert config.TRAIL_TRIGGER_R == 1.0       # IMP-059
+    assert config.TRAIL_DISTANCE_R == 1.0      # IMP-059
     assert config.MIN_STOP_PCT == 1.5
     assert config.ATR_STOP_MULT == 3.0
     assert config.MAX_RISK_PCT <= 2.0

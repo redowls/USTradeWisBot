@@ -49,6 +49,18 @@ INTC_VWAP = {
 ALL_ROWS = [META_HELD, META_COOLDOWN, GOOG_HELD, TSLA_VWAP, INTC_VWAP]
 
 
+@pytest.fixture(autouse=True)
+def _imp040_geometry_for_these_scenarios(monkeypatch):
+    """The recorded-trade scenarios in this file were derived under IMP-040's
+    0.25R ratchet (prices such as +0.25R = 100.375 are literal in the asserts).
+    IMP-059 restored IMP-013's 0.5 / 1.0 / 1.0 for the ORB entry; the shipped
+    constants are pinned in tests/test_exit_sim.py. These tests pin the geometry
+    they describe so they keep testing the mechanics they were written for.
+    """
+    monkeypatch.setattr(config, "BREAKEVEN_TRIGGER_R", 0.25)
+    monkeypatch.setattr(config, "TRAIL_TRIGGER_R", 0.25)
+    monkeypatch.setattr(config, "TRAIL_DISTANCE_R", 0.25)
+    monkeypatch.setattr(RA, "SCRATCH_CEILING_R", 0.25)
 def _record(row, ceiling, flatten_pct, flatten_r=None):
     """A build_records()-shaped record, so summarize() can be tested offline."""
     geo = RA.refusal_geometry(float(row["price"]), float(row["atr"]))

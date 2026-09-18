@@ -57,6 +57,17 @@ ADVERSE = [META_315, WMT_243, NFLX_244, MU_273]
 FAVOURABLE = [INTC_298, WMT_320]
 
 
+@pytest.fixture(autouse=True)
+def _imp040_geometry_for_these_scenarios(monkeypatch):
+    """The recorded-trade scenarios in this file were derived under IMP-040's
+    0.25R ratchet (prices such as +0.25R = 100.375 are literal in the asserts).
+    IMP-059 restored IMP-013's 0.5 / 1.0 / 1.0 for the ORB entry; the shipped
+    constants are pinned in tests/test_exit_sim.py. These tests pin the geometry
+    they describe so they keep testing the mechanics they were written for.
+    """
+    monkeypatch.setattr(config, "BREAKEVEN_TRIGGER_R", 0.25)
+    monkeypatch.setattr(config, "TRAIL_TRIGGER_R", 0.25)
+    monkeypatch.setattr(config, "TRAIL_DISTANCE_R", 0.25)
 def _floor(t):
     """The planned-risk stop measured from the real fill."""
     return t["fill"] - (t["plan_entry"] - t["plan_stop"])
@@ -301,7 +312,7 @@ def test_risk_limits_and_the_paper_endpoint_are_untouched():
 
 def test_imp040_ratchet_geometry_is_untouched_by_this_run():
     """IMP-050 changes where the stop STARTS, never where the ratchet arms."""
-    assert config.BREAKEVEN_TRIGGER_R == 0.25
+    assert config.BREAKEVEN_TRIGGER_R == 0.25  # the geometry this file's scenarios run under (autouse fixture)
     assert config.TRAIL_TRIGGER_R == 0.25
     assert config.TRAIL_DISTANCE_R == 0.25
     assert config.RR_RATIO == 1.5

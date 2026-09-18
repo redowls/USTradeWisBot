@@ -13,6 +13,16 @@ from bot import config
 from scripts import gate_monitor as gm
 
 
+@pytest.fixture
+def imp040_geometry(monkeypatch):
+    """The CRM 2026-08-31 replay expectations below were derived under IMP-040's
+    0.25R ratchet. IMP-059 restored IMP-013's geometry for the ORB entry, so these
+    tests pin the geometry they describe; the replay mechanics are what they test."""
+    monkeypatch.setattr(config, "BREAKEVEN_TRIGGER_R", 0.25)
+    monkeypatch.setattr(config, "TRAIL_TRIGGER_R", 0.25)
+    monkeypatch.setattr(config, "TRAIL_DISTANCE_R", 0.25)
+
+
 def _row(symbol, pl, reason, bo=0.0, date="2026-07-28"):
     return {"symbol": symbol, "status": "CLOSED", "pl": pl,
             "exit_reason": reason, "entry_date": date, "bo": bo}
@@ -374,7 +384,7 @@ CRM_BLOCKED = [{"symbol": "CRM", "time": "11:23:49", "price": 260.41,
                 "stretch_pct": 0.39, "vwap": 259.40}]
 
 
-def test_replay_blocked_banks_crm_20260831_on_the_ratchet_not_the_eod_close():
+def test_replay_blocked_banks_crm_20260831_on_the_ratchet_not_the_eod_close(imp040_geometry):
     g = gm._replay_blocked(CRM_BLOCKED, {"CRM": CRM_20260831}, -1.5, 2.25)
     r = g["results"][0]
     assert r["outcome"] == "TRAIL"          # NOT the plan stop, and NOT EOD
@@ -444,7 +454,7 @@ def test_replay_blocked_tracks_the_live_ratchet_config():
     assert g["results"][0]["stop_raises"] == 0
 
 
-def test_format_gate_cost_reports_the_ratchet_and_keeps_the_lower_bound_claim():
+def test_format_gate_cost_reports_the_ratchet_and_keeps_the_lower_bound_claim(imp040_geometry):
     txt = "\n".join(gm.format_gate_cost(
         gm._replay_blocked(CRM_BLOCKED, {"CRM": CRM_20260831}, -1.5, 2.25)))
     assert "ratchet" in txt                  # header names the real geometry
@@ -543,7 +553,7 @@ def test_doctrine_rows_drop_unpriced_candidates_and_are_empty_safe():
     assert gm._doctrine_rows([], -1.5) == []
 
 
-def test_replay_blocked_reports_the_doctrine_beside_the_headline():
+def test_replay_blocked_reports_the_doctrine_beside_the_headline(imp040_geometry):
     """A trailed stop that banks a fraction of 1R is headline-green, doctrine-FAIL."""
     cands = [{"symbol": "XYZ", "time": "10:00:00", "price": 100.0,
               "stretch_pct": 1.0, "vwap": 99.0}]
