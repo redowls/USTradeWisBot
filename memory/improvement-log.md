@@ -1175,3 +1175,70 @@ IMP-056 shipped `dbo.entry_refusals` on 2026-09-16 at 01:44 UTC and **pre-regist
 ### Commit + deployment
 **Committed `4654905`, pushed to `origin/main`** (the five pre-existing WIP files verified still unstaged and byte-identical afterwards: 211 insertions / 7 deletions, unchanged). **Service restarted 2026-09-17 01:49:34 UTC** — graceful shutdown (`signal 15 received — shutting down` → `stopped`), clean start (`USTradeWisBot starting (dry_run=False)` → `market closed — sleeping ~42024s until next open`), `is-active` **active**, **NRestarts=0**, MainPID 3585662, **zero ERROR / Traceback / CRITICAL lines**. Market closed, so the restart was safe.
 ★ **Deployment verified against the live unit, not assumed** (the 2026-06-23 DEPLOY-GAP lesson): `ActiveEnterTimestamp` post-dates the commit. ⚠️ **Note this IMP touched no file under `bot/`, so the restart changed no running behaviour whatsoever — it is a hygiene restart onto the pushed tree, not a deployment of new logic.**
+
+---
+
+## IMP-058 — 2026-09-18 (reviewing 2026-09-17)
+
+**`scripts/feasibility --by-symbol` — make the per-symbol ceiling record ONE tested command scored against the board, because a live watchlist trigger is now written in its currency and three routines were hand-rolling it.**
+
+### Problem: a number that parks symbols was being re-derived by hand
+On **2026-09-17** the pre-market routine re-denominated META's watchlist trigger into this module's currency: *"parks only if BOTH its median ceiling AND its feasible rate fall below the board's, over its next 4+ fills."* To set that baseline it had to `import build_records` and group the output itself — as the **09-16** run had done before it, and as tonight's review would have had to do a third time.
+- ★★★ **The 09-14 review nominated a `--by-symbol` flag; this morning's research log re-nominated it and escalated the reason: *"It is now load-bearing — META's trigger is DEFINED in terms of it — which makes the flag a correctness concern rather than a convenience."*** **This is that flag.**
+- ★★ **The specific defect it prevents has bitten this repo twice.** IMP-049 and IMP-053 were both *two-instruments-one-verdict* failures. A trigger that compares a **hand-rolled** median against a **printed** median is exactly that shape: the two can drift on tie-breaking, rounding or the feasible/reachable boundary, and the symptom would be a symbol parked on a number nobody could reproduce.
+- ★ **Why tooling and not a parameter: the escalation clause is live for a THIRTEENTH consecutive run** (09-14/09-16/09-17: 7 trades, WIN 0, SCRATCH 2, FAIL 5, F+S 100.0%, −$46.22, mean −0.182R). **The clause bars tuning.** ⚠️ **And today there was nothing to tune: zero stops, zero trail exits, zero missed take-profits — every exit-side knob was idle, and both losses of feasibility were on the entry.**
+
+### Change — `scripts/feasibility.py` only (+ its new test file)
+- **`_median(values)`** — the upper-median (`sorted(v)[n // 2]`) **factored out of `summarize()` and reused by `board_baseline()`**, so the board median a symbol is judged against is **the same number the headline prints**. Pinned by `test_board_median_matches_summarize`. It sorts a copy (`test_median_does_not_mutate_its_argument`).
+- **`board_baseline(records)`** — the book's `feasible_rate` + `median_ceiling`. **Returns `None` when no record carries a usable ceiling**: an unknown board is not a board of zero, and no symbol may be judged against one.
+- **`by_symbol(records)`** — per symbol: `fills`, `feasible`, `feasible_rate`, `median_ceiling`, `best_ceiling`, `net`, `wins`. **Records with `ceiling is None` are skipped, not counted as infeasible** (`test_by_symbol_skips_records_without_a_ceiling`) — the same rule `summarize()` already follows.
+- **`trigger_verdict(stats, board, min_fills)`** — scores one symbol on BOTH legs and returns `FIRES` / `holds` / `insufficient`.
+  - ★★ **The comparator is the BOARD, never an absolute.** The post-gate book is **93.8% F+S and 84.4% win-infeasible**; any absolute bar near +1.0R convicts every symbol the bot owns. A relative test can only fire for a name worse than the book it sits in (`test_a_relative_comparator_cannot_park_the_whole_board`).
+  - **STRICT inequality on both legs** — a symbol sitting exactly at the board does not fire (`test_equal_to_the_board_is_not_below_it`).
+  - **`MIN_TRIGGER_FILLS = 4`**, taken from META's trigger as written ("4+ fills"). Below it the verdict is **`insufficient`, never `fires`**, even when both legs are below (`test_short_sample_is_insufficient_never_fires`). Overridable via `--min-fills`.
+- **The WIN bar is still `doctrine.WIN_MIN_R`, imported and never redefined** — asserted by `test_win_feasible_uses_the_imported_doctrine_bar`, which also pins that `is_reachable` is `>=` (a ceiling of exactly +1.000R counts).
+- **CLI `--by-symbol`** prints the table sorted worst-first with a two-letter leg indicator (`r` = below board rate, `m` = below board median) and the verdict.
+
+### ⚠️ Blast radius: zero trading behaviour, and no file under `bot/` touched
+**NO entry condition, NO signal, NO scorer, NO sizing, NO stop, NO take-profit, NO ratchet, NO risk limit, NO watchlist, NO config value.** The only pre-existing function altered is `summarize()`, whose `median_ceiling` line now calls `_median()` — **numerically identical by construction**, and `test_board_feasible_rate_matches_summarize_reachable` plus the existing `tests/test_imp054_feasibility.py` both still pass unchanged.
+⚠️ **DIAGNOSTIC ONLY.** `trigger_verdict()` reports whether a written condition is met; **it does not park anything and this module never writes.** The `watchlist` table belongs to the pre-market routine. `test_module_cannot_reach_the_order_path` asserts the module cannot import `execution`, `broker` or `engine` — *a diagnostic that can reach the order path is a diagnostic that can trade.*
+⚠️ **The ceiling is still pure lookahead and can NEVER become an entry gate.** Sixteen entry discriminators have been refuted; **a per-symbol view of a post-hoc ceiling must not become the seventeenth.**
+
+### First-run result (post-gate, n=128) — and it answered tonight's pre-registered question
+      PER-SYMBOL vs the board (board 20/128 = 15.6% feasible, median +0.369R)
+      sym   fills  feas   rate   median     best        net  WINs  verdict
+      SPY      11     0    0.0%   +0.144R   +0.563R  $   +20.80     0  FIRES  [rm]   (parked)
+      UNH       4     0    0.0%   +0.167R   +0.658R  $   -48.02     0  FIRES  [rm]   (parked)
+      QQQ       8     0    0.0%   +0.187R   +0.610R  $   -34.38     0  FIRES  [rm]   (parked)
+      AAPL     13     2   15.4%   +0.325R   +1.644R  $   +10.84     1  FIRES  [rm]   (ACTIVE)
+      TSM       9     0    0.0%   +0.435R   +0.993R  $   -31.05     0  holds  [r-]
+      META     11     2   18.2%   +0.661R   +1.198R  $   -64.61     1  holds  [--]
+      MSFT      7     3   42.9%   +0.807R   +1.295R  $   +60.09     0  holds  [--]
+      INTC      2     2  100.0%   +2.421R   +2.421R  $  +116.56     2  insufficient
+
+- ★★★ **META'S TRIGGER IS SCORED AND DOES NOT FIRE — ABOVE the board on BOTH legs** (18.2% vs 15.6%; +0.661R vs +0.369R). **The pre-market run explicitly asked for both pairs of numbers to be re-stated together tonight rather than carried forward; this is that answer, and the board moved DOWN on both legs (from 15.9% / +0.380R) because of today's two fills.**
+- ⚠️ **AAPL is the ONE ACTIVE name that would fire — by 0.2pp and 0.044R, a margin inside noise — and it is NOT enrolled in any such trigger.** ★ **Reported to the pre-market routine as an observation; nothing was parked. The tool's job is to make the comparison reproducible, not to make the decision.**
+- ★ **The three other firing names are already parked**, which is a useful sanity check: the test convicts names the board has independently given up on.
+
+### Validation
+**766 passed on the working tree** (was 747; **+19**, all in `tests/test_imp058_by_symbol.py`), fixtured on the **real 09-17 fills** — MSFT #352 ceiling +0.231R and NVDA #353 ceiling +0.168R, both from that session's SIP 1-minute bars.
+- ⚠️ **Validated on BOTH trees, and the pre-existing failure set CHANGED tonight — recorded precisely rather than restated from memory.** The uncommitted WIP set has **grown** since IMP-057: six modified files (`bot/analytics.py`, **`bot/backtest.py`**, `bot/exit_sim.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py`) plus untracked `backtest_result.json`, `gate_monitor_result.json`, **and a new `entry_lab` trio** (`bot/entry_lab.py`, `scripts/entry_lab.py`, `tests/test_entry_lab.py`). **All left byte-identical; the six-file diff re-measured before and after at 215 insertions / 7 deletions.**
+- ⚠️ **The working tree now fails 2 tests in the untracked `tests/test_entry_lab.py`** (`test_doctrine_metrics_true_wr_payoff_and_drawdown`, `test_walker_caps_entries_applies_cooldown_slippage_and_fill_anchored_stop`). ★ **Proven NOT mine two ways: `bot/entry_lab.py` imports only `backtest, config, indicators, sizing` and never touches `scripts.feasibility`; and both failures were REPRODUCED in a throwaway worktree on clean `HEAD` with the entry_lab trio copied in and IMP-058 absent.**
+- ★ **Clean `HEAD` + IMP-058's two files, in a throwaway `git worktree`: 704 passed / 20 failed — the 20 being the unchanged pre-existing `tests/test_exit_sim.py` set** (which the WIP `bot/exit_sim.py` fixes in the main tree, hence the different failure profile). **IMP-058 adds ZERO new failures to either tree and all 19 of its tests pass on both.** Worktree removed afterwards (`git worktree list` back to one entry).
+- `scripts.smoke_test` **ALL GREEN** (PAPER, PA3ESJUO8RU0, equity $7,482.42, 14 active symbols). `scripts.check_exits` **ALL GREEN** (0 open positions). `scripts.check_engine` **ALL GREEN** (dry tick, flatten path exercised). `scripts.check_sizing_ladder` **ALL GREEN** (n=128, pinned at the 0.5% floor tier, IMP-021 veto holding).
+- **Live read-only round trip:** `python -m scripts.feasibility --by-symbol` ran against the real DB and the real SIP feed over all 128 post-gate trades. **No write of any kind — the module has no INSERT/UPDATE path.**
+- **Risk invariants re-read and unchanged:** `ALPACA_PAPER` **True**, `MAX_RISK_PCT` 2.0, `DAILY_LOSS_HALT_PCT` 8.0, `MAX_CONCURRENT_POSITIONS` 3, `ENTRY_CUTOFF_ET` 15:30, `FLATTEN_ET` 15:55, `VWAP_MAX_DIST_PCT` 0.25, `MIN_CONFIDENCE` 60, `MIN_STOP_PCT` 1.5, `ATR_STOP_MULT` 3.0, `BREAKEVEN_TRIGGER_R` 0.25, `TRAIL_TRIGGER_R` 0.25, `TRAIL_DISTANCE_R` 0.25, `RR_RATIO` 1.5, `REENTRY_COOLDOWN_MIN` 30.
+
+### Expected impact and how to score it
+**Zero on trade selection, sizing and P&L, by design.** What it buys is that the only live watchlist trigger written in ceiling currency is now evaluated by one tested command instead of three hand-rolled derivations.
+- **Pass condition, met on its own first run:** the board baseline printed, every symbol scored, META's two legs reproduced against a freshly recomputed board, and the verdict vocabulary (`FIRES`/`holds`/`insufficient`) rendered.
+- **What to watch next:** whether **AAPL**'s 0.2pp / 0.044R margin persists or reverts — it is currently the only ACTIVE name below the board on both legs, and it carries no trigger. ⚠️ **If the pre-market routine wants to act on it, it must register an explicit condition with an expiry; tonight's table must not become a silent park.**
+- **Observed effect:** (n/a on P&L — it cannot have one. Its first run is recorded in the 2026-09-17 daily review.)
+
+### Deliberately NOT shipped tonight (recorded so it is not re-litigated)
+- **(a) Any `MIN_STOP_PCT` / `ATR_STOP_MULT` change, even though tonight's sharpest structural number invites one.** **The floor bound 98/98 refusals at a median 3×ATR of 0.369% — 4.07× under the floor — and has now bound 150/150 rows across both ledger sessions, i.e. `ATR_STOP_MULT = 3.0` is INERT and the "volatility-adaptive" stop is a flat 1.5% constant.** ⚠️ **IMP-055 tested tightening on the full post-gate book (n=122, eleven grid points, two parameterizations) and found payoff falls MONOTONICALLY while the reachable cohort more than doubles and conversions stay pinned at 3–5 — tightening manufactures reachability and converts none of it. Widening is barred by the anti-gaming rule. Both directions are closed; the finding belongs to the retire-or-rebuild call.**
+- **(b) Any exit-side change at all.** ★ **There was nothing to change: zero stops, zero trail exits, zero missed take-profits, and the single ratchet action (NVDA 216.00 → 216.06, IMP-050/051's floor on an adverse fill) was correct and decided nothing.**
+- **(c) Any VWAP-gate change.** **Seventh consecutive exoneration**: 57 refusals, 0 win-feasible, mean −0.057% to the flatten. ⚠️ **Its margin narrowed for the first time (rose 19/57, 16 scratch-feasible, AAPL supplying 11 of each) — recorded as a watch item, not a finding. A gate is not re-opened on a session where it refused nothing that could have won.**
+- **(d) Any `underlying_held` change.** 41 NVDA refusals in 133 minutes while NVDA *rose*, 0/41 win-feasible — **PAID**, and the mirror image of 09-16's 31 GOOG refusals while GOOG fell. ★ **Two sessions is a finding about signal persistence, not yet a sample to act on.**
+- **(e) Any watchlist action.** META's trigger scored and un-fired; TSM's and BAC's un-fired; **AAPL's board-test result handed to the pre-market routine, which owns the table.**
+- **(f) Committing the pre-existing WIP set.** **Twenty-second consecutive escalation, now including two failing `entry_lab` tests.** This routine may stage only files it wrote. **Needs a human or the weekly review.**

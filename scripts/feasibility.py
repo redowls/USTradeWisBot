@@ -4,6 +4,7 @@ Usage:
   python -m scripts.feasibility                      # post-gate book
   python -m scripts.feasibility --since 2026-08-01
   python -m scripts.feasibility --detail             # one line per trade
+  python -m scripts.feasibility --by-symbol          # per-symbol vs the board
   python -m scripts.feasibility --feed iex           # SIP is the default
 
 WHY THIS EXISTS
@@ -58,6 +59,31 @@ The WIN bar is imported from `bot.doctrine`, never redefined here: IMP-049 and
 IMP-053 were both caused by two instruments carrying two vocabularies for one
 verdict, and this file refuses to add a third.
 
+PER-SYMBOL MODE (`--by-symbol`, IMP-058)
+----------------------------------------
+On 2026-09-17 the pre-market routine re-denominated META's watchlist trigger
+into this module's currency: *"parks if BOTH its median ceiling AND its feasible
+rate fall below the board's, over its next 4+ fills."* Two other routines had by
+then hand-rolled the per-symbol table by importing `build_records` and grouping
+it themselves — and a number that decides whether a symbol gets parked must not
+be re-derived by hand in three places. `--by-symbol` makes it one command.
+
+`by_symbol()` and `summarize()` share `_median()`, so the board median a symbol
+is judged against is **the same number** the headline prints. That is the whole
+point: IMP-049 and IMP-053 were both two-instruments-one-verdict defects, and a
+trigger comparing a hand-rolled median to a printed one would have been a third.
+
+The comparator is the BOARD, never an absolute. A book whose base rate is
+already ~84% win-infeasible would auto-fire any absolute threshold and park
+every name it holds; a relative test can only fire for a symbol that is worse
+than the book it sits in. Both legs use STRICT inequality — a symbol sitting
+exactly at the board does not fire — and under `MIN_TRIGGER_FILLS` the verdict
+is `insufficient`, never `fires`.
+
+⚠️ Still a diagnostic. `trigger_verdict()` reports whether a written condition
+is met; it does not park anything. The `watchlist` table belongs to the
+pre-market routine, and this module never writes.
+
 Like scripts/entry_discriminator.py and scripts/exit_geometry.py this is NOT
 imported by the live trading path or by scripts/report.py, so its network
 dependency can never break the always-on incubation report and the running bot
@@ -86,6 +112,23 @@ CEILING_BANDS: tuple[tuple[float, float, str], ...] = (
     (1.00, 1.50, "1.0-1.5R"),
     (1.50, float("inf"), ">1.5R"),
 )
+
+
+#: Fills a symbol needs before its per-symbol verdict may fire. META's trigger
+#: as written by the 2026-09-17 pre-market run says "over its next 4+ fills";
+#: below this the verdict is `insufficient`, never `fires`.
+MIN_TRIGGER_FILLS = 4
+
+
+def _median(values: list[float]) -> float:
+    """Upper-median of a sorted copy — `sorted(v)[n // 2]`.
+
+    Factored out of `summarize()` so `by_symbol()` cannot drift from it. The
+    board median a symbol's trigger is judged against MUST be the same number
+    the headline reports, or the comparison is between two instruments.
+    """
+    ordered = sorted(values)
+    return ordered[len(ordered) // 2]
 
 
 def win_ceiling_r(entry_price: float, stop_price: float,
@@ -176,7 +219,7 @@ def summarize(records: list[dict]) -> dict:
         # The number that adjudicates the exit layer: when the move WAS there,
         # how often did the bot actually bank a WIN?
         "conversion": (round(len(wins) / len(reachable) * 100, 1) if reachable else None),
-        "median_ceiling": round(sorted(r["ceiling"] for r in usable)[n // 2], 3),
+        "median_ceiling": round(_median([r["ceiling"] for r in usable]), 3),
         "incumbent_feasible": len(incumbent_ok),
         "disagree": len(disagree),
         "disagree_share": round(len(disagree) / n * 100, 1),
@@ -185,6 +228,77 @@ def summarize(records: list[dict]) -> dict:
         "disagree_net": round(sum(r["pl"] for r in disagree), 2),
         "disagree_wins": sum(1 for r in disagree if r["doctrine"] == doctrine.WIN),
         "bands": bands,
+    }
+
+
+def board_baseline(records: list[dict]) -> dict | None:
+    """The whole book's feasible rate + median ceiling — the comparator.
+
+    Returns None when no record carries a usable ceiling: an unknown board is
+    not a board of zero, and a symbol must never be judged against one.
+    """
+    usable = [r for r in records if r.get("ceiling") is not None]
+    if not usable:
+        return None
+    feasible = [r for r in usable if is_reachable(r["ceiling"])]
+    return {
+        "fills": len(usable),
+        "feasible": len(feasible),
+        "feasible_rate": round(len(feasible) / len(usable) * 100, 1),
+        "median_ceiling": round(_median([r["ceiling"] for r in usable]), 3),
+    }
+
+
+def by_symbol(records: list[dict]) -> dict:
+    """Per-symbol ceiling record, keyed by symbol.
+
+    Each value carries the two quantities a ceiling-denominated watchlist
+    trigger is written in — `feasible_rate` and `median_ceiling` — plus the
+    supporting counts a reader needs to see before trusting them.
+    """
+    out: dict[str, dict] = {}
+    usable = [r for r in records if r.get("ceiling") is not None]
+    for sym in sorted({r["symbol"] for r in usable}):
+        sub = [r for r in usable if r["symbol"] == sym]
+        feasible = [r for r in sub if is_reachable(r["ceiling"])]
+        ceilings = [r["ceiling"] for r in sub]
+        out[sym] = {
+            "fills": len(sub),
+            "feasible": len(feasible),
+            "feasible_rate": round(len(feasible) / len(sub) * 100, 1),
+            "median_ceiling": round(_median(ceilings), 3),
+            "best_ceiling": round(max(ceilings), 3),
+            "net": round(sum(r["pl"] for r in sub), 2),
+            "wins": sum(1 for r in sub if r["doctrine"] == doctrine.WIN),
+        }
+    return out
+
+
+def trigger_verdict(stats: dict, board: dict,
+                    min_fills: int = MIN_TRIGGER_FILLS) -> dict:
+    """Score one symbol against the board on BOTH legs of the ceiling trigger.
+
+    Fires only when the symbol is STRICTLY below the board on feasible rate AND
+    strictly below on median ceiling AND has at least `min_fills` fills. Equal
+    to the board is not below it; a short sample is `insufficient`, not a pass
+    and not a fire.
+    """
+    below_rate = stats["feasible_rate"] < board["feasible_rate"]
+    below_median = stats["median_ceiling"] < board["median_ceiling"]
+    enough = stats["fills"] >= min_fills
+    if not enough:
+        verdict = "insufficient"
+    elif below_rate and below_median:
+        verdict = "FIRES"
+    else:
+        verdict = "holds"
+    return {
+        "below_rate": below_rate,
+        "below_median": below_median,
+        "enough_fills": enough,
+        "min_fills": min_fills,
+        "fires": verdict == "FIRES",
+        "verdict": verdict,
     }
 
 
@@ -243,6 +357,11 @@ def main(argv: list[str] | None = None) -> int:
                         help="bar feed (default sip)")
     parser.add_argument("--detail", action="store_true",
                         help="print one line per trade")
+    parser.add_argument("--by-symbol", action="store_true",
+                        help="per-symbol ceiling record scored against the board")
+    parser.add_argument("--min-fills", type=int, default=MIN_TRIGGER_FILLS,
+                        help=f"fills before a symbol verdict may fire "
+                             f"(default {MIN_TRIGGER_FILLS})")
     args = parser.parse_args(argv)
 
     rows = [r for r in analytics.load_closed_trades()
@@ -285,6 +404,27 @@ def main(argv: list[str] | None = None) -> int:
           f"{s['disagree']} of them ({s['disagree_of_incumbent']}%) could NEVER have won.")
     print(f"    that cohort is {s['disagree_share']}% of the book, "
           f"net ${s['disagree_net']:+.2f}, WINs {s['disagree_wins']}.")
+
+    if args.by_symbol:
+        board = board_baseline(records)
+        stats = by_symbol(records)
+        print(f"\n  PER-SYMBOL vs the board "
+              f"(board {board['feasible']}/{board['fills']} = "
+              f"{board['feasible_rate']}% feasible, median "
+              f"{board['median_ceiling']:+.3f}R)")
+        print(f"    a trigger FIRES only when a symbol is strictly below the board "
+              f"on BOTH legs over >= {args.min_fills} fills")
+        print("\n  sym   fills  feas   rate   median     best        net  WINs  verdict")
+        for sym, st in sorted(stats.items(),
+                              key=lambda kv: (kv[1]["feasible_rate"],
+                                              kv[1]["median_ceiling"])):
+            tv = trigger_verdict(st, board, args.min_fills)
+            legs = f"{'r' if tv['below_rate'] else '-'}{'m' if tv['below_median'] else '-'}"
+            print(f"  {sym:<5} {st['fills']:5d}  {st['feasible']:4d}  "
+                  f"{st['feasible_rate']:5.1f}%  {st['median_ceiling']:+7.3f}R  "
+                  f"{st['best_ceiling']:+7.3f}R  ${st['net']:+9.2f}  "
+                  f"{st['wins']:4d}  {tv['verdict']:<12} [{legs}]")
+        print("    legs: r = below board feasible rate, m = below board median ceiling")
 
     if args.detail:
         print("\n  trade detail (worst ceiling first)")
