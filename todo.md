@@ -880,6 +880,19 @@ Ordered by expected impact; each item needs replay validation before code.
 
 **Item 3 (five uncommitted files) — sixteenth consecutive escalation, unchanged.** Still `bot/analytics.py`, `bot/exit_sim.py`, `bot/replay.py`, `scripts/replay.py`, `tests/test_replay.py`, plus untracked `backtest_result.json` / `gate_monitor_result.json`. The week-ending-09-11 weekly asked the daily review to commit them; **this routine's ground rules permit staging only files it touched in its own run**, so the weekly's own stated fallback was taken instead — reported as a blocking defect rather than worked around. Working tree now scores **663 passed**; clean `HEAD` does not. **Still needs a human `git add` or a decision to discard.**
 
+### Update 2026-09-19 (weekly review, week ending 09-18) — three items close, one is re-diagnosed
+
+- ✅ **Item 3 (uncommitted files) — CLOSED.** Committed as `e75563e` on 09-18 after sixteen escalations. The running tree and `origin/main` finally agree; the suite is unambiguously green (774 → 792 passed tonight with IMP-061).
+- ✅ **Item 2 (retire-or-rebuild) — ANSWERED by the operator: option B, rebuild the entry.** ORB shipped live 09-18 (IMP-059). ⚠️ **It is not yet validated**: n=0 live trades, and it cleared the walk-forward gate only under the one of four exit geometries selected after seeing results (12m in-sample PF 1.05 / +0.019R, 6 of 32 parameter sets positive; held-out top-5 trades = 121% of net). **Treated as a hypothesis on probation with a 30-trade kill criterion — see the week-ending-09-18 weekly review.**
+- ⚠️ **Item 1 (late start) — PARTLY RESOLVED, and it was never the real blocker for market research.** The hard kill is now **70 minutes** after launch (was 21:10), which gave this run ample budget: launched 21:00:39 UTC, code change shipped and deployed by 21:07. **The schedule still starts ~60 min after the nominal 20:00 UTC slot**, so moving it earlier is still worth doing, but it is no longer costing the review its code-change budget.
+- 🔁 **Item 4 — RE-DIAGNOSED, and the previous diagnosis was wrong. The key is NOT revoked; the account is OUT OF QUOTA.** Both `sonar-deep-research` and `sonar` now return a precise error:
+
+  > `HTTP 401 {"error":{"message":"You exceeded your current quota, please check your plan and billing details.","type":"insufficient_quota","code":401}}`
+
+  **The fix is to top up Perplexity billing, not to rotate the key** — rotating it would not have helped and would have burned a cycle. ★ **This also corrects three weeks of misattribution**: the 09-04 and 09-11 weeklies blamed the missing `sonar-deep-research` on the late launch. The launch was fine this week and the call still failed inside 4 minutes. **Every routine's market-context step is degraded until a human tops up the plan**; all of them fall back to WebSearch and none block.
+
+**No risk limit is proposed for change anywhere in this update, and nothing here loosens anything.**
+
 ## Entry rebuild (option B) — status 2026-09-18 (IMP-059)
 
 - Operator chose option B (rebuild the ENTRY, keep exits/risk). Built `bot/entry_lab.py` — a

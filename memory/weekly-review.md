@@ -761,3 +761,118 @@ The escalation clause has been live for nine weeks. What changed this week is th
 - **(h) No risk relaxation.** All limits verified unchanged tonight. A losing week is not a reason to widen anything, and nothing here proposes it.
 
 **No code shipped tonight.** Launched ~21:00 UTC, past the routine's 20:40 UTC cutoff — analysis-only by rule, for the fourth consecutive week.
+
+---
+
+## Week ending 2026-09-18 (Mon 09-14 → Fri 09-18, 5 sessions) — Grade: **D**
+
+### Stats
+| Metric | This week | Prior week |
+|---|---|---|
+| Closed **strategy** trades | 7 | 11 |
+| Net P&L (strategy) | **−$46.22** | −$113.51 |
+| Profit factor | **0.17** — worst of the run | 0.19 |
+| Headline win rate (sign of P&L) | 42.9% (3/7) | 45.5% |
+| **True win rate (doctrine)** | **0.0%** (0/7) — second straight zero | 0.0% |
+| **Stop rate** | **42.9%** (3/7) | 72.7% |
+| WIN / SCRATCH / FAIL | **0 / 2 / 5** | 0 / 3 / 8 |
+| **FAIL+SCRATCH share** | **100.0%** | 100.0% |
+| Equity | **$7,528.64 → $7,192.26 (−4.47%)** | −1.49% |
+
+- Gross win **$9.27** / gross loss **$55.49**. Avg win **+$3.09** vs avg loss **−$13.87** (payoff 0.22). Avg **−0.182R**.
+- **Best: META +$6.50** (a break-even stop — not a win). **Worst: GOOG −$36.19** (a clean full-1R stop, −1.004R).
+- Per symbol: GOOG −$36.19 · TSM −$9.80 · AAPL −$8.36 · MSFT +$1.05 · NVDA +$1.72 · META +$5.36 (2 trades).
+- Exit mix: **STOP 3 / EOD_FLATTEN 4 / TAKE_PROFIT 0** — second consecutive week with zero take-profit fills.
+- Sessions: 09-14 −$1.14 (1t) · 09-15 **$0.00, no trades** (34 candidates, all refused) · 09-16 **−$47.85** (4t, FOMC day) · 09-17 +$2.77 (2t) · 09-18 **$0.00 strategy, 0 trades**.
+- **All 7 trades are MA-entry.** The ORB entry replaced it mid-week (09-18) and has **n=0**.
+
+### ★★★ The equity line does not belong to the strategy, and that is the week's headline
+**Equity fell −$336.38 (−4.47%) but the strategy only lost −$46.22.** The other **−$290.16 (86% of the decline)** is the 2026-09-18 test-harness accident: an unguarded pytest run placed **fourteen real 1-share META bracket orders** on the live paper account. It reconciles to the cent:
+
+> −$46.22 (ledger) + −$290.16 (accident) = **−$336.38** = $7,528.64 → $7,192.26. Broker confirms equity **$7,192.26**, cash $7,192.26, **0 positions**.
+
+**One pytest run lost 6.3× what the strategy lost all week, and 4.8× what the trailing ten sessions lost between them.** It was invisible for a full day because `daily_summary` wrote "0 buys / 0 sells / $0.00" beside the drop and **no code compared the ledger to the equity curve** — IMP-043's DB guard kept the accidental fills out of `trades`, so a guard built to protect the trade history is what made the loss silent. ★ **What saved it from being far worse: the 15:55 EOD flatten sweeps *broker* positions, not DB rows, so it closed 14 shares of META (~$9,317 notional on a $7.2k account) that the rest of the system did not know existed.** The no-overnight invariant held against a position every instrument was blind to. Root-caused by reproduction (the fixture constants return `1 / 651.60 / 699.60`, byte-identical to all fourteen orders) and fixed the same night as IMP-060.
+
+**Stop-rate / true-win-rate trend (9 weeks):**
+| Week ending | n | Net | PF | Stop rate | True WR | Headline WR | F+S |
+|---|---|---|---|---|---|---|---|
+| 07-24 | 20 | −$158.02 | 0.56 | 35.0% | 5.0% | 40.0% | 95.0% |
+| 07-31 | 16 | +$31.89 | 1.21 | 43.8% | 12.5% | 62.5% | 87.5% |
+| 08-07 | 20 | −$180.28 | 0.21 | 45.0% | 0.0% | 30.0% | 100.0% |
+| 08-14 | 19 | −$137.84 | 0.42 | 26.3% | 5.3% | 31.6% | 94.7% |
+| 08-21 | 17 | +$37.60 | 1.32 | 29.4% | 11.8% | 47.1% | 88.2% |
+| 08-28 | 21 | +$96.92 | 2.30 | 52.4% | 4.8% | 57.1% | 95.2% |
+| 09-04 | 17 | +$118.51 | 2.77 | 52.9% | 11.8% | 52.9% | 88.2% |
+| 09-11 | 11 | −$113.51 | 0.19 | 72.7% | 0.0% | 45.5% | 100.0% |
+| **09-18** | **7** | **−$46.22** | **0.17** | **42.9%** | **0.0%** | **42.9%** | **100.0%** |
+
+**F+S has been ≥ 60% for TEN consecutive weeks** (threshold: two). **True win rate has been 0.0% for two straight weeks.** The stop rate fell 72.7% → 42.9%, and **that fall is not an improvement** — it is composition, not behaviour: four of seven exits were EOD flattens on a shrinking book, and PF fell anyway (0.19 → 0.17). This is exactly the case the doctrine warns about in reverse: a stop rate that drops while expectancy drops with it is noise, not progress.
+
+### The win column, audited
+Three trades printed positive P&L. **None is a WIN.** META +$6.50 (+0.229R) and META −$1.14 (−0.031R) are **break-even stop touches, scored FAIL**; MSFT +$1.05 (+0.028R) and NVDA +$1.72 (+0.047R) are **SCRATCH flattens**. **The bot did not reach +1R once in 7 trades and produced zero take-profit fills.** The loss is concentrated the same way as last week: **GOOG −$36.19 is a single full-1R stop and is 78% of the week's net loss.**
+
+### Market context — FOMC delivered a HIKE, and the bot's worst day was that day
+External research: **Perplexity is out of quota** — `sonar-deep-research` and `sonar` both return **HTTP 401 `insufficient_quota`**. ★ **This corrects three weeks of misdiagnosis**: the 09-04 and 09-11 reviews blamed the late launch for the missing deep research. The launch was fine this week (21:00 UTC, first research attempt inside 4 minutes) and the call still failed. **The cause is billing, not scheduling.** Fell back to web search.
+
+- **The Fed hiked 25bp on 09-16** — a genuine surprise. Pre-week consensus was a cut; a hot CPI flipped pricing to ~85% odds of a hike, with at least one more signalled. The **10-year yield hit 5.041%, its highest since 2007.**
+- Week: **Nasdaq +2.6%, S&P 500 +0.7%, Dow −733 points** — a violently two-sided tape, not a trending one. Mon/Tue slid into the decision; **Thu rallied hard** post-Fed as yields and oil retreated; **Fri eased on triple witching** with the BoJ hiking to a 31-year-high policy rate.
+- AI/semis (NVDA, AMD) sold off on the Amodei safety essay; energy led on Middle East supply risk; ~53% of AAII respondents bearish.
+- ★ **The bot's worst session (09-16, −$47.85, 4 trades, 3 losses) is FOMC day**, and GOOG's full-1R stop landed in it. Last week's review predicted precisely this — *"expect compression into Tuesday and a violent, fade-prone Wednesday afternoon — the worst possible tape for a constant-width stop."* **That call was correct.** A long-only intraday breakout system holding through a surprise-hike afternoon is structurally short the event, and it paid for it.
+
+### Process audit
+- **Risk limits: clean, and re-verified tonight.** `MAX_RISK_PCT` 2.0, `DAILY_LOSS_HALT_PCT` 8.0, `MAX_CONCURRENT_POSITIONS` 3, `ENTRY_CUTOFF_ET` 15:30, `FLATTEN_ET` 15:55, paper endpoint (smoke test reports `mode: PAPER`, PA3ESJUO8RU0). Circuit breaker never tripped — worst *strategy* day −0.64%. Zero overnight holds. Nothing widened, nothing relaxed, nothing proposed.
+- **⚠️ But there WAS a capital-protection failure this week, and it must be named as one.** The test harness could place real money orders against the live account, and did — **−3.88% of equity in an afternoon.** No risk *limit* was breached and the trading path behaved correctly throughout, but "the test suite can trade the account" is a defect of the same family the grade must punish. It is the **third** instance of this repo's recurring shape: *two instruments, one guard* (IMP-043 guarded the DB and not the broker; IMP-049 and IMP-053 were the same defect in the metrics layer).
+- **Reliability: spotless.** Service `active`, **NRestarts=0**, **zero** error/fail/traceback lines across 7 days of journal.
+- **Six IMPs (055–060), and for the first time in seven weeks one of them changed what the bot does in the market** — though that one came from the operator, not from this routine. Judged as a set **they compound and cancel nothing**: 055/056/057 complete the indictment of the entry (stop-geometry refit refuted; the refusal ledger built; the refused population scored — **56 entry decisions across 09-16, zero win-feasible**), 058 is hygiene on the gate monitor, 059 acts on the conclusion, and 060 is a necessary emergency fix. **But five of six still never touched the live path.**
+- **Last week's directives — the best completion record of the series.** (a) *"STOP MEASURING; the next IMP must touch the live path or retire the bot"* — **honored**, by the operator shipping ORB. (b) The `ATR_STOP_MULT`/`MIN_STOP_PCT` refit — **correctly NOT shipped**: IMP-055 tested eleven grid points and found payoff falls monotonically while conversions stay pinned, so tightening manufactures reachability and converts none of it; widening is barred by the anti-gaming rule. **Both directions closed, and saying so is the right outcome.** (c) *"Commit the five un-versioned files — EIGHTH week of asking"* — ★ **DONE at last (`e75563e`, 09-18). The running tree and the repo finally agree; the suite is unambiguously green for the first time in this series.** (d) *"Put retire-or-rebuild to the human"* — ★ **DONE, and answered: option B, rebuild the entry.** Four weeks of escalation paid off. (e) Fix the late start — **superseded**: the real blocker is the Perplexity quota (see above). (f) Same-day re-entry — META traded twice, +$5.36 net, both break-even stops; **benign this week.** (g) FOMC calendar — **correct and predictive.** (h) No risk relaxation — **honored.**
+- **⚠️ One process concern, recorded because it is not visible from any single session.** IMP-059's own routine-written verdict was ***"NO candidate entry demonstrates a robust out-of-sample edge. Nothing ships to the live path."*** ORB then shipped anyway on an operator instruction, under **the one of four exit geometries in which it passed**. That is selection on the exit geometry *after seeing the results* — the multiple-comparisons failure `scripts/entry_lab` exists to prevent. The addendum is commendably honest about its own bounds (12m in-sample PF 1.05 / +0.019R with **only 6 of 32 parameter sets positive and a grid median of −0.035R**; held-out n=75 PF 1.41 but **top-5 trades = 121% of net** and Aug/Sep flat-to-negative; t≈0.4–1.0). **This is the operator's call and it is legitimately theirs to make. My duty is to record that the evidence behind it is weak, so nobody six weeks from now mistakes ORB for a validated edge.** Compounding this: three interactive sessions were open on the repo at once and produced contradictory log entries minutes apart.
+
+### Grade rationale — **D**
+**A −4.47% equity week, PF 0.17 (worst of the run), zero WINs in 7 trades, zero take-profit fills, F+S 100% for the second straight week, and a −$290.16 operational loss from a test harness that could trade the live account.** The win column is not merely padded, it is **entirely** padding for the second week running — every sign-positive trade is a break-even stop or a scratch flatten, and I state that explicitly as the doctrine requires. The stop rate's fall from 72.7% to 42.9% is composition, not improvement, and must not be read as progress.
+
+It is **D** and not **F** on a deliberate reading of the guide. The F conditions are *large loss, risk-limit breach, or system failure (crash, naked positions, halt tripped repeatedly)*. **None occurred**: no risk limit moved, no crash, no naked position, no halt, and the strategy's own loss was small (−$46.22). The $290.16 was a harness accident against which **the bot's own safety layer worked** — the flatten closed a position no instrument could see, preventing 14 shares of META going naked through a weekend on a $7.2k account. The 2026-06-19 F was categorically worse: the bot itself broke its core contract for two consecutive nights.
+
+It is not a **C**, and not close. C is *"small loss within limits OR profitable but rules broken."* The loss is not small relative to a $7.2k account, and a defect that let a test run cost 3.88% of equity is a process failure that a profitable week could not have excused either.
+
+**What holds the grade up at D rather than below it is the remediation and the directive closure, and both are genuinely excellent:** the accident was root-caused by *reproduction to the exact order tuple* rather than inference, guarded the same night in two layers with +11 tests, and the guard's first run **audited the suite and found two other live-order-reaching tests** — the unknown became known. Alongside it, three directives this review had escalated for four to eight consecutive weeks all closed in one week: the un-versioned WIP is committed, retire-or-rebuild was put to the human and answered, and a live-path change finally shipped.
+
+### ⚖️ Strategy verdict — **NO DEMONSTRATED EDGE (seventh consecutive week). The question has been TRANSFERRED, not answered.**
+1. **On the MA entry the verdict is final and now moot.** It ends its life at 0.0% true win rate over its last two weeks, PF 0.19 then 0.17, and IMP-054/057's measurement stands: **83.5% of post-gate fills were win-infeasible from the moment of the fill, and across 09-16's 56 entry decisions not one was win-feasible.** It was retired on 09-18. Nothing this week rehabilitates it.
+2. **The exit layer remains exonerated and should stay untouched.** Its ratchet is capital protection and it works; the week's two SCRATCH flattens and two break-even stops are the ratchet doing its job on entries that had nothing to give.
+3. **★ ORB is a hypothesis on probation, not a new edge — and I am recording that distinction deliberately.** It has **n=0** live: its first session produced 55 refusals (`orb_after_cutoff` 28, `orb_low_volume` 23, `orb_market_filter` 4) and zero fills on a −0.13% SPY day, which is the gate working correctly, not evidence of anything. **Every number in IMP-059's addendum — PF 1.41, payoff 3.00, true WR 13.3% — is out-of-sample backtest on a geometry chosen after the fact, and remains entirely unvalidated live.**
+4. **The escalation clause now applies to ORB exactly as it applied to MA**, and it has a clean slate to prove itself on. **If the ORB book prints F+S ≥ 60% across its first three sessions with trades, or fails the 30-trade kill criterion, the honest response is to stop the strategy — not to tune `ORB_MIN_REL_VOL`.** I am pre-registering that here so it cannot be relitigated later.
+5. **The bot is now a well-instrumented, well-protected, reliably-run system wrapped around an entry signal that has never demonstrated edge.** Everything except the entry is in good order. That was true last week and it is true tonight.
+
+### What worked / what didn't
+- **Worked:** The EOD flatten, against an untracked broker position — the single most valuable thing that happened this week. IMP-060's root-cause-by-reproduction and two-layer guard. The closure of three long-running directives. Risk and reliability, spotlessly. The 09-11 review's FOMC regime call, which was correct.
+- **Didn't:** Everything the strategy did with money — PF 0.17, zero WINs, zero take-profits, GOOG's full-1R stop on FOMC day carrying 78% of the loss. And a test suite that could reach the broker, for the entire life of the project until 09-19.
+
+### Improvements shipped this week
+- **IMP-055 (09-15)** — stop-geometry grid over the full post-gate book (n=122, eleven grid points, two parameterizations). **Observed effect: VALIDATED AS A REFUTATION; F+S share effect zero by construction (analysis-only).** Payoff falls monotonically as 1R tightens while conversions stay pinned at 3–5. ★ This is what correctly barred last week's designated change — a refutation that saves a week is worth more than a tweak that spends one.
+- **IMP-056 (09-16)** — `dbo.entry_refusals`, a persisted ledger of refused entry candidates. **Observed effect: VALIDATED; zero stop-rate effect by construction.** First live session wrote **52 rows against 9 log lines** — 43 decisions that had never been recorded anywhere in the bot's history. **Became load-bearing within 48 hours**: it is the only reason ORB's first session could be judged at all (55 rows, `orb_*` vocabulary).
+- **IMP-057 (09-17)** — feasibility scoring of the *refused* population. **Observed effect: VALIDATED AND DECISIVE; zero stop-rate effect by construction.** **56 entry decisions, zero win-feasible — and the best ceiling of all 56 belonged to a trade the bot took.** Selection was optimal; there was nothing to select. This is the brick that finishes the entry indictment.
+- **IMP-058 (09-18)** — gate-monitor hardening (one printed median, not a hand-rolled twin). **Observed effect: hygiene, PASS, zero stop-rate effect.** Prevents a recurrence of the IMP-049/053 *two-instruments-one-verdict* defect.
+- **IMP-059 (09-18, OPERATOR)** — **the week's only live-path change**: `ENTRY_MODE = "orb"` and IMP-013's ratchet restored (BE 0.5R, trail 1.0R@1.0R). **Observed effect: UNMEASURABLE — n=0.** One live session, 55 refusals, zero fills. **F+S share: no ORB trades exist to move it.** ⚠️ Shipped against its own routine's "nothing ships" verdict, on the one of four exit geometries under which it passed. **Judge it on expectancy and payoff from its first 30 trades; do not treat the backtest as validation.**
+- **IMP-060 (09-19)** — block live broker order placement from the test suite. **Observed effect: n/a by design — score by absence; zero stop-rate effect (no file under `bot/` changed).** ★ **The highest-value change of the week by a wide margin**, and its first run audited the suite's true order-touching surface (2 tests, both now explicit).
+- **IMP-061 (09-19, weekly — shipped tonight)** — see below.
+
+**Judged as a set: they compound tightly and cancel nothing.** 055/056/057 are one investigation that finished; 059 acts on its conclusion; 058 and 060 are hygiene and emergency repair. **The set's honest weakness is that the routine itself still shipped only instrumentation — the one change that altered live behaviour came from the operator.**
+
+### 🔧 Shipped tonight — **IMP-061: alarm when the day's equity move is not explained by the ledger**
+The week pointed at something **clearly more damaging** than the stop-exit failure cause, and the doctrine's priority rule yields to it: **86% of the week's equity decline came from money that moved without the ledger knowing, and it stayed invisible for a day.** The stop-exit side was genuinely unactionable — the MA book is retired and the ORB book is n=0, so any entry/exit/geometry change tonight would have been tuning on nothing (and IMP-055 already refuted the only geometry change on the table).
+
+- **`bot/reconcile.py`** (new, pure): `divergence = (equity_close − equity_open) − gross_pl`, alarming when it exceeds `max($25, 0.25% of session-open equity)`. At $7,482.42 that bar is $25.00 and the 09-18 incident clears it **11.6× over**. Unexplained *gains* alarm too — an unrecorded winner is still an unrecorded fill.
+- **`engine.post_close_summary`** calls it; **`notify.reconciliation_alert`** sends it. Wrapped so a detector can never break the post-close path. **Silent on a clean day by design** — an alert that fires every evening is one nobody reads.
+- **Detection only. No order path, no sizing, no halt, and no risk limit touched** — a test pins `MAX_RISK_PCT` 2.0 / `DAILY_LOSS_HALT_PCT` 8.0 / `MAX_CONCURRENT_POSITIONS` 3 / 15:30 / 15:55 as part of this change.
+- **Validation: 792 passed (was 774, +18), zero failures.** The regression test pins the real incident — $7,482.42 → $7,192.26 against a $0.00 ledger must alarm — plus the clean 09-17 and 09-16 sessions staying silent, tolerance scaling, and "don't report *fine* when you don't know" (a missing equity endpoint returns `ok=False`, never a clean reconciliation). `scripts.smoke_test` **ALL GREEN** (PAPER, PA3ESJUO8RU0, $7,192.26, 13 symbols), `scripts.check_exits` **ALL GREEN** (0 open positions), `scripts.check_engine` **ALL GREEN**.
+- **Committed `22cea51`, pushed to `origin/main`. Service restarted 2026-09-19 21:07:11 UTC** — graceful shutdown, clean start, `active`, **NRestarts=0**, zero errors, log confirms `entry mode=orb … ratchet BE 0.5R / trail 1.0R@1.0R`. ★ Deployment verified against the live unit (`ActiveEnterTimestamp` post-dates the commit), per the 2026-06-23 DEPLOY-GAP lesson. Market closed (Saturday), so the restart was safe.
+- **Pass condition: score by absence.** No `RECONCILIATION MISMATCH` alert on a clean session; any alert that does fire is a real finding. **Monday 09-21 is its first live test, and Monday's daily review judges it.**
+
+### Focus for next week
+- **(a) ORB is on probation — enforce it, do not nurse it.** Report its trade count toward the **30-trade kill criterion** every session. **Do not touch `ORB_MIN_REL_VOL`, `ORB_CUTOFF_ET`, `ORB_RANGE_BARS` or the market filter** on the strength of refusal counts; entry parameters move through `scripts.entry_lab` on held-out data, never by loosening a gate that refused things.
+- **(b) Pre-registered kill test: if the ORB book prints F+S ≥ 60% over its first three sessions with trades, the escalation clause fires against ORB** exactly as it did against MA — and the response is structural or stopping, **not a parameter tweak.** Treat IMP-059's backtest numbers as a hypothesis to be falsified, not a result to be defended.
+- **(c) Score IMP-061 by absence**, and treat any reconciliation alert as a real finding on the day it fires.
+- **(d) Perplexity billing is exhausted — this needs a human.** `todo.md` item: HTTP 401 `insufficient_quota` on both `sonar-deep-research` and `sonar`. **Three weeks of missing market context were wrongly blamed on the launch time; the launch is fine and the quota is the blocker.** Until it is topped up, use WebSearch and say so.
+- **(e) Calendar — a quiet data week dominated by Fedspeak, immediately after a surprise hike.** ~10 Fed speaker appearances; **Fri 09-25 Durable Goods (8:30 ET) + final Michigan sentiment (10:00 ET)**; COST earnings Thu 09-24 after the close. **PCE is 09-30, not next week.** With the 10Y at 5.04% (highest since 2007) and at least one more hike signalled, headline-driven intraday reversals are the base case — an opening-range system's hardest tape, and its first real test.
+- **(f) Standing queue item, still unactionable: profit capture** (break-even stops were 9 of 18 FAILs in the trailing MA book). It cannot be judged until the ORB book has trades. **Do not port an MA-era conclusion onto ORB.**
+- **(g) No risk relaxation.** All limits verified unchanged tonight. A −4.47% week is the single most dangerous moment to touch one, and nothing here proposes it.
