@@ -20,8 +20,8 @@ import traceback
 from datetime import date, datetime
 
 from . import (
-    broker, config, confidence, data, exits, execution, logbook, notify, signals,
-    sizing,
+    broker, config, confidence, data, exits, execution, logbook, notify, reconcile,
+    signals, sizing,
 )
 
 # 1-min bars pulled per tick for the break-even high-water mark (IMP-031). A
@@ -598,6 +598,24 @@ class Engine:
         notify.daily_summary_alert(summ)
         self.summarized_on = today
         self._log("daily summary written")
+        self._reconcile_day(summ)
+
+    def _reconcile_day(self, summary: dict | None) -> None:
+        """Alarm if the day's equity move is not explained by the ledger (IMP-061).
+
+        Runs after the summary is written and the day is marked summarized, and
+        swallows everything: this is a *detector*, and a detector that can break
+        the post-close path would be a worse bug than the one it detects. The
+        2026-09-18 incident (-$290.16 against a 0-trade ledger) is the case it
+        exists for; see bot/reconcile.py.
+        """
+        try:
+            result = reconcile.check(summary)
+            self._log(reconcile.describe(result))
+            if result.get("diverged"):
+                notify.reconciliation_alert(result)
+        except Exception as exc:  # noqa: BLE001 - a detector must never break the close
+            self._log(f"reconciliation check error: {type(exc).__name__}: {exc}")
 
     # --- one tick (market open) ---
     def tick(self, now: datetime | None = None) -> None:

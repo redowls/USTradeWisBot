@@ -157,6 +157,20 @@ DAILY_LOSS_HALT_PCT = 8.0       # was 3.0; raised 2026-06-10 to un-halt after th
                                 # early instead of trading the whole day down. Exits
                                 # on already-open positions are unaffected.
 
+# --- DB <-> broker reconciliation alarm (IMP-061) ---
+# Alert when the broker's equity move for the day cannot be explained by the
+# trades the bot recorded. On 2026-09-18 an unguarded pytest run placed fourteen
+# real META bracket orders and cost -$290.16 (-3.88%) on a ZERO-TRADE session;
+# `daily_summary` wrote "0 buys / 0 sells / $0.00" beside it and nothing alarmed,
+# because no code compared the ledger to the equity curve. IMP-060 closed that
+# particular vector; this closes the detection gap behind it. Detection only —
+# it sends a message and touches no risk limit (see bot/reconcile.py).
+# The bar is max(USD floor, PCT of session-open equity) so it scales with the
+# account: at $7,192.26 equity that is max($25.00, $17.98) = $25.00, and the
+# 09-18 incident clears it 11.6x over.
+RECONCILE_TOLERANCE_USD = 25.0  # flat floor, so a small account ignores pennies
+RECONCILE_TOLERANCE_PCT = 0.25  # % of session-open equity, so a large one still alarms
+
 # --- Re-entry throttle (#2) ---
 REENTRY_COOLDOWN_MIN = 30          # after a symbol's trade closes, wait this many
                                    # minutes before re-entering it. Kills the same-name

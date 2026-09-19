@@ -120,6 +120,30 @@ def daily_summary_alert(summary: dict) -> bool:
     return send(text)
 
 
+def reconciliation_alert(result: dict) -> bool:
+    """Alarm when the day's equity move is not explained by the recorded trades.
+
+    IMP-061. Sent only when `reconcile.check` reports `diverged` — a clean
+    reconciliation is silent on purpose, because an alert that fires every
+    evening is an alert nobody reads. The 2026-09-18 shape (equity -$290.16,
+    ledger $0.00, zero trades) is called out explicitly in the text so the
+    on-call reader does not have to remember what the number means.
+    """
+    delta = _f(result.get("equity_close")) - _f(result.get("equity_open"))
+    text = (
+        f"🚨 <b>RECONCILIATION MISMATCH {_esc(result.get('trade_date'))}</b>\n"
+        f"Broker equity moved <b>${delta:+,.2f}</b> "
+        f"(${_f(result.get('equity_open')):,.2f} → ${_f(result.get('equity_close')):,.2f})\n"
+        f"Ledger recorded <b>${_f(result.get('gross_pl')):+,.2f}</b> over "
+        f"{result.get('num_sells')} exits\n"
+        f"<b>Unexplained: ${_f(result.get('divergence')):+,.2f}</b> "
+        f"(tolerance ${_f(result.get('tolerance')):,.2f})\n"
+        f"Money moved that the bot did not record — check broker fills for "
+        f"untracked orders or a position that survived the flatten."
+    )
+    return send(text)
+
+
 def error_alert(message: str) -> bool:
     """Notify on an unexpected exception (wired into the global handler in Phase 10)."""
     return send(f"⚠️ <b>ERROR</b>\n<code>{_esc(message)}</code>")
