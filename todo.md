@@ -919,3 +919,11 @@ The pass is **front-loaded and concentrated**. Re-checked on the lab output afte
 2. Report **NVDA's share of ORB P&L** every week; if one name is >60% of net after 30 trades, say so as a concentration warning, not a win.
 3. **`ORB_MIN_REL_VOL` is never relaxed** and the SPY filter is never removed to raise the trade count (anti-gaming: both are the reasons the config passed).
 4. **Kill criterion:** after **30 live ORB trades**, if expectancy ≤ 0 or F+S ≥ 60% over the last 3 traded sessions, write "ORB has no demonstrated live edge" plainly and put **retire** to the operator as the only remaining option — do not ship a parameter change instead.
+
+### 2026-09-19 — Next IMP candidate: same-day DB↔broker reconciliation alarm (deferred from IMP-060)
+
+**Why it is wanted.** On 2026-09-18 the account lost **$290.16** while `trades` held **zero rows** and `daily_summary` wrote "0 trades". Nothing in the system noticed; it took the next morning's review and a broker query to find fourteen orphan META fills. IMP-060 closes the *cause* (tests can no longer place orders). This closes the *detection gap*, which is independent of that cause and would catch any future source of untracked fills — a stray script, a manual order, a partial fill the engine missed, a bracket leg that fired after a restart.
+
+**Shape (not yet designed, do not treat as spec).** In the post-close path, compare broker realised P&L / equity delta for the session against the DB's `daily_summary.gross_pl`, and alarm on a divergence beyond a small tolerance. Must be **read-only** against the broker and must not gate or alter trading. Cheap, test-coverable, no risk-limit surface.
+
+**Not a risk-limit change; needs no human approval.** Deferred from 2026-09-19 purely by the one-change-per-run rule.

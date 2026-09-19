@@ -3752,3 +3752,60 @@ IMP-054 scores the trades the bot **filled**; **IMP-057 (shipped tonight) scores
 - Equity **$7,482.42 (−25.18%)**, **second consecutive session below the −25% line**. Trailing-10 true win rate **6.5%**, era **6.2%** against the **8.7%** it needs. Board stands at **14 active**.
 
 ---
+## 2026-09-18 — Daily Review
+
+### Stats
+- **Strategy trades: ZERO.** The ORB entry's first live session refused every candidate it saw. DB `trades` holds no row for 2026-09-18; `daily_summary` records 0 buys / 0 sells, gross_pl $0.0000, realized_pl_pct 0.0000.
+- **★★★ AND YET EQUITY FELL $7,482.42 → $7,192.26 = −$290.16 (−3.88%) — the worst single-day loss in the bot's history, on a day it did not trade.** That is not a strategy loss. It is a **test-harness accident**: a pytest run placed fourteen REAL 1-share META bracket orders on the live paper account. Full root cause below; this is the entire story of the session.
+- Broker reconciliation (`alpaca` MCP, account **PA3ESJUO8RU0**): equity **$7,192.26**, cash **$7,192.26**, long_market_value **0**, **0 open positions**, ACTIVE, not blocked, `last_equity` 7,482.42. **No overnight/weekend position — the flatten did its job.** The −$290.16 is fully realised and ties to the broker fills to the cent (see below).
+- **DB ↔ broker divergence: 14 broker fills, 0 DB rows.** The DB is not wrong about the *strategy* — no strategy trade occurred. It is blind to the accident, and the reason it is blind is itself part of the root cause.
+- Service: `active (running)`, started 11:54:08 UTC, NRestarts=0, zero ERROR/Traceback lines. Log confirms the ORB deployment line: `entry mode=orb (ORB range=6 bars, cutoff 11:30 ET, relvol>=1.3, market filter=SPY); ratchet BE 0.5R / trail 1.0R@1.0R (enabled=True)`.
+
+### Stop-exit accounting
+- **Today: no closed strategy trades — stop rate, true win rate and the WIN/SCRATCH/FAIL split are all undefined (n=0). Not "0%", undefined.** The accidental META round trip is deliberately EXCLUDED from every doctrine number: it had no signal, no confidence score, no sizing decision and no bot-managed exit. Folding a −$290 non-trade into the strategy's book would corrupt the exact metric the doctrine exists to protect. It is accounted separately, in full, as an operational loss.
+- **Trailing 10 sessions with trades (2026-09-02 → 09-17, n=31, all MA-entry — the ORB book is still empty):**
+  - **Stop rate 17/31 = 54.8%.**
+  - **WIN 2 (6.5%) · SCRATCH 11 · FAIL 18.** FAIL splits **full-1R 5 · break-even 9 · faded (EOD) 4**.
+  - **True win rate 6.5% vs headline win rate 45.2%** — the headline is **7.0× the truth**. Net **−$60.85**.
+  - **FAIL+SCRATCH = 29/31 = 93.5%.**
+  - `by_flatten_outcome`: **faded 8 (−$67.93)** vs **drifted-up 4 (+$17.75)**.
+- **★★★ THE ESCALATION CLAUSE IS TRIPPED AND HAS BEEN FOR SOME TIME.** `doctrine.escalation_verdict` over the last 3 sessions with trades (09-14, 09-16, 09-17): **F+S share 100.0%** vs the 60% threshold, true win rate **0.0%**, headline **42.9%**, avg **−0.182R**. Per the standing rule this bars further parameter tweaks to the MA book — which is moot in one sense (the MA entry was retired to ORB on 09-18) and NOT moot in another: **the ORB entry inherits the same exit geometry and the same escalation clause, and it has n=0 to its name.**
+- **Dominant failure cause across the trailing book: profit capture.** 9 of 18 FAILs are break-even stops — trades that reached +0.5R, armed IMP-013's ratchet, and handed back every cent. That is unchanged from prior sessions and is the standing queue item. **Today contributes no evidence either way.**
+
+### Root cause — the −$290.16, established from the order record and proven by reproduction
+**Not inferred. Reproduced exactly.**
+
+1. **What the broker shows.** Fourteen `utwb-META-*` 1-share BRACKET buys, submitted **11:22:01–11:22:03Z (7)** and **11:22:57–11:22:58Z (7)** — two runs of the same selection ~56s apart. Every one carried **stop 651.60 / take-profit 699.60**. All fourteen filled at the **13:30 open**, $684.29–$688.45, **avg $686.226**. At **19:55:13–23Z** every unused leg was cancelled; at **19:55:34Z** a single market sell, **qty 14 @ $665.50**. `14 × (665.50 − 686.226) = −$290.16` — **the equity drop to the cent.**
+2. **It was not the bot.** 11:22Z = **07:22 EDT**, pre-market. `bot.log` shows the service asleep across that window (`07:44:11 EDT | market closed — sleeping ~6348s until next open`) and the 07:54 EDT restart came *after* the orders. No ENTRY line, no FLATTEN line, no order log for any of the fourteen. The main loop never saw them.
+3. **Where the numbers come from.** `tests/test_imp056_entry_refusals.py` pins the 2026-09-15 META refusal as fixture constants: **`META_PRICE = 670.80`, `META_ATR = 6.40`, `META_CONF = 61.30`**. Feed those to the real sizing path — `sizing.plan_position("META", 61.30, 670.80, 6.40, 7527.50, 7527.50)` — and it returns **1 share, stop 651.60, take-profit 699.60**. ★ **Byte-identical to all fourteen orders. That is the proof of origin.**
+4. **The mechanism.** That file's `_run()` helper builds **`engine.Engine(dry_run=False)`** and stubs `signals.evaluate_watchlist`, `confidence.score`, `broker.account_summary`, `broker.open_position_symbols`, and the `logbook` writers — **but not the order path.** Every candidate in the file that is *refused* is harmless; any candidate that **passes** the VWAP gate goes through real sizing and out through `execution.submit_bracket_order` to Alpaca. Re-run off-pytest with submit stubbed to a recorder, this session: action **`bought`**, order **`('META', 1, 651.6, 699.6)`**.
+5. **★★★ WHY IT WAS INVISIBLE, AND THIS IS THE UNCOMFORTABLE PART: the IMP-043 conftest guard hid it.** That guard blocks live *DB writes* in tests. So the fourteen orders could never be recorded — `trades` stayed empty, `daily_summary` wrote "0 trades", and the only surviving trace was a $290.16 equity drop with nothing to attribute it to. **A safety guard built to protect the trade history is what converted a loud accident into a silent one.** Nothing blocked live *broker* writes. That asymmetry is the defect.
+6. **What the tape then did to the position.** META **gapped up and collapsed**: open 687.77, high 690.00, **low 661.90, close 665.39 (−2.49% on the day, −3.57% from the high)** on a flat tape (SPY 761.62, **−0.13%**, 0.53% range; QQQ +0.62%; NVDA +1.20%). The accidental fills bought the **top of a gap-up at the open** — precisely the "stretched fill, fades" pattern the VWAP gate exists to refuse. ⚠️ **The 651.60 stop was never threatened (META's low 661.90), so the position had no protection that mattered; it simply bled for six hours until the 15:55 flatten.**
+7. **What worked.** ★ **The EOD flatten caught a position the DB did not know existed** — it sweeps *broker* positions, not DB rows, so it cancelled the orphan legs and sold all 14 shares. Without that, 14 shares of META ($9,317) would have gone naked through the weekend on a $7.2k account. **The no-overnight invariant held against a position the rest of the system was blind to.** That is the naked-protection layer earning its keep.
+
+### The ORB entry's first live session — read it separately, and read it as a non-event
+- **ORB evaluated normally and refused everything.** `dbo.entry_refusals` for 09-18: **55 rows — `orb_after_cutoff` 28** (12:50–15:29, breaks arriving after the 11:30 cutoff), **`orb_low_volume` 23** (10:10–11:09, trigger-bar rel-vol < 1.3), **`orb_market_filter` 4** (10:10–10:14, SPY below its own session VWAP).
+- ★ **This is the gate working, not the gate failing.** On a −0.13% SPY day with a 0.53% range, an opening-range-breakout system taking zero trades is the correct answer, and the refusal vocabulary landed in the ledger exactly as IMP-059 specified.
+- ⚠️ **But it means the ORB book is still n=0 after its first session. Every claim in IMP-059's addendum — PF 1.41, payoff 3.00, true WR 13.3% held-out — remains entirely unvalidated live.** The 30-trade kill criterion has 30 trades to go. **Do not read "no losses today" as ORB working.**
+- ⚠️ **The accidental META position did NOT block ORB entries** (held symbols = {META} = 1, cap 3; buying power ample). The zero-trade outcome and the accident are independent.
+
+### What worked / what didn't
+- **Worked:** EOD flatten against an untracked broker position; ORB refusal ledger; service stability (zero errors, clean restart); broker reconciliation caught a divergence the DB could not report.
+- **Didn't:** the test suite could place real money orders, and the DB guard masked it. **One pytest run cost 3.88% of the account — more than the ten prior trading sessions lost between them (−$60.85).**
+
+### Lessons & improvement candidates
+1. **★★★ SHIPPED AS IMP-060 — block live broker order placement from tests.** The highest-impact change available by a wide margin: the trailing 10 sessions of *trading* lost $60.85; one unguarded test run lost $290.16.
+2. **Profit capture (break-even stops, 9 of 18 FAILs)** — the standing queue item for the trading logic. **Deliberately not touched tonight:** it belongs to the MA book, which is retired, and the ORB book has n=0. Acting now would be tuning on zero evidence.
+3. **Consider a DB↔broker daily reconciliation assertion** in the post-close path, so "equity moved but `trades` is empty" alarms the same day instead of waiting for this review. Candidate for a future IMP; not shipped tonight (one change per run).
+
+### Notes for pre-market research
+- **★★★ META TRADED $290.16 OF REAL EQUITY YESTERDAY AND NONE OF IT WAS A SIGNAL.** Do not read the 09-18 META fills as a strategy entry, do not park META on their evidence, and do not let them enter any feasibility or ceiling calculation. **META's actual bot record is unchanged from 09-17.** The name itself behaved badly for a breakout system: gap to 690.00, close 665.39, **−3.57% off the high** — a textbook gap-up fade.
+- **★★ ORB'S FIRST SESSION REFUSED 55 CANDIDATES AND THE BINDING GATE WAS VOLUME, NOT THE CUTOFF.** 23 `orb_low_volume` between 10:10–11:09 are breaks that happened *inside* the window and failed rel-vol ≥ 1.3; the 28 `orb_after_cutoff` are post-11:30 and were never eligible. ⚠️ **If ORB stays at n=0 for several sessions, rel-vol 1.3 is the first parameter to examine — but examine it in `scripts.entry_lab` on held-out data, never by loosening it live.**
+- **★★ THE MARKET FILTER FIRED FOUR TIMES IN THE FIRST FIVE MINUTES** (SPY below its session VWAP 10:10–10:14). SPY closed 761.62 vs session VWAP 760.45 — above at the close, below early. **The filter is load-bearing and fails closed, as designed.**
+- **★ THE TAPE WAS FLAT AND NARROW:** SPY 761.62 (−0.13%, range 757.98–762.00 = 0.53%), QQQ 721.36 (+0.62%), NVDA 222.04 (+1.20%), META 665.39 (−2.49%). **A zero-trade day on this tape is defensible; score it as a non-event, not as evidence about ORB.**
+- **★ WATCHLIST IS NOW 13 ACTIVE SYMBOLS** (AAPL, AMD, AMZN, BAC, CRM, GOOG, INTC, META, MSFT, NFLX, NVDA, TSLA, TSM) per the live smoke test — one fewer than the 14 recorded on 09-17. Not this routine's table; flagged so the change is noticed and owned.
+- **⚠️ `sonar` FAILED A TWENTY-SIXTH TIME — `PPLX_EMPTY`.** Market context was rebuilt from Alpaca IEX daily bars instead, which is stricter anyway. **Still a billing action for a human.**
+- **★ THE PRE-EXISTING UNCOMMITTED WIP SET IS GONE** — committed as `e75563e` on 09-18. **After twenty-two consecutive escalations this item is CLOSED.** Working tree tonight held only this routine's three files.
+- Equity **$7,192.26 (−28.08%)**, third consecutive session below the −25% line and a new low — **but $290.16 of the gap to −25% is the test accident, not the strategy.** Strategy equity, had the accident not happened, would stand at **$7,482.42 (−25.18%)**, flat on the session. **Both numbers belong in the record; the account is what it is, and the cause is what it is.**
+
+---

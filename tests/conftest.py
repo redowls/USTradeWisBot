@@ -61,6 +61,99 @@ def _no_live_db_writes(monkeypatch):
         monkeypatch.setattr(db, name, _blocked(name))
 
 
+class LiveBrokerOrderBlocked(BaseException):
+    """Raised when a test reaches a live order-placement path (IMP-060).
+
+    The IMP-043 guard above blocks live *database* writes. Nothing blocked live
+    *broker* writes, and on 2026-09-18 that asymmetry cost $290.16 of real paper
+    equity: a test run drove ``Engine.consider_entries`` with ``dry_run=False``
+    and every collaborator stubbed EXCEPT the broker, so the IMP-056 META
+    fixture (price 670.80, ATR 6.40) went through the real
+    ``sizing.plan_position`` -> 1 share, stop 651.60, take-profit 699.60 -> and
+    out through ``execution.submit_bracket_order`` to Alpaca. Fourteen 1-share
+    META bracket orders were submitted pre-market at 11:22 UTC, filled at the
+    13:30 open around $686, and were swept up by the 15:55 flatten at $665.50.
+    The conftest DB guard is what hid it: the trades could never be recorded, so
+    ``trades`` showed zero rows for the day while the broker showed a 14-share
+    round trip.
+
+    BaseException for the same reason as ``LiveDatabaseWriteBlocked``:
+    ``submit_bracket_order`` is written to never raise (it catches ``Exception``
+    and returns an error dict) so a plain exception would be swallowed and the
+    test would pass while the order sat live at the broker.
+    """
+
+
+# Mutating broker surface only. Reads (account_summary, get_positions, get_clock,
+# open_position_symbols, get_order, entry_fill_price, ...) are deliberately left
+# alone: several tests legitimately read the live account and a read cannot move
+# money.
+_EXECUTION_ORDER_PATHS = ("submit_bracket_order", "cancel_order", "replace_stop_order")
+_BROKER_ORDER_PATHS = ("cancel_all_orders", "close_all_positions", "close_position")
+# Backstop: catches any path that skips the module functions above, including
+# `broker.trading_client().submit_order(...)` called straight from a test.
+_TRADING_CLIENT_ORDER_METHODS = (
+    "submit_order", "replace_order_by_id", "cancel_order_by_id", "cancel_orders",
+    "close_position", "close_all_positions", "exercise_options_position",
+)
+
+
+def _capture_real_execution() -> dict:
+    """Bind the genuine execution functions once, at import, before any patching."""
+    from bot import execution
+
+    return {name: getattr(execution, name) for name in _EXECUTION_ORDER_PATHS}
+
+
+_REAL_EXECUTION = _capture_real_execution()
+
+
+@pytest.fixture(autouse=True)
+def _no_live_broker_orders(monkeypatch):
+    """Fail loudly instead of silently placing real orders on the paper account."""
+    def _blocked(where, name):
+        def _fail(*args, **kwargs):
+            detail = ", ".join(
+                [repr(a) for a in args[:2]] + [f"{k}={v!r}" for k, v in list(kwargs.items())[:2]]
+            )[:160]
+            raise LiveBrokerOrderBlocked(
+                f"{where}.{name}() was called during a test and would have placed "
+                f"or modified a REAL order on the live paper account: ({detail})\n"
+                "Stub the broker in your test (e.g. monkeypatch.setattr(execution, "
+                "'submit_bracket_order', ...) or build the Engine with dry_run=True). "
+                "See tests/conftest.py for why this guard exists (IMP-060)."
+            )
+        return _fail
+
+    from alpaca.trading.client import TradingClient
+
+    from bot import broker, execution
+
+    for name in _EXECUTION_ORDER_PATHS:
+        monkeypatch.setattr(execution, name, _blocked("bot.execution", name))
+    for name in _BROKER_ORDER_PATHS:
+        monkeypatch.setattr(broker, name, _blocked("bot.broker", name))
+    for name in _TRADING_CLIENT_ORDER_METHODS:
+        monkeypatch.setattr(TradingClient, name, _blocked("TradingClient", name), raising=False)
+
+
+@pytest.fixture
+def real_order_functions(monkeypatch):
+    """Opt back in to the genuine bot.execution order functions (IMP-060).
+
+    For the handful of tests whose subject IS one of those functions' internals.
+    They must stub ``broker.trading_client`` themselves; the TradingClient
+    class-level backstop stays armed either way, so an unstubbed client still
+    cannot reach Alpaca. Requesting this fixture is the visible, greppable
+    record that a test drives a real order path on purpose.
+    """
+    from bot import execution
+
+    for name in _EXECUTION_ORDER_PATHS:
+        monkeypatch.setattr(execution, name, _REAL_EXECUTION[name])
+    return execution
+
+
 @pytest.fixture(autouse=True)
 def _legacy_tests_run_in_ma_mode(monkeypatch):
     """Every test written before IMP-059 pins MA-mode behaviour (the IMP-021

@@ -267,7 +267,7 @@ def test_replace_chain_hop_limit():
 
 # --- 3. execution.replace_stop_order -------------------------------------------
 
-def test_replace_stop_order_success(monkeypatch):
+def test_replace_stop_order_success(monkeypatch, real_order_functions):
     seen = {}
 
     class _Client:
@@ -283,7 +283,7 @@ def test_replace_stop_order_success(monkeypatch):
     assert seen == {"order_id": "leg-1", "stop_price": 101.5}
 
 
-def test_replace_stop_order_never_raises(monkeypatch):
+def test_replace_stop_order_never_raises(monkeypatch, real_order_functions):
     class _Client:
         def replace_order_by_id(self, order_id, order_data=None):
             raise RuntimeError("order already replaced")
