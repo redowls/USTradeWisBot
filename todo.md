@@ -940,3 +940,22 @@ The pass is **front-loaded and concentrated**. Re-checked on the lab output afte
 **Shape (not yet designed, do not treat as spec).** In the post-close path, compare broker realised P&L / equity delta for the session against the DB's `daily_summary.gross_pl`, and alarm on a divergence beyond a small tolerance. Must be **read-only** against the broker and must not gate or alter trading. Cheap, test-coverable, no risk-limit surface.
 
 **Not a risk-limit change; needs no human approval.** Deferred from 2026-09-19 purely by the one-change-per-run rule.
+
+### 2026-09-22 — Pre-registered for the weekly: the fixed 1.5R take-profit (profit capture)
+
+**Evidence (2026-09-21, ORB's first session with fills).** META filled 715.74, plan stop 701.75 (**1R = 13.99**), `TAKE_PROFIT` filled **735.295 = +1.398R**. The name's day high was **752.96 (+2.66R available)** and it **closed 741.29 (+1.83R)**. The bot exited a +11% mover at the 47th percentile of its own move, and a plain 15:55 flatten would have beaten the target by **+0.43R**. Same session, INTC gave back 1.03R of a 1.28R move to the 1.0R trail. **Profit capture — not entry quality — was the whole of the day's shortfall; all three entries were correct and three of three closed green.**
+
+**Why it was NOT shipped on 2026-09-22.**
+1. **n = 1**, on the strongest trend day in six weeks (Nasdaq record close, +2.26%). The textbook overfit.
+2. ⚠️ **Binding:** `IMP-059`'s walk-forward gate validated the live ORB configuration **with this take-profit in place** (held-out **PF 1.28 / 6m, 1.41 / 12m**). Altering the exit geometry **voids the only held-out evidence the live config has**, so it is not a free change even though the standing entry-lab rule names only entry signals.
+3. The escalation clause is tripped on the retired `ma-ribbon` book (see IMP-062), and the doctrine bars parameter tweaks while it is.
+
+**How to settle it properly.** Re-run `scripts.entry_lab` / `scripts.replay` over 6- and 12-month held-out windows with the ORB entry fixed and only the exit varied: (a) live `RR_RATIO 1.5` TP, (b) no TP, trail only, (c) TP at 2.5R/3R, (d) scale out half at 1.5R and trail the rest. **Ship only on held-out expectancy > 0, PF ≥ 1.2, n ≥ 30, judged on expectancy and payoff first, stop rate second** — and re-run the ORB gate afterwards to confirm the entry still passes under the new geometry. **Do not tighten `TRAIL_DISTANCE_R`: refuted by IMP-050 on the MA book and by IMP-059's gate under ORB (0.5-distance variant 12m PF 0.84 vs 1.41).**
+
+### 2026-09-22 — For human decision: `TAKE_PROFIT` is an unconditional WIN, but 3 of 31 TP fills banked < +1.0R
+
+**Measured, not changed.** `doctrine.classify` scores any `TAKE_PROFIT` exit as a WIN, per the user's standing directive of 2026-09-01. Across the full 320-trade book, **3 of 31 TAKE_PROFIT fills banked less than +1.0R**: META 2026-07-07 **+0.717R**, GOOGL 2026-07-06 **+0.892R**, BAC 2026-07-14 **+1.000R**.
+
+**Cause.** The bracket's stop and target are anchored to the **planned** entry price, not to the actual fill. Entry slippage therefore *widens* real risk and *narrows* real reward at the same time. 2026-09-21's META is the clean worked example: planned entry 715.14, filled **715.74**, so realized 1R was **13.99 vs 13.39 planned (+4.5% more risk than budgeted)** and the 1.5R target realized as **1.398R**. A TP fill drops below +1.0R once entry slippage exceeds **25% of planned 1R**.
+
+**Why nothing was changed.** The WIN definition is a standing user directive, and re-anchoring the bracket to the fill would move the stop and redefine R across the whole historical book, breaking comparability of every doctrine number ever recorded. **Two separable questions for a human:** (i) should `classify` require `profit_R >= 1.0` even on a TAKE_PROFIT fill? (ii) should the bracket anchor to the fill rather than the plan? **Neither is a risk-limit change; (ii) touches stop geometry and should not be attempted without a held-out replay.**

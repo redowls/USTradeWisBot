@@ -215,6 +215,48 @@ def breakeven_true_win_rate(rows: list[dict]) -> float | None:
     return round(100.0 * -avg_rest / (avg_win - avg_rest), 1)
 
 
+#: Which entry regime each ``signals.signal_type`` belongs to (IMP-062).
+#:
+#: A doctrine verdict is only meaningful over trades ONE entry decided. The
+#: 2026-09-18 switch to ORB (IMP-059) retired the MA-ribbon entry that produced
+#: ``MA`` / ``BOTH`` / ``BREAKOUT`` signals, so the book now contains two
+#: populations that no longer share a generating process. ``BOTH`` and
+#: ``BREAKOUT`` sit with ``MA`` because all three came out of the same ribbon +
+#: level-break scorer; ORB is its own regime.
+#:
+#: Unmapped signal types (and NULL) deliberately return None rather than
+#: defaulting into a regime: attributing a trade to the wrong strategy is worse
+#: than declining to attribute it.
+ENTRY_REGIMES: dict[str, str] = {
+    "ORB": "orb",
+    "MA": "ma-ribbon",
+    "BOTH": "ma-ribbon",
+    "BREAKOUT": "ma-ribbon",
+}
+
+#: Reason codes for ``escalation_verdict``'s verdict, so ``escalated=False`` is
+#: never ambiguous between "the strategy is fine" and "we do not know yet".
+ESCALATED = "escalated"
+BELOW_THRESHOLD = "below-threshold"
+INSUFFICIENT_SESSIONS = "insufficient-sessions"
+NO_TRADES = "no-trades"
+
+
+def entry_regime(row: dict) -> str | None:
+    """Which entry strategy produced this trade, or None when unattributable."""
+    return ENTRY_REGIMES.get((row.get("signal_type") or "").upper())
+
+
+def by_regime(rows: list[dict]) -> dict:
+    """{entry regime -> its rows}. Unattributable rows are dropped, not pooled."""
+    out: dict[str, list[dict]] = {}
+    for r in rows:
+        label = entry_regime(r)
+        if label is not None:
+            out.setdefault(label, []).append(r)
+    return {k: out[k] for k in sorted(out)}
+
+
 def by_session(rows: list[dict]) -> dict:
     """{exit date -> summarize(rows of that session)}, sessions with trades only.
 
@@ -232,7 +274,8 @@ def by_session(rows: list[dict]) -> dict:
 
 
 def escalation_verdict(rows: list[dict], sessions: int = 3,
-                       threshold: float = 60.0) -> dict:
+                       threshold: float = 60.0,
+                       regime: str | None = None) -> dict:
     """Has FAIL+SCRATCH stayed >= ``threshold``% across the last N sessions?
 
     The doctrine's escalation clause: when it has, stop shipping parameter
@@ -245,18 +288,69 @@ def escalation_verdict(rows: list[dict], sessions: int = 3,
     resets the window. Returns ``escalated=False`` with the sessions it did find
     when fewer than ``sessions`` are available — an escalation needs evidence,
     and a short window is not evidence.
+
+    ``regime`` (IMP-062) restricts the book to one entry strategy BEFORE the
+    window is chosen, so the N sessions are that strategy's last N rather than
+    the calendar's. Without it the window is whatever traded most recently,
+    which after an entry switch blends a retired strategy with the live one and
+    yields a verdict describing neither — on 2026-09-21 the window was six
+    MA-ribbon trades plus three ORB, and IMP-060/061 both had to hand-correct
+    that in prose. ``regimes_in_window`` and ``mixed`` report the blend so an
+    un-filtered verdict announces that it is blended instead of reading clean.
+
+    ⚠️ ``escalated`` is deliberately left to fire on a mixed window exactly as
+    before. A blended window is weak evidence, but treating "we cannot tell
+    which strategy is failing" as permission to resume shipping tweaks would
+    turn a measurement fix into a loosened safety gate. Mixing is surfaced, not
+    excused; ``reason`` says which of the three states produced the verdict.
     """
-    per = by_session(rows)
+    scored = rows if regime is None else by_regime(rows).get(regime, [])
+    per = by_session(scored)
     dates = sorted(per)[-sessions:]
-    window = [r for r in rows
+    window = [r for r in scored
               if r.get("exit_time") is not None and r["exit_time"].date() in dates
               and r.get("realized_pl") is not None]
     agg = summarize(window)
     share = agg["fail_scratch_share"]
+
+    counts: dict[str, int] = {}
+    for r in window:
+        counts[entry_regime(r) or "unattributed"] = (
+            counts.get(entry_regime(r) or "unattributed", 0) + 1)
+
+    escalated = bool(len(dates) == sessions and share >= threshold)
+    if not window:
+        reason = NO_TRADES
+    elif len(dates) < sessions:
+        reason = INSUFFICIENT_SESSIONS
+    elif escalated:
+        reason = ESCALATED
+    else:
+        reason = BELOW_THRESHOLD
+
     return {
-        "escalated": bool(len(dates) == sessions and share >= threshold),
+        "escalated": escalated,
         "sessions": [str(d) for d in dates],
         "fail_scratch_share": share,
         "threshold": threshold,
         "summary": agg,
+        "regime": regime,
+        "regimes_in_window": dict(sorted(counts.items())),
+        "mixed": len(counts) > 1,
+        "reason": reason,
     }
+
+
+def escalation_by_regime(rows: list[dict], sessions: int = 3,
+                         threshold: float = 60.0) -> dict:
+    """{entry regime -> its own ``escalation_verdict``}, each over its own book.
+
+    The per-strategy read the blended verdict cannot give. A regime with fewer
+    than ``sessions`` sessions reports ``reason='insufficient-sessions'`` rather
+    than a clean ``escalated=False`` — after an entry switch the new strategy's
+    verdict is *unknown*, and reporting unknown as fine is the same failure
+    IMP-061 closed on the reconciliation side.
+    """
+    return {label: escalation_verdict(sub, sessions=sessions, threshold=threshold,
+                                      regime=label)
+            for label, sub in by_regime(rows).items()}

@@ -52,6 +52,28 @@ def _print_doctrine(rows) -> None:
               f"({', '.join(esc['sessions'])}).")
         print("      Stop shipping parameter tweaks; the signal itself is the "
               "suspect. Hand it to the weekly review with these numbers.")
+    if esc["mixed"]:
+        blend = " + ".join(f"{n} {k}" for k, n in esc["regimes_in_window"].items())
+        print(f"      ⚠️  MIXED WINDOW ({blend}) — this verdict describes no "
+              f"single entry strategy. Read the per-regime split below.")
+
+    # Per-entry-regime escalation (IMP-062). After an entry switch the blended
+    # verdict above spans two strategies; these describe one each.
+    per_regime = doctrine.escalation_by_regime(rows)
+    if len(per_regime) > 1:
+        print("\n  Escalation by entry regime")
+        for label, v in per_regime.items():
+            s = v["summary"]
+            if v["escalated"]:
+                verdict = f"⚠️  ESCALATED ({v['fail_scratch_share']}%)"
+            elif v["reason"] == doctrine.INSUFFICIENT_SESSIONS:
+                verdict = (f"UNKNOWN — only {len(v['sessions'])} session(s) of "
+                           f"evidence, needs 3")
+            else:
+                verdict = f"not escalated ({v['fail_scratch_share']}%)"
+            print(f"    {label:<10} n={s['trades']:<4} true WR "
+                  f"{s['true_win_rate']}%  F+S {s['fail_scratch_share']}%"
+                  f"   {verdict}")
 
 
 def _print_report(since=None) -> int:
