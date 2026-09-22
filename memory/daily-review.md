@@ -3809,3 +3809,72 @@ IMP-054 scores the trades the bot **filled**; **IMP-057 (shipped tonight) scores
 - Equity **$7,192.26 (−28.08%)**, third consecutive session below the −25% line and a new low — **but $290.16 of the gap to −25% is the test accident, not the strategy.** Strategy equity, had the accident not happened, would stand at **$7,482.42 (−25.18%)**, flat on the session. **Both numbers belong in the record; the account is what it is, and the cause is what it is.**
 
 ---
+
+## 2026-09-21 — Daily Review
+
+### Stats
+- **The ORB entry's first session with fills.** Trades: **3 closed, 3W / 0L headline (100%)**. Net **+$62.59 (+0.870%)**. Equity **$7,192.26 → $7,254.85**. All three were `ORB` signals at **confidence 70** — a band the retired MA book never reached (its live distribution topped out in the low 60s).
+- Winners as the ledger sees them: META **+$39.11 (+2.73%)**, MSFT **+$15.40 (+0.77%)**, INTC **+$8.08 (+0.67%)**. No losers. Avg **+$20.86** per trade, **avg banked +0.709R** — against a trailing-10-session average of **−0.033R**.
+- Exit mix: **TAKE_PROFIT 1**, **STOP 1**, **EOD_FLATTEN 1**. First TAKE_PROFIT fill since 2026-07-14.
+- Entries 10:05:44 (META), 10:05:55 (MSFT), 10:21:02 (INTC) ET — all three inside the 11:30 ORB cutoff, book **full at 3/3 from 10:21**. Holding times 3h11m / 5h50m / 3h04m.
+- Sizing: 2 META / 4 MSFT / 10 INTC. Dollar risk **$27.98 / $31.80 / $32.82 = 0.39–0.46% of equity**, against `MAX_RISK_PCT` 2.0. Nothing near a limit; the 8% daily-loss halt was never in play (the day was green throughout).
+- **Broker-reconciled to the cent via the `alpaca` MCP:** `last_equity` 7,192.26 → `equity` 7,254.85 = **+$62.59**, matching DB `daily_summary` exactly. Cash $7,254.85, `long_market_value` 0, **0 positions**, ACTIVE, not blocked. Every entry fill, exit fill and ratchet replace in the DB ties to an Alpaca order id. Both unused bracket legs were cancelled (MSFT TP 19:55:36Z, INTC TP 17:25:24Z) — **no orphans, no naked overnight.**
+- Reliability: **zero errors**, `NRestarts=0`, MainPID 3934784 up since 2026-09-19 21:07:11 UTC. The 15:55 flatten took **one** pass (15:55:37 cancel → 15:55:41 fill).
+- ⚠️ **Evidence-path note for future runs: `journalctl -u ustradewisbot.service` returns NOTHING for this session.** The unit writes `StandardOutput=append:/var/log/ustradewisbot/bot.log`, so systemd only records start/stop lines. **The session log lives in `/var/log/ustradewisbot/bot.log` (+ `bot.log.1`, rotated daily at 17:00, `rotate 14`).** Not a bug — but a review that trusts journalctl here sees a silent bot on a 3-trade day.
+
+### Stop-exit accounting
+**The headline says 3W/0L/100%. The doctrine says one win, one scratch, one failure.** This is the cleanest demonstration of why the rule exists that this book has produced.
+
+| Trade | Exit | P&L | `profit_R` | Verdict |
+|---|---|---|---|---|
+| META | TAKE_PROFIT | +$39.11 | **+1.398R** | **WIN** |
+| MSFT | EOD_FLATTEN (drifted-up) | +$15.40 | **+0.484R** | **SCRATCH** |
+| INTC | STOP (break-even kind) | +$8.08 | **+0.246R** | **FAIL** |
+
+- **Stop rate: 1/3 (33.3%).**
+- **WIN 1 · SCRATCH 1 · FAIL 1** — FAIL breakdown **full-1R 0 / break-even 1**. `EOD_FLATTEN` split: **faded 0, drifted-up 1**.
+- **True win rate 33.3% vs headline 100.0%** — a **66.7-point** divergence, the widest single-session gap on record. The true one governs.
+- **FAIL+SCRATCH share 66.7%.**
+- **Trailing 10 sessions (2026-09-03 → 2026-09-21, n=29):** stop rate **55.2%**, **true win rate 6.9% vs headline 51.7%**, F+S **93.1%**, net **−$53.44**, avg banked **−0.033R**. FAIL kinds: **full-1R 5 · break-even 9 · faded 4**. Break-even stops remain the single largest FAIL kind, exactly as they have been since 09-10.
+- ⚠️ **ESCALATION CLAUSE TRIPPED** — last 3 sessions with trades (09-16, 09-17, **09-21**) run **F+S 88.9%** ≥ 60%. ★ **But that window is six MA-ribbon trades plus three ORB.** Two thirds of the evidence comes from an entry strategy retired on 09-18. **Split by regime: `ma-ribbon` n=7, true WR 0.0%, F+S 100% → genuinely escalated. `orb` n=3, true WR 33.3%, F+S 66.7% → UNKNOWN, one session of evidence.** This is what IMP-062 ships tonight.
+- **Dominant failure cause: profit capture.** Not entry quality — see below, entry quality was the best it has ever been.
+
+### Market context
+**A major risk-on trend day, and the bot was in the right names.** S&P 500 **+1.49% to 7,764.70**; Nasdaq Composite **+2.26% to 27,122.09 — a record close, its first since June**, and its best day since 4 August; Dow +0.71% to 52,048.83. Chipmakers ripped on early signs of success for Meta's AI agent: **META +11%**, **INTC +12%**, AMD ~+10% (through $1T market cap), QCOM +9%. Brent settled ~$100, the 10-year fell below 5%.
+Alpaca IEX daily bars agree: **META o 679.81 / h 752.96 / c 741.29**, **INTC o 116.49 / h 124.69 / c 121.73**, **MSFT o 495.56 / h 501.71 / c 501.64**, **SPY o 766.30 / c 773.52 (+0.94%)**.
+⚠️ **`sonar` returned `PPLX_EMPTY` — the TWENTY-SEVENTH consecutive failure.** All figures above are WebSearch + Alpaca bars. **This is a billing/API action for a human; the routine has now escalated it on every run for six weeks.**
+
+### Trade-by-trade review
+`1R` = fill − plan stop. `avail_R` = (day high − fill) ÷ 1R: the most the trade could have paid from the price the bot actually got.
+
+| # | Sym | Entry (ET) | Exit (ET) | conf | 1R | avail_R | banked | Exit | P&L | Root cause |
+|---|-----|-----------|-----------|------|----|---------|--------|------|-----|------------|
+| 1 | META | 10:05:44 @715.74 | 13:16:42 @735.295 | 70 | 13.99 | **+2.66R** | **+1.398R** | TAKE_PROFIT | **+$39.11** | **Right name, right day, capped exit.** Ratchet armed break-even 12:03 and walked the stop to 720.14 across four raises. The **fixed 1.5R take-profit filled at 735.295 while META ran to 752.96 and closed 741.29** — the bot exited a +11% name at the 47th percentile of its own move. **Not a mistake; a designed ceiling. Correctly a WIN.** |
+| 2 | MSFT | 10:05:55 @496.99 | 15:55:41 @500.84 | 70 | 7.95 | **+0.59R** | **+0.484R** | EOD_FLATTEN | **+$15.40** | **The exit did almost everything available.** MSFT's whole day was a 2.1% range; from the fill only +0.59R was ever on offer and the flatten banked **82% of it**. Break-even armed 15:39 at +0.53R; the trail never triggered because +1R never printed. **SCRATCH is the honest label — capital preserved, thesis unpaid — but the cause is the tape, not the logic.** |
+| 3 | INTC | 10:21:02 @120.392 | 13:25:25 @121.20 | 70 | 3.282 | **+1.31R** | **+0.246R** | STOP | **+$8.08** | ★ **The day's real failure, and it closed green.** Peak seen 124.58 at 11:44 (**MFE +1.28R**). Break-even armed 10:58 at +0.54R; the trail armed 11:31 at +1.06R and ratcheted to 121.29 — i.e. **exactly 1R below the peak, by design**. Price then faded for 1h41m into the stop, filling at 121.20 (**−$0.09/share slippage, −$0.90**). **The 1.0R-wide trail handed back 1.03 of the 1.28R the trade earned.** ⚠️ Counterfactual honesty: INTC **closed 121.73**, so holding to the flatten recovers only **+0.16R** — the giveback was to the *peak*, not to the close. |
+
+### What worked / what didn't
+- ★★★ **Worked — entry quality, emphatically.** On the strongest trend day in six weeks the bot picked **META (+11%) and INTC (+12%)**, two of the session's biggest movers, plus MSFT which closed at its high. All three went green. **Zero false breakouts. Zero faded flattens. Zero full-1R stops.** After 320 trades of reviews blaming entry quality, **today's entries were not the problem and must not be "fixed".**
+- ★★★ **Worked — IMP-061 on its first live session.** `16:00:45 EDT | reconciliation ok — broker moved $+62.59, ledger recorded $+62.59 over 3 exits, unexplained $+0.00 (tolerance $25.00)`. It logged on a clean day and **raised no alert**, which is the designed behaviour. Independently confirmed against the broker. **PASS — score it by absence, and it delivered.**
+- ★★ **Worked — the ratchet did its job three times out of three.** Nine `STOP RAISED` replaces, no 422s, no order-id churn failures, and not one trade closed red.
+- ⚠️ **Didn't — profit capture, on both exit paths at once.** Two different mechanisms truncated two different winners on the same day: **META's fixed 1.5R take-profit** left +1.26R on the table on a name that ran +2.66R, and **INTC's 1.0R-wide trail** gave back 1.03R of a 1.28R move. **The strategy's problem today was not finding the move — it was keeping it.**
+- ⚠️ **Didn't — the escalation clause could not answer the only question that mattered.** It fired at 88.9% on a window that is two-thirds retired-strategy trades, and its `escalated=False` for ORB would have read as a clean bill of health for an n=3 book.
+
+### Lessons & improvement candidates
+1. **★★★ SHIPPED AS IMP-062 — make the escalation clause entry-regime aware.** The gate that governs whether changes may ship was reporting a verdict over two strategies at once, and IMP-060 and IMP-061 both had to hand-correct it in prose. Now `ma-ribbon` reads ESCALATED (n=7, true WR 0.0%) and `orb` reads UNKNOWN (n=3, one session) — and the blended verdict still fires, so nothing was unlatched.
+2. **★★★ NOT SHIPPED — the fixed 1.5R take-profit, now the leading profit-capture candidate, pre-registered for the weekly.** META is the exhibit: **+2.66R available, +1.398R banked, close at +1.83R**. A trailing exit with no hard cap would have beaten the TP on this trade by ~0.4–1.3R. ⚠️ **n=1, on the best trend day in six weeks — the textbook overfit.** More importantly, **IMP-059's walk-forward gate validated the live ORB config *with this TP in place* (held-out PF 1.28 at 6m, 1.41 at 12m); changing it voids the only held-out evidence the live configuration has.** It must go through `scripts.entry_lab` / `scripts.replay` on held-out data first. Numbers attached above; handed to the weekly.
+3. **★★ REFUTED AGAIN, do not re-propose — tightening `TRAIL_DISTANCE_R`.** INTC's 1.03R giveback is exactly what a narrower trail would have caught, and it is exactly the change **IMP-050 killed on the MA book** ("wins in H2, loses in H1, cuts wins 40/64 → 26/64 by round-tripping the SCRATCH cohort — retire it") and that **IMP-059's gate failed under ORB** (the 0.5-distance variant, 12m PF 0.84 vs 1.41). Two independent refutations, one on held-out data under the live entry. **Left alone.**
+4. **★ Measured, not acted on — `TAKE_PROFIT` is an unconditional WIN in `doctrine.classify`, but 3 of 31 TP fills banked < +1.0R** (META 07-07 +0.717R, GOOGL 07-06 +0.892R, BAC 07-14 +1.000R). Cause: the bracket's TP and stop are anchored to the **planned** entry, not the fill, so entry slippage shrinks realized R:R below `RR_RATIO` (META today: planned 1.5R, realized 1.398R, and actual risk 13.99 vs 13.39 planned = **+4.5% more risk than budgeted**). Small and bounded, but it is the mirror of the hole the doctrine exists to close. **The WIN definition is the user's standing directive — proposed in `todo.md`, not changed unilaterally.**
+
+### Notes for pre-market research
+- **★★★ ORB'S FIRST FILLS ARE IN AND THE ENTRY LOOKS GOOD — n=3, DO NOT OVER-READ IT.** 3/3 green, avg **+0.709R**, confidence **70** on all three (vs the MA book's low-60s ceiling). **One session is not evidence.** The doctrine's own answer is `orb → UNKNOWN, needs 3 sessions`; treat 09-22 and 09-23 as the sessions that make or break the read.
+- **★★★ THE BOT WAS FULL (3/3) FROM 10:21 ET AND THE ORB CUTOFF IS 11:30** — so from INTC's 13:25 exit there were two free slots and **~2 hours of a record-setting tape with no eligible entries by design**. Worth watching whether the 11:30 cutoff is leaving trend days on the table; **an observation only, and an entry-lab question, not a live-gate one.**
+- **★★ META AND INTC BOTH RAN FAR PAST THE BOT'S EXIT** (META exit 735.295 vs high 752.96 / close 741.29; INTC exit 121.20 vs high 124.69 / close 121.73). **Both are live, correct watchlist names on current evidence — keep them.** META's bot record is now genuinely positive for the first time (and remember the 09-18 META fills were the test accident, not signals).
+- **★★ MSFT gave a valid ORB signal into a 2.1% day-range** — the trade was fine and the tape was small. No action; noted so a +$15.40 SCRATCH is not misread as an exit-logic fault.
+- **★ WATCHLIST STABLE AT 13 ACTIVE SYMBOLS** (AAPL, AMD, AMZN, BAC, CRM, GOOG, INTC, META, MSFT, NFLX, NVDA, TSLA, TSM) per tonight's smoke test — unchanged from 09-18. AMD (+10%) and QCOM (+9%) both had huge days; **AMD is already on the list, QCOM is not** — a pre-market call, not this routine's.
+- **★ REGIME NOTE: this was a trending risk-on tape (SPY +0.94%, QQQ-led, Nasdaq record close).** The ORB entry's first real test came on the friendliest possible day. **Its next test on a chop day is the one that matters.**
+- **⚠️ `sonar` FAILED FOR THE 27TH TIME (`PPLX_EMPTY`).** Market context rebuilt from WebSearch + Alpaca bars. **Human billing action still outstanding.**
+- **⚠️ FUTURE REVIEWS: USE `/var/log/ustradewisbot/bot.log`, NOT `journalctl`.** The unit redirects stdout/stderr to that file; journalctl holds only systemd lifecycle lines and showed *nothing* for this 3-trade session.
+- Equity **$7,254.85 (−27.45%)**, up $62.59 on the day. Still below the −25% line; **$290.16 of the gap remains the 09-18 test accident, not strategy loss.**
+
+---
