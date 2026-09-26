@@ -171,6 +171,18 @@ DAILY_LOSS_HALT_PCT = 8.0       # was 3.0; raised 2026-06-10 to un-halt after th
 RECONCILE_TOLERANCE_USD = 25.0  # flat floor, so a small account ignores pennies
 RECONCILE_TOLERANCE_PCT = 0.25  # % of session-open equity, so a large one still alarms
 
+# --- Review-coverage detection (IMP-064, weekly 2026-09-26) ---
+# 2026-09-22/23/24 all went unreviewed — 09-24 had a fill — and nothing noticed
+# for four days. Every governance promise this bot makes (the ORB 30-trade kill
+# criterion, the stop-exit buckets, scoring IMP-061 by absence) is discharged by
+# the daily review, so an unreviewed session is one where all of them silently
+# did not happen. How many completed sessions the coverage check looks back over:
+# deep enough that a multi-day gap is still visible at the weekly review, shallow
+# enough that ancient history is not re-reported forever. Only the NEWEST
+# unreviewed session ever alarms; the rest of the window is logged as backlog
+# (see bot/coverage.py). Detection only — no risk limit is involved.
+COVERAGE_LOOKBACK_SESSIONS = 10
+
 # --- Re-entry throttle (#2) ---
 REENTRY_COOLDOWN_MIN = 30          # after a symbol's trade closes, wait this many
                                    # minutes before re-entering it. Kills the same-name

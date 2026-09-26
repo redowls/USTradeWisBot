@@ -144,6 +144,35 @@ def reconciliation_alert(result: dict) -> bool:
     return send(text)
 
 
+def coverage_alert(result: dict) -> bool:
+    """Alarm when a completed session has no daily review written for it.
+
+    IMP-064. Sent only when `coverage.check` reports `gapped`, and only about the
+    newest unreviewed session — a clean coverage check is silent for the same
+    reason `reconciliation_alert` is. The 2026-09-22/23/24 shape (three skipped
+    sessions, one with a fill, unnoticed for four days) is what it exists for, so
+    the text says which session is missing and whether it traded.
+    """
+    stale = result.get("stale") or {}
+    traded = ("<b>and it had fills</b> "
+              f"(${_f(stale.get('net_pl')):+,.2f})" if stale.get("had_fills")
+              else "(no fills that session)")
+    missing = result.get("missing") or []
+    text = (
+        f"📝 <b>DAILY REVIEW MISSING — {_esc(stale.get('date'))}</b>\n"
+        f"That session closed with no review entry {traded}\n"
+        f"Coverage: <b>{result.get('reviewed')}/{result.get('sessions')}</b> "
+        f"recent sessions reviewed"
+    )
+    if len(missing) > 1:
+        text += ("\nAlso unreviewed: "
+                 + _esc(", ".join(str(s["date"]) for s in missing[:-1])))
+    text += ("\nThe kill-criterion count, the stop-exit buckets and the "
+             "reconciliation score all live in that review — an unreviewed "
+             "session is one where none of them happened.")
+    return send(text)
+
+
 def error_alert(message: str) -> bool:
     """Notify on an unexpected exception (wired into the global handler in Phase 10)."""
     return send(f"⚠️ <b>ERROR</b>\n<code>{_esc(message)}</code>")

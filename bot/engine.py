@@ -20,8 +20,8 @@ import traceback
 from datetime import date, datetime
 
 from . import (
-    broker, config, confidence, data, exits, execution, logbook, notify, reconcile,
-    signals, sizing,
+    broker, config, confidence, coverage, data, exits, execution, logbook, notify,
+    reconcile, signals, sizing,
 )
 
 # 1-min bars pulled per tick for the break-even high-water mark (IMP-031). A
@@ -599,6 +599,7 @@ class Engine:
         self.summarized_on = today
         self._log("daily summary written")
         self._reconcile_day(summ)
+        self._check_review_coverage(today)
 
     def _reconcile_day(self, summary: dict | None) -> None:
         """Alarm if the day's equity move is not explained by the ledger (IMP-061).
@@ -616,6 +617,27 @@ class Engine:
                 notify.reconciliation_alert(result)
         except Exception as exc:  # noqa: BLE001 - a detector must never break the close
             self._log(f"reconciliation check error: {type(exc).__name__}: {exc}")
+
+    def _check_review_coverage(self, today) -> None:
+        """Alarm if a completed session has no daily review written (IMP-064).
+
+        Same contract as `_reconcile_day`: runs last, after the day is marked
+        summarized, and swallows everything — a detector that can break the
+        post-close path is a worse bug than the one it detects. The
+        2026-09-22/23/24 gap (three skipped sessions, one with a fill, unnoticed
+        for four days) is the case it exists for; see bot/coverage.py.
+
+        Reads are best-effort and the whole thing is optional by construction: a
+        missing memory file or an unreadable table logs a skip, never an alarm.
+        """
+        try:
+            result = coverage.check(coverage.load_sessions(),
+                                    coverage.read_review_text(), today=today)
+            self._log(coverage.describe(result))
+            if result.get("gapped"):
+                notify.coverage_alert(result)
+        except Exception as exc:  # noqa: BLE001 - a detector must never break the close
+            self._log(f"review coverage check error: {type(exc).__name__}: {exc}")
 
     # --- one tick (market open) ---
     def tick(self, now: datetime | None = None) -> None:
