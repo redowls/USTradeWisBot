@@ -3878,3 +3878,99 @@ Alpaca IEX daily bars agree: **META o 679.81 / h 752.96 / c 741.29**, **INTC o 1
 - Equity **$7,254.85 (−27.45%)**, up $62.59 on the day. Still below the −25% line; **$290.16 of the gap remains the 09-18 test accident, not strategy loss.**
 
 ---
+
+## 2026-09-25 — Daily Review
+
+### Stats
+- **Trades: ZERO.** DB `trades` holds no row for 2026-09-25; `daily_summary` records 0 buys / 0 sells, gross_pl $0.0000, realized_pl_pct 0.0000, `equity_open` = `equity_close` = **$7,278.05**, `symbols_traded` NULL.
+- **Broker-reconciled to the cent (`alpaca` MCP, account PA3ESJUO8RU0):** equity **$7,278.05**, `last_equity` **$7,278.05**, cash $7,278.05, `long_market_value` 0, **0 open positions**, **0 orders of any status on 09-25**, ACTIVE, not blocked. DB and broker agree exactly: nothing traded, nothing moved. **No naked weekend position.**
+- Service: `active (running)`, MainPID 135733 up since **2026-09-24 23:52:30 UTC**, **NRestarts=0**, **zero ERROR/Traceback lines**, one uninterrupted process across the whole session. `16:00:13 EDT | reconciliation ok — broker moved $+0.00, ledger recorded $+0.00 over 0 exits, unexplained $+0.00` — IMP-061 reporting correctly on a flat day.
+- Equity **$7,278.05 (−27.22%)**, unchanged on the day. **$290.16 of the gap to the −25% line remains the 09-18 test accident, not strategy loss** (strategy-only equity $7,568.21).
+- ⚠️ **PROCESS GAP — THIS REVIEW COVERS A FOUR-SESSION HOLE.** `memory/daily-review.md` jumps 09-21 → 09-25: the routine produced **no entry for 09-22, 09-23 or 09-24**, and 09-24 had a fill. Two of those runs died mid-flight and left uncommitted code behind (below). The trades are recovered in this entry; the gap itself is a finding, not a footnote.
+
+### Stop-exit accounting
+- **Today: n=0. Stop rate, true win rate and the WIN/SCRATCH/FAIL split are UNDEFINED — not 0%.** A session with no fills is evidence about the *gate*, not about the exits.
+- **The unreviewed session that did trade — 2026-09-24, recovered here.** META #357, entry 10:10:53 @766.64 (conf 70, ORB), exit 15:55:44 @778.24 `EOD_FLATTEN`, **+$23.20 (+1.5131%)**, `profit_R` **+0.906** → **SCRATCH** (drifted-up). 1R = 12.80; META's high was 779.80, so **+1.028R was available and the flatten banked 88% of it**. The ratchet armed once (13:05:22, stop 753.84 → 766.64 = break-even). ★ **This is a SCRATCH that the exit logic played almost perfectly** — it missed the +1.0R WIN bar by 0.094R on a name that closed at 777.73. Nothing to fix here; the label is honest and the execution was not the constraint.
+- **Trailing 10 sessions with trades (2026-09-04 → 2026-09-24, n=24):**
+  - **Stop rate 13/24 = 54.2%.**
+  - **WIN 1 (4.2%) · SCRATCH 8 · FAIL 15.** FAIL kinds: **full-1R 5 · break-even 7 · faded 3**.
+  - **True win rate 4.2% vs headline win rate 50.0%** — the headline is **11.9× the truth**. Net **−$114.30**, avg banked **−0.102R**.
+  - **FAIL+SCRATCH = 23/24 = 95.8%.** `by_flatten_outcome`: faded 5 (−$54.36) vs drifted-up 5 (+$41.77).
+  - `breakeven_true_win_rate` = **10.7%** — the book needs a 10.7% true win rate to break even at its own payoff and is delivering 4.2%.
+  - ⚠️ **20 of those 24 trades are the RETIRED MA-ribbon entry.** The number is a record of what was replaced, not a verdict on what is running.
+- **Escalation (IMP-062, per regime):**
+  - **`ma-ribbon`: ESCALATED** — 09-14/09-16/09-17, n=7, F+S **100%**, true WR **0.0%**, avg −0.182R. Retired 09-18; the verdict stands as its epitaph.
+  - **`orb`: `insufficient-sessions`** — only 2 sessions with fills (09-21, 09-24), n=4, F+S 75.0%, true WR **25.0%**, net **+$85.79**, avg **+0.759R**. **UNKNOWN, and correctly reported as unknown.** The blended verdict still reads ESCALATED (83.3%) on a window that is 2 MA + 4 ORB — exactly the mixing IMP-062 exists to surface.
+- **ORB book to date (n=4, 6 sessions): WIN 1 · SCRATCH 2 · FAIL 1, stop rate 25.0%, net +$85.79, avg +0.759R, zero full-1R stops, zero faded flattens.** Small, and the best four consecutive trades in this bot's history.
+- **Dominant failure cause today: NOT a stop-exit cause at all — it is throughput.** The bot took 0 trades on a green tape, and that is what this run root-caused.
+
+### Market context
+**A quietly constructive, rotating tape — green at the index, ugly under the surface for anything that ran yesterday.** S&P 500 **+0.51% to 7,743.41**, Nasdaq Composite **+0.50% to 27,068.72**, Dow **+0.93% to 51,828.62** (snapping a three-week losing streak; S&P +0.63% / Nasdaq +1.21% for the week). Oil fell on Strait-of-Hormuz reopening optimism (**WTI −2.33% to $92.41**, Brent −2.14% to $104.32), which halted the yield surge — though the **10-year still closed at 5.18%, its highest since the GFC**.
+Alpaca IEX daily bars: **SPY o 768.70 / h 772.265 / l 766.32 / c 771.35 (+0.53%, range 0.77%)**, **QQQ c 744.44 (+0.45%)**. The dispersion is the story: **MSFT +3.73% (o 498.855 → c 516.155, h 519.39) — the Dow's single biggest contributor**, **AAPL +1.53% closing at its high (341.02, h 341.67)**, **BAC +1.09%**; against **INTC −3.42%** and **META −3.40%**, both handing back Monday's spike, and **TSLA −1.56% on a wide 384.62 → 367.74 reversal**. CRM −1.76%.
+⚠️ **`sonar` returned `PPLX_EMPTY` — the TWENTY-EIGHTH consecutive failure.** Every figure above is WebSearch + Alpaca bars. **Human billing action, outstanding for seven weeks.**
+
+### Root cause of the zero-trade session — measured, not guessed
+`dbo.entry_refusals` for 09-25 holds **58 rows = 16 candidates** after collapsing per-poll re-logs (3.62× inflation, the known ORB-era artefact):
+
+| block | candidates | window (ET) |
+|---|---|---|
+| `orb_after_cutoff` | **14** | 12:10 → 14:25 |
+| `orb_low_volume` | 2 | 10:35 → 10:38 (both AAPL, one bar) |
+| `orb_market_filter` | 0 | — |
+
+- **Exactly ONE candidate appeared inside the 11:30 ORB window all day** — AAPL at 10:35 @336.57 — and it failed rel-vol. **The opening range simply was not broken between 10:40 and 12:10.** On a session whose leaders (MSFT, AAPL) opened near their lows and trended up all afternoon, the 30-minute opening range was taken out *late*, not early.
+- **Of the 14 after-cutoff candidates, 4 were blocked by the cutoff and nothing else** (BAC 12:15 @56.61, MSFT 12:55 @518.67 and 12:56, BAC 14:25 @56.44). Those four are the entire population a later cutoff would have released.
+- **Six-session ORB census (09-18 → 09-25): 116 candidates, 4 fills.** `orb_after_cutoff` is **78/116 = 67.2%** of all candidates and **29/116 = 25.0%** were cutoff-blocked *and nothing else*. `orb_low_volume` 32, `orb_market_filter` 3, `underlying_held` 3. **Throughput is 0.67 fills/session; the 30-trade kill criterion would need ~45 sessions at that rate.**
+- **Not a bug, not a data gap, not a dead watchlist:** 14 active symbols, smoke test green, market filter never fired, one clean process, zero errors. The gate evaluated normally and said no.
+
+### ★★★ The cutoff hypothesis, tested and REFUTED on held-out data — do not re-propose
+The obvious read is that `ORB_CUTOFF_ET` 11:30 is starving the book. Per the IMP-059 standing rule it went through the walk-forward gate **before** touching any live file. **Two independent searches, 12 months of SIP 5-min bars, 251 sessions (in-sample 2025-09-26→2026-05-20, held-out 2026-05-21→2026-09-25), 0.03%/fill slippage, live exit geometry:**
+
+1. **Full 64-cell `RULES['orb']` grid** (k 3/6 × cutoff 11:30/13:00/14:00/15:00 × rel-vol 0/1.3 × buffer 0/0.1 × market-filter on/off): the in-sample winner is **`{k:6, cutoff:'11:30', min_relvol:1.3, buffer_pct:0.0, above_vwap:True, mkt:True}`** — **every single parameter is the live value** — held-out n=69, PF **1.51**, expectancy **+0.103R**, payoff **2.84**, true WR 13.0%. GATE: PASS.
+2. **Cutoff-only sweep, every other parameter pinned to live** (the new IMP-063 tool):
+
+| cutoff | held-out n | net$ | PF | expR | payoff | true WR |
+|---|---|---|---|---|---|---|
+| **11:30 (live)** | 69 | **+219.01** | **1.48** | **+0.103** | **2.77** | **13.0%** |
+| 12:00 | 78 | +172.08 | 1.32 | +0.071 | 2.22 | 11.5% |
+| 13:00 | 99 | +46.58 | 1.06 | +0.017 | 1.70 | 10.1% |
+| 14:00 | 125 | −108.72 | 0.90 | −0.024 | 1.49 | 8.8% |
+| 15:00 | 146 | −222.84 | 0.82 | −0.044 | 1.40 | 7.5% |
+
+- **Expectancy, PF, payoff and true win rate all fall MONOTONICALLY as the cutoff extends — on the held-out window AND in-sample.** Doubling the trade count (69 → 146) turns +$219 into −$223.
+- ★★★ **The marginal cohort is the proof.** The trades a later cutoff *adds* (and it displaces none — the ORB book rarely fills 3 slots): **+30 trades @ −0.181R = −$172** at 13:00, **+56 @ −0.180R = −$328** at 14:00, **+77 @ −0.176R = −$442** at 15:00. **The added expectancy is essentially constant at −0.174…−0.181R across all four relaxations** — post-11:30 opening-range breaks are not a mixed bag containing some good trades, they are a **uniformly negative-edge cohort.**
+- ★★ **The day that motivated the hypothesis refutes it too.** Replaying 09-25 with a 13:00 cutoff: **3 trades, −$10.13, −0.111R** — BAC 12:10 @56.63 → 56.65 (**+0.02R**), WMT 12:10 @107.90 → 107.94 (**+0.02R**), MSFT 12:50 @518.89 → 515.95 (**−0.38R**). The MSFT break that looked like the one that got away was a buy **0.14% below the day's high** that closed 0.6% lower. 09-22 would have gained +$19.73 and 09-24 +$23.06; 09-23 nothing. Over the four unreviewed sessions the relaxation nets roughly +$33 — **inside noise, and against −$442 on the held-out window.**
+- **VERDICT: `CONFIRMED-INCUMBENT`. The 11:30 cutoff is load-bearing, and the 67.2% of candidates it refuses are refused correctly.** This retires the 09-21 entry's open watch item ("worth watching whether the 11:30 cutoff is leaving trend days on the table") with a definitive answer: **it is leaving losses on the table.** Low throughput is where this entry's edge comes from, not a defect to be fixed.
+
+### What worked / what didn't
+- ★★★ **Worked — the gate.** On a day the bot looked idle it was refusing a cohort measured at −0.18R. **Score a zero-trade ORB session as the gate working until evidence says otherwise; today that evidence was sought and came back the other way.**
+- ★★★ **Worked — the discipline.** The tempting, obvious, "it only takes 0.67 trades a session" fix was tested before it was shipped and died on held-out data. That is IMP-059's rule paying for itself.
+- ★★ **Worked — reliability.** One process, NRestarts=0, zero errors, IMP-061 reconciling $0.00 against $0.00, flat into the weekend.
+- ⚠️ **Didn't — the review loop itself.** Three sessions went unreviewed and **two aborted runs left uncommitted, untested, unlogged code in the working tree** (see below). Nothing detected either.
+- ⚠️ **Didn't — throughput remains genuinely low, and the cutoff is now eliminated as the lever.** n=4 after six sessions. The honest position: the ORB entry's held-out evidence (PF 1.48, payoff 2.77) is the best this bot has ever had, its live evidence is four trades, and **the correct action is to let it run**, not to manufacture volume.
+
+### ⚠️ Uncommitted WIP from two aborted runs — left untouched, flagged for the operator
+`git status` carries three modified files this run did **not** author and did **not** stage:
+- **`bot/logbook.py` + `scripts/refusal_audit.py`** (mtime 2026-09-23 01:37) — a `collapse_refusal_ticks` helper that deduplicates per-poll refusal re-logs, self-labelled **IMP-063**. Measured genuine (MA-era days inflate 1.00×, ORB days 3.2–4.3×) and **this review used it**, but it is **uncommitted, untested and unlogged**. It is inert in the trading path (only `scripts/refusal_audit.py` calls it). ⚠️ It also has a real defect: the run key includes `atr`, which drifts in the 4th decimal, so one bar can split into two candidates (AAPL 09-25 10:35:44 / 10:36:49, identical price and VWAP, atr 0.6564 vs 0.6565).
+- **`bot/entry_lab.py`** (mtime 2026-09-25 01:38) — widens the `RULES['orb']` cutoff grid to 14:00/15:00, self-labelled **IMP-064**. Uncommitted, untested, unlogged. Lab-only.
+- **Numbering:** neither is in `memory/improvement-log.md`, so **063 and 064 were unclaimed. This run takes IMP-063.** Whoever lands that WIP must renumber it.
+
+### Lessons & improvement candidates
+1. **★★★ SHIPPED AS IMP-063 — `bot/entry_sweep.py` + `scripts/entry_sweep.py`: sweep ONE live entry parameter and judge it head-to-head against the running gate.** The existing lab searches the whole grid and answers "what is the best ORB?"; it structurally cannot answer "the gate that is live, with one parameter moved — better or worse?", which is the only question a one-change-per-run discipline may act on. It adds the three things the grid search cannot report: the **live config as the baseline** (read from `bot.config`, so it cannot drift), **monotonicity** across the swept values, and the **ADDED/DROPPED marginal cohort**. It is what produced the refutation above, and it makes it reproducible in one command. **No live-path file, no constant, no risk limit touched.**
+2. **★★★ NOT SHIPPED — the fixed 1.5R take-profit. Now measured, and it FAILS the gate on the in-sample leg.** Pre-registered by the 09-21 review as the leading profit-capture candidate. Held-out looks tempting; in-sample kills it: **RR 1.5 → in-sample +0.014R / PF 1.04, held-out +0.103R / PF 1.48**; **RR 2.0 → in-sample −0.007R / PF 0.97**, held-out +0.117R / PF 1.54; **RR 2.5 → in-sample −0.016R / PF 0.93**, held-out +0.118R; **TP removed entirely → identical to RR 2.5/3.0** (the limit leg effectively never fills beyond 2.5R). `entry_lab.gate` refuses all of them on *"in-sample expectancy <= 0"*, the held-out gain is **+0.014R on n=69 (t 1.20 → 1.28 — noise)**, and true WR *falls* 13.0% → 10.1%. ★ **Hand these numbers to the weekly: the 1.5R cap is not the leak it looked like on META 09-21.**
+3. **★★ Detect a missing daily review.** Three sessions — one with a fill — went unreviewed and nothing noticed; the only trace was code left in the working tree. A check that every `daily_summary` row with `num_sells > 0` has a `## YYYY-MM-DD` heading in `memory/daily-review.md` is cheap and would have alarmed on 09-23. **Strong IMP candidate for the next run** (one change per run; tonight's belongs to the entry question the zero-trade session raised).
+4. **★ REFUTED, do not re-propose — extending `ORB_CUTOFF_ET`.** Recorded above with numbers. Added to the same shelf as ORB-vs-alternatives (IMP-059), `TRAIL_DISTANCE_R` tightening (IMP-050 + IMP-059) and the late-entry ban (IMP-048).
+5. **★ Left alone deliberately — `ORB_MIN_REL_VOL` and `ORB_RANGE_BARS`.** The 64-cell grid tested rel-vol {0.0, 1.3} and k {3, 6} and chose the live values on held-out data. **Every live ORB parameter is now the held-out winner of everything the lab has searched.** There is no tuning left to do here; the next real question is structural and belongs to the weekly with more n.
+
+### Notes for pre-market research
+- **★★★ THE 11:30 ORB CUTOFF IS SETTLED — DO NOT TREAT `orb_after_cutoff` REFUSALS AS MISSED OPPORTUNITY.** 67.2% of six sessions' candidates are post-cutoff and they are a **−0.18R cohort on 12 months of held-out data**. A day with 14 after-cutoff refusals and 0 fills is a **correct** day. Full numbers in this entry; reproduce with `python -m scripts.entry_sweep --dim cutoff --values 11:30,12:00,13:00,14:00,15:00`.
+- **★★★ ORB IS n=4 AFTER SIX SESSIONS AND ITS ESCALATION VERDICT IS `insufficient-sessions`.** Net +$85.79, avg +0.759R, zero full-1R stops. **Do not read this as validation and do not read low volume as failure.** At 0.67 fills/session the 30-trade criterion is ~9 weeks out; that is the price of a selective entry.
+- **★★ MSFT IS THE NAME TO WATCH AND IT ALMOST SIGNALLED.** +3.73% (498.855 → 516.155, high 519.39), the Dow's biggest contributor, and it broke its opening range at **12:55 — 85 minutes past the cutoff**. It is a live, correct watchlist name; the bot was right to pass on *that entry*, not wrong to hold the name. Same shape on **AAPL** (+1.53%, closed at its high 341.02, its only candidate at 10:35 failed rel-vol by a hair).
+- **★★ META AND INTC BOTH REVERSED HARD (−3.40% / −3.42%)**, giving back most of Monday's spike; **TSLA reversed 384.62 → 367.74 intraday (−1.56%)**. META's bot record is still net positive (+$62.31 over two fills). **No action — but yesterday's leaders were today's losers, so do not chase the 09-21/09-24 winners into Monday.**
+- **★ WATCHLIST IS 14 ACTIVE SYMBOLS** (AAPL, AMD, AMZN, BAC, CRM, GOOG, INTC, META, MSFT, NFLX, NVDA, TSLA, TSM, **WMT**) per tonight's smoke test — **WMT is back, up from 13 on 09-21.** Not this routine's table; flagged so the change is owned. WMT produced 5 of 09-25's candidates (all post-cutoff) and moved +0.40% on a 1.6% range.
+- **★ REGIME NOTE: index-green, dispersion-high, with the move arriving AFTER noon.** Two of the three sessions in this hole (09-23, 09-25) gave the ORB entry nothing inside its window. **If Monday's leaders again break their opening range after 11:30, that is the expected shape of this strategy, not a malfunction.**
+- **⚠️ `sonar` FAILED FOR THE 28TH TIME (`PPLX_EMPTY`).** Human billing action still outstanding.
+- **⚠️ THREE MODIFIED FILES SIT UNCOMMITTED IN THE WORKING TREE** from the 09-23 and 09-25 aborted runs (`bot/logbook.py`, `scripts/refusal_audit.py`, `bot/entry_lab.py`) plus four `_tmp_*.py` scratch scripts. Left untouched by this run, per the standing rule. **An operator decision: land them properly (with tests and a renumbered IMP) or discard them.**
+- Equity **$7,278.05 (−27.22%)**, flat on the day, third session in a row without a loss. Still below the −25% line; **$290.16 of that gap is the 09-18 test accident.**
+
+---
