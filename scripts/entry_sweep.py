@@ -27,7 +27,9 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 
 from bot import config, db, entry_lab, entry_sweep
-from scripts.entry_lab import DEFAULT_EQUITY, DEFAULT_SLIPPAGE_PCT, _arg, load_or_fetch
+from scripts.entry_lab import (
+    DEFAULT_EQUITY, DEFAULT_SLIPPAGE_PCT, _arg, load_or_fetch, resolve_feed,
+)
 
 #: Values are read off the command line as strings; these dimensions are numeric
 #: in ``rule_orb``'s vocabulary and must be cast or the rule silently compares a
@@ -52,10 +54,12 @@ def main(argv: list[str] | None = None) -> int:
     start = date.fromisoformat(_arg(argv, "--start", str(end - timedelta(days=365))))
     slippage = float(_arg(argv, "--slippage", str(DEFAULT_SLIPPAGE_PCT)))
     equity = float(_arg(argv, "--equity", str(DEFAULT_EQUITY)))
-    feed = _arg(argv, "--feed", "sip")
+    feed, feed_warning = resolve_feed(argv)
     cache = _arg(argv, "--cache", "")
     out = _arg(argv, "--out", "")
     syms_arg = _arg(argv, "--symbols", "")
+    if feed_warning:
+        print(f"⚠️  {feed_warning}")
 
     base = entry_sweep.live_orb_params()
     if dim not in base:

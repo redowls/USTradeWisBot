@@ -56,17 +56,71 @@ def fetch_bars(symbols: list[str], start: date, end: date, feed: str = "sip") ->
     return out
 
 
+#: Marker key written beside the bars so a cache states which feed and window it
+#: holds. Prefixed with a character no ticker uses, so it can never collide with
+#: a symbol in the same dict (and an old, unmarked cache is simply treated as a
+#: miss rather than misread).
+CACHE_META_KEY = "__meta__"
+
+
+def cache_matches(cached: dict, symbols: list[str], start: date, end: date, feed: str) -> bool:
+    """Is ``cached`` usable for this request?
+
+    **Why this guard exists (IMP-065).** The original check was
+    ``set(symbols) <= set(cached)`` — the symbol set and nothing else. A cache
+    built on SIP bars was therefore served, silently, to a run asking for IEX,
+    and a cache built over a 3-week window was served to a run asking for 12
+    months. Both produce a lab verdict about data the caller did not request, and
+    the feed case is not hypothetical: the 2026-09-28 run found that the ``tod``
+    volume gate clears the walk-forward gate on SIP and FAILS it on IEX, so which
+    feed a cache holds decides the verdict.
+
+    Unmarked (pre-IMP-065) caches return False: refetching is cheap, and a
+    verdict from unknown bars is not.
+    """
+    meta = cached.get(CACHE_META_KEY)
+    if not isinstance(meta, dict):
+        return False
+    if str(meta.get("feed")) != str(feed):
+        return False
+    if str(meta.get("start")) != str(start) or str(meta.get("end")) != str(end):
+        return False
+    return set(symbols) <= (set(cached) - {CACHE_META_KEY})
+
+
 def load_or_fetch(symbols: list[str], start: date, end: date, feed: str, cache: str) -> dict[str, pd.DataFrame]:
     if cache and os.path.exists(cache):
         with open(cache, "rb") as fh:
             cached = pickle.load(fh)
-        if set(symbols) <= set(cached):
+        if cache_matches(cached, symbols, start, end, feed):
             return {s: cached[s] for s in symbols}
     bars = fetch_bars(symbols, start, end, feed)
     if cache:
         with open(cache, "wb") as fh:
-            pickle.dump(bars, fh)
+            pickle.dump({**bars, CACHE_META_KEY: {
+                "feed": str(feed), "start": str(start), "end": str(end),
+            }}, fh)
     return bars
+
+
+def resolve_feed(argv: list[str]) -> tuple[str, str | None]:
+    """The feed to measure on, plus a warning when it is not the bot's own feed.
+
+    **Defaults to ``config.DATA_FEED`` — the feed the LIVE bot trades on (IMP-065).**
+    It used to default to ``"sip"``, which meant IMP-059's walk-forward gate and
+    IMP-063's 64-cell grid both judged entry configurations on consolidated bars
+    while the running bot saw IEX. Those are not the same measurement: on SIP the
+    time-of-day volume gate cleared the gate at +0.100R/PF 1.42, and on IEX over
+    the same 251 sessions it FAILED at +0.019R/PF 1.04. A gate that authorises
+    live entry changes has to be computed on the bars the entry will actually see.
+    """
+    feed = _arg(argv, "--feed", str(config.DATA_FEED)).lower()
+    live = str(config.DATA_FEED).lower()
+    if feed != live:
+        return feed, (f"feed={feed} is NOT the live bot's feed ({live}) — this run's "
+                      f"numbers do not describe what the bot would have seen; "
+                      f"do not ship an entry change on them")
+    return feed, None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -75,10 +129,12 @@ def main(argv: list[str] | None = None) -> int:
     start = date.fromisoformat(_arg(argv, "--start", str(end - timedelta(days=200))))
     slippage = float(_arg(argv, "--slippage", str(DEFAULT_SLIPPAGE_PCT)))
     equity = float(_arg(argv, "--equity", str(DEFAULT_EQUITY)))
-    feed = _arg(argv, "--feed", "sip")
+    feed, feed_warning = resolve_feed(argv)
     cache = _arg(argv, "--cache", "")
     out = _arg(argv, "--out", "")
     syms_arg = _arg(argv, "--symbols", "")
+    if feed_warning:
+        print(f"⚠️  {feed_warning}")
     rules_arg = _arg(argv, "--rules", ",".join(entry_lab.RULES))
     run_incumbent = "--incumbent" in argv
     # Exit-geometry sensitivity (lab only — the live config is untouched). Lets the
