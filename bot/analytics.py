@@ -496,11 +496,19 @@ def skip_bearish_gate_verdict(results_by_proxy: dict) -> dict:
 
 
 def load_closed_trades(since: date | None = None) -> list[dict]:
-    """Closed trades joined to their signal (signal_type/confidence/broke_level)."""
+    """Closed trades joined to their signal (signal_type/confidence/broke_level).
+
+    ``final_stop_price``/``stop_raises`` are selected because
+    ``doctrine.stop_was_armed`` needs the RECORDED stop to tell a ratchet that
+    armed to the fill from an IMP-050/051 floor lift (IMP-067). Leaving them out
+    does not fail — the audit degrades to "unknown" — which is precisely how
+    IMP-067 would have shipped inert, the way STOP_RATCHET_MIN_PCT silently made
+    IMP-050 inert until IMP-051 found it.
+    """
     sql = (
         "SELECT t.trade_id, t.symbol, t.realized_pl, t.realized_pl_pct, "
         "t.exit_reason, t.entry_time, t.exit_time, t.entry_price, "
-        "t.stop_price, t.exit_price, "
+        "t.stop_price, t.exit_price, t.final_stop_price, t.stop_raises, "
         "s.signal_type, s.confidence, s.broke_level, s.momentum_score "
         "FROM trades t LEFT JOIN signals s ON s.trade_id = t.trade_id "
         "WHERE t.status = 'CLOSED' AND t.realized_pl IS NOT NULL"

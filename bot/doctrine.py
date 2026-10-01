@@ -64,6 +64,12 @@ FLATTEN_MIN_R = -0.25
 #: armed and gave the move back. -1.0 is a clean stop fill; the 0.25R of slack
 #: absorbs stop slippage (2026-08-28 TSM #307 filled at -1.01R).
 FULL_STOP_MAX_R = -0.75
+#: How far below the fill a recorded stop may sit and still count as "armed to
+#: break-even". ``exits.compute_trailed_stop`` returns ``round(candidate, 2)``,
+#: so a stop armed to the fill is persisted up to half a cent below it —
+#: 2026-09-30 AMZN #359 armed at 250.27 against a 250.2722 fill. Without this
+#: slack that genuinely-armed stop would read as never armed (IMP-067).
+ARMED_STOP_EPSILON = 0.005
 
 
 def profit_r(row: dict) -> float | None:
@@ -113,16 +119,67 @@ def classify(row: dict) -> str:
     return FAIL if r < FLATTEN_MIN_R else SCRATCH
 
 
+def stop_was_armed(row: dict) -> bool | None:
+    """Did the stop that got hit actually reach the fill? True / False / None.
+
+    Reads the RECORDED mechanism (``trades.final_stop_price`` vs the real fill)
+    instead of inferring it from the outcome, which is all ``fail_kind`` can do.
+    None means the row carries no recorded final stop and the question is
+    genuinely unanswerable — never guessed.
+
+    ★ Why this exists (IMP-067). ``fail_kind`` splits FAIL on ``profit_R``
+    alone, so every STOP loss inside ``(FULL_STOP_MAX_R, FAIL_MAX_R]`` is named
+    'break-even' — a label whose whole meaning is "IMP-013/040 armed the stop
+    and protected the capital". Since IMP-050/051 went live (2026-09-08) that
+    inference is no longer safe: the **fill-anchored floor** raises the stop on
+    an *adverse fill alone*, with the trade never going green, which writes a
+    ``final_stop_price`` above the plan stop while leaving it far below entry.
+    2026-09-30 AAPL #358 is the first such trade to be mislabelled — one raise,
+    a +0.36 floor lift (0.066R, exactly its adverse slippage), MFE +0.176R so
+    the 0.5R break-even stage never came close, stopped for -$23.42 at
+    -0.719R — and it reported as 'break-even', crediting a ratchet stage that
+    never ran. Measured over the book: of 9 raised-but-never-armed trades (all
+    of them post-09-08 floor fires, net -$168.96) 3 happened to land in
+    'full-1R' and this one in 'break-even'.
+
+    ``None`` is returned, not False, for the 272 closed rows with a NULL
+    ``final_stop_price``: those all record ``stop_raises = 0``, but IMP-043
+    recovered raises from a ROTATING log, so a raise whose line had already
+    rotated away is indistinguishable from no raise at all — 2026-07-10 TSLA
+    #139 is the known case (IMP-053 documents its stop as raised; the column
+    says nothing). Reporting those as unarmed would be the "unknown dressed up
+    as a clean bill of health" failure IMP-062 fixed.
+
+    Measurement only: this function does not change any WIN/SCRATCH/FAIL
+    verdict, any ``fail_kind``, or any exit behaviour. Pure — no DB, no network.
+    """
+    final = row.get("final_stop_price")
+    entry = row.get("entry_price")
+    if final is None or entry is None:
+        return None
+    entry_f = _f(entry)
+    if entry_f <= 0:
+        return None
+    return _f(final) >= entry_f - ARMED_STOP_EPSILON
+
+
 def fail_kind(row: dict) -> str | None:
     """Sub-classify a FAIL: 'full-1R', 'break-even', or 'faded'. None if not FAIL.
 
     'full-1R'    — stopped at (or through) the original plan stop: the real
                    false-breakout loss.
-    'break-even' — the stop armed and the trade came back to it: IMP-013/040
-                   protected the capital, the thesis still did not pay.
+    'break-even' — a stop above the plan stop took the trade back out: the
+                   capital was partly protected, the thesis still did not pay.
     'faded'      — no stop was touched; the trade drifted below -0.25R and the
                    15:55 flatten closed it. The open-fade leak ``analytics.
                    by_flatten_outcome`` was built for (2026-08-31 COST #312).
+
+    ⚠️ The split is a ratio proxy and deliberately stays one (IMP-053 chose the
+    -0.75R edge on real trades; re-cutting these labels is a taxonomy decision
+    for the weekly, not for a nightly run). It therefore CANNOT distinguish a
+    stop the ratchet armed to break-even from one the IMP-050/051 fill-anchored
+    floor merely lifted by the adverse slippage — ask ``stop_was_armed`` for
+    that, and read 'break-even' as "a raised stop", not as "capital protected".
     """
     if classify(row) != FAIL:
         return None
@@ -142,6 +199,12 @@ def summarize(rows: list[dict]) -> dict:
     being the ``realized_pl > 0`` count the doctrine exists to distrust). When
     the two diverge, the true one governs the verdict. Empty input returns a
     zeroed dict rather than raising, so a no-trade session still reports.
+
+    ``break_even_armed`` (IMP-067) audits the 'break-even' count against the
+    recorded stop: how many of those stops ``stop_was_armed`` confirms reached
+    the fill, how many never did (an IMP-050/051 floor lift misread as armed
+    protection), and how many have no recorded final stop to check. It is
+    additive — every other field, and every verdict, is unchanged by it.
     """
     rows = [r for r in rows if r.get("realized_pl") is not None]
     n = len(rows)
@@ -149,15 +212,21 @@ def summarize(rows: list[dict]) -> dict:
         return {"trades": 0, "stops": 0, "stop_rate": 0.0,
                 "win": 0, "scratch": 0, "fail": 0,
                 "fail_kinds": {"full-1R": 0, "break-even": 0, "faded": 0},
+                "break_even_armed": {"armed": 0, "unarmed": 0, "unknown": 0},
                 "true_win_rate": 0.0, "headline_win_rate": 0.0,
                 "fail_scratch_share": 0.0, "total_pl": 0.0, "avg_r": None}
 
     labels = [classify(r) for r in rows]
     kinds = {"full-1R": 0, "break-even": 0, "faded": 0}
+    armed = {"armed": 0, "unarmed": 0, "unknown": 0}
     for r in rows:
         kind = fail_kind(r)
         if kind is not None:
             kinds[kind] += 1
+        if kind == "break-even":
+            was = stop_was_armed(r)
+            armed["unknown" if was is None else
+                  ("armed" if was else "unarmed")] += 1
     stops = sum(1 for r in rows if is_stop_exit(r))
     win = labels.count(WIN)
     scratch = labels.count(SCRATCH)
@@ -173,6 +242,7 @@ def summarize(rows: list[dict]) -> dict:
         "scratch": scratch,
         "fail": fail,
         "fail_kinds": kinds,
+        "break_even_armed": armed,
         "true_win_rate": round(100.0 * win / n, 1),
         "headline_win_rate": round(100.0 * headline / n, 1),
         "fail_scratch_share": round(100.0 * (fail + scratch) / n, 1),

@@ -35,6 +35,19 @@ def _print_doctrine(rows) -> None:
     print(f"  WIN / SCRATCH / FAIL : {d['win']} / {d['scratch']} / {d['fail']}"
           f"   (FAIL: full-1R {k['full-1R']} · break-even {k['break-even']}"
           f" · faded {k['faded']})")
+    # IMP-067: 'break-even' is a ratio proxy and cannot tell a stop the ratchet
+    # armed to the fill from one the IMP-050/051 floor lifted by the adverse
+    # slippage alone. Print the recorded-mechanism audit so the label is never
+    # read as "capital protected" without the evidence for it.
+    a = d["break_even_armed"]
+    if k["break-even"]:
+        parts = [f"{a['armed']} truly armed to the fill"]
+        if a["unarmed"]:
+            parts.append(f"⚠️  {a['unarmed']} never armed (IMP-050 floor lift "
+                         f"only — a false breakout, not protected capital)")
+        if a["unknown"]:
+            parts.append(f"{a['unknown']} no recorded final stop")
+        print(f"    of those break-even stops: {' · '.join(parts)}")
     print(f"  True win rate : {d['true_win_rate']}%   (headline "
           f"{d['headline_win_rate']}%)")
     bar = doctrine.breakeven_true_win_rate(rows)
