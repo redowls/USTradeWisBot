@@ -224,6 +224,115 @@ def by_stop_protection(rows: list[dict]) -> dict:
     return out
 
 
+#: Prefix `Engine.consider_entries` writes into ``entry_refusals.detail`` for an
+#: ORB candidate a quality condition turned away (IMP-059). The suffix is the
+#: FULL block list joined with "+", which is why `detail` — not `reason` — is the
+#: only honest source for attribution (see `refusal_blocks`).
+REFUSAL_BLOCK_PREFIX = "orb_blocked_"
+
+
+def refusal_blocks(row: dict) -> tuple[str, ...] | None:
+    """Every gate condition that refused one ORB candidate, not just the first.
+
+    **The defect this exists for (IMP-068).** ``entry_refusals.reason`` is written
+    as ``f"orb_{orb['blocks'][0]}"`` — the FIRST block only — while ``detail``
+    carries the whole set. Grouping the ledger by ``reason`` is the obvious thing
+    to do and it silently reads every multi-block refusal as single-cause. Over
+    the 10 live ORB sessions (2026-09-18 … 10-01, 731 ORB-blocked rows)
+    **68.8% of rows carry more than one block**, so the obvious grouping
+    mis-attributes more than two thirds of the ledger:
+
+    * ``after_cutoff`` — by-reason **502**, exclusive **141** (3.56x overstated).
+    * ``low_volume`` — by-reason **207**, but it is *involved* in **515**
+      (2.5x UNDER-stated, because it is rarely the first block).
+    * ``market_filter`` — by-reason **22**, involved in **340** (15.5x under).
+    * ``below_vwap`` — by-reason **0**, involved in **10**: never visible at all.
+
+    Why the distinction decides money rather than tidiness: **moving a gate can
+    only ever recruit that gate's EXCLUSIVE population.** A candidate refused
+    ``after_cutoff+low_volume`` is still refused once the clock moves, because the
+    volume floor — which IMP-066 vindicated on IEX — rejects it anyway. On
+    2026-10-01 ``reason`` says the clock turned away 107 of 131 rows (82%); only
+    **23 (18%), across 3 symbols**, were clock-only.
+
+    Returns the ordered block tuple, or None when `detail` is absent or is not an
+    ORB block record (``underlying_held``, VWAP refusals and the rest pass
+    through as None rather than being mis-parsed into a block). Pure — no DB.
+    """
+    detail = row.get("detail")
+    if not isinstance(detail, str) or not detail.startswith(REFUSAL_BLOCK_PREFIX):
+        return None
+    blocks = tuple(b for b in detail[len(REFUSAL_BLOCK_PREFIX):].split("+") if b)
+    return blocks or None
+
+
+def by_refusal_block(rows: list[dict]) -> dict:
+    """Attribute ORB refusals per gate condition: by-reason vs ANY vs EXCLUSIVE.
+
+    The companion to `refusal_blocks`, and the number a reader actually wants:
+    ``exclusive`` is "this candidate would have been bought if and only if this
+    one condition were lifted", which is the only population a gate change can
+    recruit. ``any`` is "this condition was involved", and
+    ``reason_attributed`` reproduces what grouping by ``entry_refusals.reason``
+    reports — kept side by side on purpose so the distortion is visible in the
+    report instead of having to be remembered.
+
+    Measurement-only, in the refuted-candidate-made-visible line of
+    IMP-004/007/014/015/016 and the evidence-integrity line of IMP-065/066/067:
+    it changes no entry, no exit, no sizing and no risk limit. It exists because
+    the open no-demonstrated-edge escalation on the ORB entry will be settled on
+    these counts, and one of them was being read 3.6x too large.
+
+    Returns ``{"rows", "orb_rows", "multi_block", "multi_block_pct", "blocks"}``
+    where ``blocks`` maps each block name to ``{"reason_attributed", "any",
+    "exclusive", "symbols_any", "symbols_exclusive", "reason_over_exclusive"}``
+    (``reason_over_exclusive`` is None when nothing is exclusive — an infinite
+    overstatement is reported as unknown, never as a number). Blocks are ordered
+    by descending ``any``. Pure — no DB, no network.
+    """
+    parsed = [(r, refusal_blocks(r)) for r in rows]
+    orb = [(r, b) for r, b in parsed if b]
+    out = {"rows": len(rows), "orb_rows": len(orb), "multi_block": 0,
+           "multi_block_pct": 0.0, "blocks": {}}
+    if not orb:
+        return out
+
+    multi = sum(1 for _, b in orb if len(b) > 1)
+    out["multi_block"] = multi
+    out["multi_block_pct"] = round(100.0 * multi / len(orb), 1)
+
+    any_n: Counter = Counter()
+    exc_n: Counter = Counter()
+    reason_n: Counter = Counter()
+    any_syms: dict[str, set] = {}
+    exc_syms: dict[str, set] = {}
+    for r, blocks in orb:
+        sym = r.get("symbol")
+        for b in blocks:
+            any_n[b] += 1
+            any_syms.setdefault(b, set()).add(sym)
+        if len(blocks) == 1:
+            exc_n[blocks[0]] += 1
+            exc_syms.setdefault(blocks[0], set()).add(sym)
+        # What grouping by `reason` would have credited this row to. Derived from
+        # blocks[0] rather than read from r["reason"] so the comparison holds for
+        # rows the engine truncated (`reason` is capped at 24 chars) and for the
+        # synthetic rows the tests pin this behaviour with.
+        reason_n[blocks[0]] += 1
+
+    for b in sorted(any_n, key=lambda x: (-any_n[x], x)):
+        ex = exc_n.get(b, 0)
+        out["blocks"][b] = {
+            "reason_attributed": reason_n.get(b, 0),
+            "any": any_n[b],
+            "exclusive": ex,
+            "symbols_any": len(any_syms.get(b, ())),
+            "symbols_exclusive": len(exc_syms.get(b, ())),
+            "reason_over_exclusive": round(reason_n.get(b, 0) / ex, 2) if ex else None,
+        }
+    return out
+
+
 def by_flatten_outcome(rows: list[dict]) -> dict:
     """Split EOD_FLATTEN-exit P&L into faded (net loss) vs drifted-up (net gain).
 
@@ -528,6 +637,24 @@ def load_daily_summaries(since: date | None = None) -> list[dict]:
         sql += " WHERE trade_date >= ?"
         params.append(since)
     sql += " ORDER BY trade_date"
+    return db.query(sql, params)
+
+
+def load_refusals(since: date | None = None) -> list[dict]:
+    """Refused entry candidates (IMP-056's ledger), for `by_refusal_block`.
+
+    ``detail`` is selected because it is the only column carrying the full block
+    set; ``reason`` comes along so a caller can confirm the by-reason view it is
+    being warned about. The ledger starts 2026-09-16 — earlier sessions left no
+    rows and are not recoverable.
+    """
+    sql = ("SELECT refusal_id, symbol, ts, reason, detail, confidence, "
+           "signal_type, price, session_vwap, atr FROM entry_refusals")
+    params: list = []
+    if since is not None:
+        sql += " WHERE CAST(ts AS DATE) >= ?"
+        params.append(since)
+    sql += " ORDER BY ts, symbol"
     return db.query(sql, params)
 
 

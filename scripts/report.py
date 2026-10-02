@@ -89,6 +89,41 @@ def _print_doctrine(rows) -> None:
                   f"   {verdict}")
 
 
+def _print_refusal_blocks(since) -> None:
+    """Why the bot refused the candidates it generated — attributed honestly.
+
+    IMP-068. The ``exclusive`` column is the only one a gate change can act on:
+    lifting a condition recruits the candidates it alone refused, never the ones
+    a second condition was also rejecting. ``by-reason`` reproduces what grouping
+    the ledger by ``entry_refusals.reason`` reports, so the gap between the two
+    columns is readable instead of having to be remembered.
+
+    Degrades to silence on any DB error: the report's job is the closed-trade
+    book, and a missing/empty refusal ledger (nothing before 2026-09-16) must
+    never take the whole report down with it.
+    """
+    try:
+        refusals = analytics.load_refusals(since)
+    except Exception as exc:  # noqa: BLE001 - never fail the report over a side table
+        print(f"\n(refusal ledger unavailable: {type(exc).__name__})")
+        return
+    rb = analytics.by_refusal_block(refusals)
+    if not rb["blocks"]:
+        return
+    print("\nBy refusal block (ORB candidates the gate turned away — IMP-068):")
+    print("  EXCLUSIVE = this condition was the ONLY thing refusing the candidate, i.e. the")
+    print("  population lifting it could actually recruit. ANY = it was involved. by-reason =")
+    print("  what grouping on entry_refusals.reason (blocks[0] only) claims. Rows are polls,")
+    print("  not candidates — one break re-logs each tick while it stays refused (IMP-063).")
+    print(f"  {'block':16} {'by-reason':>9} {'ANY':>6} {'EXCL':>6} {'over':>6} {'syms(excl)':>10}")
+    for block, s in rb["blocks"].items():
+        over = "—" if s["reason_over_exclusive"] is None else f"{s['reason_over_exclusive']:.2f}x"
+        print(f"  {block:16} {s['reason_attributed']:9d} {s['any']:6d} "
+              f"{s['exclusive']:6d} {over:>6} {s['symbols_exclusive']:10d}")
+    print(f"  {rb['multi_block']}/{rb['orb_rows']} rows ({rb['multi_block_pct']}%) carry more "
+          f"than one block — that is the share 'by-reason' mis-attributes.")
+
+
 def _print_report(since=None) -> int:
     label = "all time" if since is None else f"since {since}"
     print("=" * 72)
@@ -189,6 +224,8 @@ def _print_report(since=None) -> int:
                 continue
             print(f"  {band:9} {s['trades']:6d} {s['win_rate']:6.1f} "
                   f"{s['total_pl']:10.2f} {s['expectancy']:8.2f} {_pf(s):>6}")
+
+    _print_refusal_blocks(since)
 
     summaries = analytics.load_daily_summaries(since)
     if summaries:
