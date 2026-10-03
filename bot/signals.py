@@ -191,6 +191,30 @@ def _orb_cutoff() -> time:
     return time(hh, mm)
 
 
+def entries_halted() -> bool:
+    """True when ENTRY_MODE names no live entry rule (IMP-070).
+
+    ``ENTRY_MODE = "none"`` is the state this bot is in when its pre-registered
+    kill criterion has fired and no candidate rule has a recorded walk-forward
+    gate PASS. It is a HALT ON NEW ENTRIES ONLY: every candidate is still
+    computed and still written to dbo.entry_refusals (so the evidence stream
+    that would validate a replacement keeps accruing), and every exit path —
+    the bracket, the IMP-013 break-even/1R ratchet, the 15:55 flatten — is
+    untouched, because an open position must still be managed and closed.
+    """
+    return str(config.ENTRY_MODE).lower() == "none"
+
+
+def uses_orb_path() -> bool:
+    """True when the ORB features should be computed for the refusal ledger.
+
+    Both ``"orb"`` (live rule) and ``"none"`` (halted, IMP-070) take this path:
+    the difference is that under a halt the features are recorded and then
+    refused, never acted on.
+    """
+    return str(config.ENTRY_MODE).lower() in ("orb", "none")
+
+
 def orb_features(df: pd.DataFrame) -> dict:
     """Opening-range-breakout state of the LAST bar of ``df`` (a closed bar).
 
@@ -333,7 +357,7 @@ def evaluate(symbol: str, df: pd.DataFrame | None = None, n_bars: int = 120) -> 
     session_vwap = round(vwap_last, 4) if vwap_last and vwap_last > 0 else None
     signal_type = _classify(bo_score, ma, value)
     orb: dict | None = None
-    if config.ENTRY_MODE == "orb":
+    if uses_orb_path():
         # IMP-059: the ORB rule replaces the MA/breakout classification as the
         # entry decision; the component scores are still computed and persisted
         # so every fill stays comparable with the pre-IMP-059 book.
@@ -341,6 +365,14 @@ def evaluate(symbol: str, df: pd.DataFrame | None = None, n_bars: int = 120) -> 
         signal_type = "ORB" if orb["signal"] else None
         if orb["candidate"] and orb["or_high"]:
             broke_level = orb["or_high"]
+        if entries_halted():
+            # IMP-070: the kill criterion fired. Record the candidate, refuse it.
+            # This is the LAST word on signal_type — no mode may re-enable an
+            # entry while ENTRY_MODE is "none".
+            if orb["candidate"]:
+                orb["blocks"].append("entry_halted")
+            orb["signal"] = False
+            signal_type = None
     return {
         "symbol": symbol,
         "breakout_score": round(bo_score, 4),
@@ -368,7 +400,7 @@ def evaluate_watchlist(n_bars: int = 120) -> list[dict]:
     but is not a signal.
     """
     bars = data.get_watchlist_bars(n_bars=n_bars)
-    if config.ENTRY_MODE != "orb":
+    if not uses_orb_path():
         return [evaluate(sym, df=df, n_bars=n_bars) for sym, df in bars.items()]
     now = datetime.now(config.MARKET_TZ)
     mkt_ok, mkt_detail = orb_market_ok(bars, now)

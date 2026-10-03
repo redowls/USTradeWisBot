@@ -358,7 +358,33 @@ _assert_weights()
 # under every alternative (IMP-059). This mode exists on the imp059-orb-entry-mode
 # branch for a future rule that DOES clear `scripts.entry_lab`; it must not be
 # switched on without a fresh gate PASS recorded in memory/improvement-log.md.
-ENTRY_MODE = "orb"           # operator decision 2026-09-18 — see IMP-059 addendum
+# "none" = NO live entry rule. New entries are halted; candidates are still
+#         computed and written to dbo.entry_refusals, and every exit path (the
+#         bracket, the IMP-013 break-even/1R ratchet, the 15:55 flatten) stays
+#         fully active so an open position is still managed. See signals.
+#         entries_halted(). This is NOT a risk-limit change — it only removes
+#         risk — and it is reversed by one constant once a rule clears the gate.
+#
+# ★ 2026-10-03 (IMP-070, weekly): ENTRY_MODE "orb" -> "none". The pre-registered
+# kill criterion FIRED. escalation_by_regime['orb'] on a PURE 3-session window
+# (09-24 / 09-30 / 10-02) reads escalated, F+S 100%, true win rate 0%, n=7,
+# avg -0.289R; F+S has been >= 60% for two consecutive weeks (75% -> 100%). Four
+# independent instruments now agree the ORB entry has no demonstrated edge:
+#   * IMP-059's own walk-forward lab: held-out PF 0.83 — it FAILED the >=1.2 gate
+#     and was never cleared to go live (see the DORMANT note above);
+#   * IMP-066's 251-session walk-forward on the live config: -0.0084R, PF 0.97;
+#   * IMP-069's exit-independent excursion statistic: edge ratio 1.012 on the
+#     live book and 0.669 (ANTI-predictive) on the wider window, with the 1.5R
+#     target reached 0/21 times against the 40% the bracket needs;
+#   * the live ledger: n=10, -$8.29, zero WINs in the last 6 trades.
+# IMP-069 also attributes 99.6% of the loss to no-follow-through (the ENTRY), so
+# no exit tweak can rescue it. Per the stop-exit doctrine's escalation clause the
+# only moves left are structural or stopping; "ma" is not a refuge (six+ weeks of
+# "no demonstrated edge", 83.5% of fills win-infeasible from the fill, IMP-054),
+# so swapping to it would be thrash. Do NOT set this back to "orb" or "ma".
+# Re-enable only with a fresh `scripts.entry_lab` gate PASS (held-out expectancy
+# > 0, PF >= 1.2, n >= 30) recorded in memory/improvement-log.md, per IMP-059.
+ENTRY_MODE = "none"          # IMP-070 (2026-10-03, weekly) — kill criterion fired
 ORB_RANGE_BARS = 6              # 30 minutes of 5-min bars
 ORB_CUTOFF_ET = "11:30"         # a break that comes later is not an opening-range break
 ORB_MIN_REL_VOL = 1.3           # trigger-bar volume vs the 20-bar average (indicators.relative_volume)

@@ -402,7 +402,7 @@ class Engine:
             # trigger close to be ABOVE the session VWAP, and a range break is by
             # nature stretched above it; the +0.25% cap was measured on MA fills
             # (IMP-022) and was NOT part of the configuration that passed the gate.
-            if config.ENTRY_MODE != "orb" and vwap_dist is not None and vwap_dist > config.VWAP_MAX_DIST_PCT:
+            if not signals.uses_orb_path() and vwap_dist is not None and vwap_dist > config.VWAP_MAX_DIST_PCT:
                 _refuse(ev, conf, "above_vwap", f"above_vwap_+{vwap_dist:.2f}%")
                 self._log(f"ENTRY SKIPPED {ev['symbol']}: entry {ev['close']:.2f} is "
                           f"+{vwap_dist:.2f}% above session VWAP "
@@ -678,6 +678,13 @@ class Engine:
     def run(self) -> None:
         self._install_signal_handlers()
         self._log(f"USTradeWisBot starting (dry_run={self.dry_run})")
+        if signals.entries_halted():
+            # IMP-070: loud on every start so a halted bot is never mistaken for
+            # a working one that simply found no setups.
+            self._log("ENTRY MODE=none — NEW ENTRIES ARE HALTED (IMP-070: the "
+                      "pre-registered kill criterion fired on the ORB signal). "
+                      "Candidates are still recorded to dbo.entry_refusals; exits, "
+                      "the ratchet and the 15:55 flatten remain fully active.")
         self._log(f"entry mode={config.ENTRY_MODE} (ORB range={config.ORB_RANGE_BARS} bars, "
                   f"cutoff {config.ORB_CUTOFF_ET} ET, relvol>={config.ORB_MIN_REL_VOL}, "
                   f"market filter={config.ORB_MARKET_FILTER_SYMBOL or 'off'}); "
