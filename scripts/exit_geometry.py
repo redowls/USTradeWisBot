@@ -29,7 +29,8 @@ import sys
 
 from bot import config, db
 from bot.data import get_bars_for_symbols
-from bot.exit_sim import ExitGeometry, giveback_rows, replay_geometry
+from bot.exit_sim import (ExitGeometry, excursion_summary, giveback_rows,
+                          replay_geometry)
 
 POST_GATE_START = "2026-07-25"   # IMP-021 + IMP-022 shipped after this close
 BARS_PER_SYMBOL = 6000           # ~390 RTH 1-min bars/day -> ~15 sessions
@@ -177,6 +178,44 @@ def _print_run(result: dict, budget: float | None,
           f"{verdict}{support}")
 
 
+def _print_excursions(summary: dict) -> None:
+    """The entry-quality block (IMP-069) — read it BEFORE the what-if grid below.
+
+    Every candidate geometry in that grid competes only for the 'gave-back'
+    sub-total. When that is a rounding error next to 'no-follow-through', the
+    grid is optimising the wrong surface however large its deltas look, and the
+    honest next move is the entry lab (IMP-059) or a retire-or-rebuild call.
+    """
+    if not summary:
+        return
+    print("\nEntry quality — excursions, measured independently of any exit "
+          "(IMP-069):")
+    ratio = summary["edge_ratio"]
+    print(f"  mean MFE {summary['mean_mfe_r']:+.3f}R vs mean |MAE| "
+          f"{summary['mean_mae_r']:.3f}R   edge ratio "
+          f"{ratio if ratio is not None else float('nan'):.3f} (floor 1.000)")
+    print(f"  reached the {summary['target_r']:g}R target: "
+          f"{summary['target_reached']}/{summary['trades']} "
+          f"({summary['target_reach_pct']:.1f}%) vs "
+          f"{summary['target_reach_needed_pct']:.0f}% a "
+          f"{summary['target_r']:g}R bracket needs to break even")
+    print(f"  -> {summary['verdict']}")
+    print(f"  Leak attribution (exhaustive, sums to the book; trigger "
+          f"{summary['breakeven_trigger_r']:g}R):")
+    for label in ("banked", "no-follow-through", "gave-back"):
+        row = summary["attribution"][label]
+        owner = {"banked": "", "no-follow-through": "  <- owned by the ENTRY",
+                 "gave-back": "  <- owned by the EXIT"}[label]
+        print(f"    {label:18s} n={row['trades']:>3d}  ${row['total_pl']:>9.2f}"
+              f"  (peak ${row['peak_mfe_usd']:.2f}){owner}")
+    entry_owned, exit_owned = summary["entry_owned_pl"], summary["exit_owned_pl"]
+    worse = abs(entry_owned) - abs(exit_owned)
+    print(f"    The exit geometry owns ${abs(exit_owned):.2f} of a "
+          f"${abs(entry_owned) + abs(exit_owned):.2f} loss; the entry owns "
+          f"${abs(entry_owned):.2f} ({'entry' if worse > 0 else 'exit'} is the "
+          "bigger surface).")
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--since", default=POST_GATE_START,
@@ -241,6 +280,8 @@ def main(argv: list[str]) -> int:
               f"  capture {banked / peak * 100.0:.1f}%")
     else:
         print("  (none)")
+
+    _print_excursions(excursion_summary(baseline["rows"]))
 
     prior = ExitGeometry(live.breakeven_trigger_r, PRE_IMP029_TRAIL_R,
                          PRE_IMP029_TRAIL_R, live.ratchet_min_pct)

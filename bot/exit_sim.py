@@ -295,3 +295,135 @@ def giveback_rows(rows: list[dict], min_peak_r: float = 0.5,
     """
     return [r for r in rows
             if r["mfe_r"] >= min_peak_r and r["actual_pl"] <= max_realized]
+
+
+# --- Entry quality, measured independently of the exit (IMP-069) -------------
+#
+# Every number this bot reports — net P&L, win rate, stop rate, profit factor,
+# expectancy, and every doctrine WIN/SCRATCH/FAIL bucket — is a function of the
+# signal AND the exit together. That is why the improvement log has oscillated
+# between "fix the exit" (IMP-013/028/029/040) and "fix the entry"
+# (IMP-017/021/022/059/065/066) for 68 runs without ever settling which one is
+# actually broken: no statistic in the repo could separate them.
+#
+# MFE and MAE can. Measured from the fill over a window that runs to the 15:55
+# flatten, they say which way the stock went AFTER the signal fired and how far,
+# and they do not depend on where any stop was placed. Two tests follow from
+# that, and neither has a tunable threshold:
+#
+#   1. DIRECTIONAL INFORMATION. ``edge_ratio = mean(MFE_R) / mean(|MAE_R|)``.
+#      A signal that predicts direction travels further for you than against
+#      you, so the only non-arbitrary floor is 1.0. Below it the entry is
+#      anti-predictive and no exit geometry can rescue it.
+#   2. TARGET REACHABILITY. The share of trades whose MFE ever prints
+#      ``RR_RATIO`` R, against the ``1/(1+RR_RATIO)`` hit rate a 1R-stop /
+#      RR_RATIO-target bracket needs to break even. If the target is never
+#      touched the TAKE_PROFIT leg is decorative and all upside has to come from
+#      the trail and the flatten capturing sub-target excursions.
+#
+# Then the leak is ATTRIBUTED by partitioning realized P&L three ways. The split
+# is exhaustive and mutually exclusive, so the three sub-totals sum to the book:
+#
+#   banked            realized > 0 — the trade paid.
+#   no-follow-through realized <= 0 and MFE never reached the break-even
+#                     trigger. The trade never showed enough profit for ANY
+#                     ratchet to act on, so no exit change could have helped it.
+#                     This loss belongs to the ENTRY.
+#   gave-back         realized <= 0 and MFE did reach the trigger. The thesis
+#                     paid and the geometry handed it back. This loss belongs to
+#                     the EXIT.
+#
+# Measured on the live ORB book (10 trades, 2026-09-21..2026-10-02): edge_ratio
+# **1.012**, target reached **0/10** against the 40% a 1.5R bracket needs, and
+# the attribution is no-follow-through **-$93.72** vs gave-back **-$0.36**. On
+# the wider window bars still cover (21 trades back to 2026-09-10) it is worse:
+# edge_ratio **0.669**, target 0/21, no-follow-through **-$212.70** vs gave-back
+# **-$1.50**. The exit geometry owns under 1% of the leak in both windows, which
+# is the measurement the 2026-10-02 daily review used to stop proposing exit
+# tweaks against a no-demonstrated-edge entry.
+#
+# Caveat inherited from the module docstring: IEX bars under-report true highs
+# and lows, so BOTH excursions are biased small. The ratio is a quotient of two
+# quantities biased the same direction, which is why it is reported rather than
+# the raw magnitudes alone.
+
+EXCURSION_CLASSES = ("banked", "no-follow-through", "gave-back")
+
+
+def classify_excursion(row: dict, breakeven_trigger_r: float) -> str:
+    """Attribute one replayed trade to ``banked`` / ``no-follow-through`` / ``gave-back``.
+
+    ``row`` is a ``replay_geometry`` per-trade row (needs ``actual_pl``, ``mfe_r``).
+    The three classes partition the book exactly — see the block comment above.
+    """
+    if float(row["actual_pl"]) > 0:
+        return "banked"
+    if float(row["mfe_r"]) < breakeven_trigger_r:
+        return "no-follow-through"
+    return "gave-back"
+
+
+def excursion_summary(rows: list[dict],
+                      breakeven_trigger_r: float | None = None,
+                      target_r: float | None = None) -> dict:
+    """Exit-independent entry-quality scorecard over ``replay_geometry`` rows.
+
+    Returns ``{}`` for an empty book. ``breakeven_trigger_r`` and ``target_r``
+    default to the live config so the verdict describes the geometry actually
+    running. Pure — no DB, no network, no mutation of ``rows``.
+    """
+    if not rows:
+        return {}
+    trigger = (config.BREAKEVEN_TRIGGER_R if breakeven_trigger_r is None
+               else float(breakeven_trigger_r))
+    target = config.RR_RATIO if target_r is None else float(target_r)
+
+    n = len(rows)
+    mfes = [float(r["mfe_r"]) for r in rows]
+    maes = [abs(float(r["mae_r"])) for r in rows]
+    mean_mfe = sum(mfes) / n
+    mean_mae = sum(maes) / n
+    # mean_mae is a mean of absolute values, so it is 0 only when NO trade ever
+    # traded below its fill. Leave the ratio undefined there rather than inventing
+    # an infinity the caller would have to special-case anyway.
+    edge_ratio = round(mean_mfe / mean_mae, 3) if mean_mae > 0 else None
+
+    reached = sum(1 for m in mfes if m >= target)
+    needed = 100.0 / (1.0 + target) if target > 0 else None
+
+    attribution: dict[str, dict] = {}
+    for label in EXCURSION_CLASSES:
+        sub = [r for r in rows if classify_excursion(r, trigger) == label]
+        attribution[label] = {
+            "trades": len(sub),
+            "total_pl": _round2(sum(float(r["actual_pl"]) for r in sub)),
+            "peak_mfe_usd": _round2(sum(float(r["mfe_usd"]) for r in sub)),
+        }
+
+    if edge_ratio is None:
+        verdict = "UNDEFINED — no trade traded below its fill"
+    elif edge_ratio <= 1.0:
+        verdict = ("NO DIRECTIONAL EDGE — the average trade travels further "
+                   "AGAINST the entry than for it")
+    else:
+        verdict = (f"excursions favour the entry {edge_ratio:g}:1 — judge it "
+                   f"against the {needed:.0f}% target-reach the bracket needs"
+                   if needed is not None else
+                   f"excursions favour the entry {edge_ratio:g}:1")
+
+    return {
+        "trades": n,
+        "breakeven_trigger_r": trigger,
+        "target_r": target,
+        "mean_mfe_r": round(mean_mfe, 3),
+        "mean_mae_r": round(mean_mae, 3),
+        "median_mfe_r": round(sorted(mfes)[n // 2], 3),
+        "edge_ratio": edge_ratio,
+        "target_reached": reached,
+        "target_reach_pct": round(reached / n * 100.0, 1),
+        "target_reach_needed_pct": round(needed, 1) if needed is not None else None,
+        "attribution": attribution,
+        "exit_owned_pl": attribution["gave-back"]["total_pl"],
+        "entry_owned_pl": attribution["no-follow-through"]["total_pl"],
+        "verdict": verdict,
+    }
